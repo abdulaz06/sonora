@@ -62,7 +62,7 @@ The tray menu provides Show, Hide, Toggle Fullscreen, and Quit. Left-clicking th
 
 ## Download
 
-Version 0.1.0 Windows x64 installers are available from the [latest release](../../releases/latest):
+Version 0.1.0 Windows x64 installers are available from the [latest release](https://github.com/abdulaz06/sonora/releases/latest):
 
 - `Sonora_0.1.0_x64-setup.exe` — NSIS installer
 - `Sonora_0.1.0_x64_en-US.msi` — MSI installer
