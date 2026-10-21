@@ -2,6 +2,20 @@
 
 Sonora is a personal Windows desktop music visualizer built with Rust, TypeScript, WebGL 2, and Tauri 2. It captures a selected output endpoint through WASAPI loopback, derives real-time audio control signals, and renders three GPU-driven visual modes.
 
+## See Sonora in Action
+
+Watch **Flow Ink** respond to music in real time. This one-minute recording shows Sonora's audio-reactive fluid visuals in motion.
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI" title="Watch Sonora — Flow Ink with sound">
+    <img src="DOCS/assets/flow-ink-thumbnail.png" alt="Sonora Flow Ink audio-reactive visualization — click to watch the demo" width="900" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI"><strong>▶ Watch the 60-second Flow Ink demo with sound</strong></a>
+</p>
+
 ## Highlights
 
 - Captures the system's default output device or a user-selected output device, with automatic switching when the default changes.
