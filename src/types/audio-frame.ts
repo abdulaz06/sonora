@@ -113,3 +113,33 @@ export interface AudioFeatureFrame {
   /** Processed log-frequency spectrum (96 bins, 0–1). */
   juiced_fft: number[];
 }
+
+const zeroBands = (): BandPresence => ({ sub_bass: 0, bass: 0, low_mid: 0, mid: 0, upper_mid: 0, high: 0, air: 0 });
+const zeroBand = (): BandData => ({ energy: 0, peak: 0, flux: 0 });
+
+/** A silent frame, used before the first real frame arrives. */
+export function emptyFrame(): AudioFeatureFrame {
+  return {
+    bands: {
+      sub_bass: zeroBand(), bass: zeroBand(), low_mid: zeroBand(), mid: zeroBand(),
+      upper_mid: zeroBand(), high: zeroBand(), air: zeroBand(),
+    },
+    spectral: { centroid: 0, spread: 0, flatness: 0, rolloff: 0 },
+    energy: { instant: 0, short_term: 0, long_term: 0, ratio: 0, dynamic_range: 0 },
+    beat: { bpm: 120, phase: 0, onset: false, confidence: 0 },
+    rhythm: { four_on_floor: 0, half_time_heavy: 0, backbeat_groove: 0, broken_beat: 0, syncopated_dance: 0, ambient_free: 0 },
+    elements: {
+      kick: { presence: 0, energy: 0 }, snare: { presence: 0, energy: 0 }, hihat: { presence: 0, energy: 0 },
+      bass: { presence: 0, energy: 0 }, vocal: { presence: 0, energy: 0 }, pad: { presence: 0, energy: 0 },
+      lead: { presence: 0, energy: 0 },
+    },
+    mood: { warmth: 0, brightness: 0, aggression: 0, smoothness: 0, spaciousness: 0 },
+    motion_density: 0,
+    spectrum_bars: new Array<number>(128).fill(0),
+    fade_in_out: 0,
+    intensity: 0,
+    presence: zeroBands(),
+    hits: zeroBands(),
+    juiced_fft: new Array<number>(96).fill(0),
+  };
+}

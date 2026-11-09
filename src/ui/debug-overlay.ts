@@ -1,4 +1,10 @@
 import type { AudioFeatureFrame } from '../types/audio-frame';
+import type { EventState } from '../engine/events';
+import type { RendererStats } from '../engine/renderer';
+
+/** Overlay refresh interval (ms); innerHTML rebuilds are not free. */
+const REFRESH_MS = 66;
+let lastRefresh = 0;
 
 let overlayEl: HTMLDivElement | null = null;
 let styleEl: HTMLStyleElement | null = null;
@@ -11,9 +17,9 @@ const OVERLAY_CSS = `
   right: 0;
   width: 280px;
   height: 100%;
-  background: rgba(8, 8, 16, 0.92);
-  color: #c8c8d0;
-  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: rgba(8, 8, 10, 0.9);
+  color: rgba(236, 231, 223, 0.8);
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', Consolas, monospace;
   font-size: 11px;
   padding: 14px 12px;
   overflow-y: auto;
@@ -141,6 +147,11 @@ const OVERLAY_CSS = `
   margin-bottom: 6px;
 }
 
+#debug-overlay .events { margin-bottom: 14px; }
+#debug-overlay .section-name { font-size: 18px; letter-spacing: 0.08em; text-transform: uppercase; color: #ECE7DF; }
+#debug-overlay .ev { display: flex; justify-content: space-between; font-size: 10px; color: rgba(236,231,223,0.55); }
+#debug-overlay .ev.fresh { color: #ECE7DF; }
+#debug-overlay .stats { font-size: 10px; color: rgba(236,231,223,0.45); margin-top: 4px; }
 /* Color accents per section */
 .color-band .bar-fill { background: #38bdf8; }
 .color-spectral .bar-fill { background: #a78bfa; }
@@ -232,8 +243,30 @@ function jfftHTML(bins: number[]): string {
   return `<div class="jfft">${cells}</div>`;
 }
 
-export function updateDebugOverlay(frame: AudioFeatureFrame): void {
+function eventsHTML(st: EventState | undefined, stats: RendererStats | undefined): string {
+  if (!st) return '';
+  const now = st.recent.length ? st.recent[st.recent.length - 1].time : 0;
+  const rows = [...st.recent].reverse().map((e) => {
+    const fresh = now - e.time < 2 && e === st.recent[st.recent.length - 1];
+    return `<div class="ev ${fresh ? 'fresh' : ''}"><span>${e.type}</span><span>${e.strength.toFixed(2)} @ ${e.time.toFixed(1)}s</span></div>`;
+  }).join('');
+  const s = stats ? `<div class="stats">${stats.fps.toFixed(0)} fps · ${stats.frameMs.toFixed(1)} ms cpu · ${stats.quality.level} · ${stats.sceneWidth}×${stats.sceneHeight}</div>` : '';
+  return `<div class="section events">
+    <div class="section-title">Events</div>
+    <div class="section-name">${st.section}</div>
+    ${barHTML('Build', st.buildProgress)}
+    ${barHTML('Drop env', st.dropEnvelope)}
+    ${barHTML('Level', Math.min(1, st.level))}
+    ${rows || '<div class="ev"><span>no events yet</span></div>'}
+    ${s}
+  </div>`;
+}
+
+export function updateDebugOverlay(frame: AudioFeatureFrame, events?: EventState, stats?: RendererStats): void {
   if (!overlayEl || !visible) return;
+  const nowMs = performance.now();
+  if (nowMs - lastRefresh < REFRESH_MS) return;
+  lastRefresh = nowMs;
 
   const b = frame.bands;
   const s = frame.spectral;
@@ -246,6 +279,7 @@ export function updateDebugOverlay(frame: AudioFeatureFrame): void {
   const h = frame.hits;
 
   overlayEl.innerHTML = `
+    ${eventsHTML(events, stats)}
     <div class="section">
       <div class="beat-row">
         <div class="bpm-display">${bt.bpm.toFixed(0)}<span class="bpm-unit">BPM</span></div>

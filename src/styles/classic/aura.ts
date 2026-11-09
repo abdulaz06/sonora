@@ -13,26 +13,26 @@
  * so it can sit alongside Halo Spectrum and Flow-Ink as a switchable mode.
  */
 
-import { hslToRgb } from '../engine/color-engine';
-import { buildProgram } from '../engine/gl-utils';
-import { FlowField } from '../primitives/flow-field';
-import { GlowOrbSystem } from '../primitives/glow-orbs';
-import { ParticleSystem } from '../primitives/particles';
-import { DEFAULT_RING_COUNT, MAX_RING_COUNT, RingSystem } from '../primitives/rings';
-import { TendrilSystem } from '../primitives/tendrils';
+import { hslToRgb } from '../../engine/color-engine';
+import { buildProgram } from '../../engine/gl-utils';
+import { FlowField } from '../../primitives/flow-field';
+import { GlowOrbSystem } from '../../primitives/glow-orbs';
+import { ParticleSystem } from '../../primitives/particles';
+import { DEFAULT_RING_COUNT, MAX_RING_COUNT, RingSystem } from '../../primitives/rings';
+import { TendrilSystem } from '../../primitives/tendrils';
 
-import glowOrbFragSrc from '../engine/shaders/glow-orb.frag?raw';
-import glowOrbVertSrc from '../engine/shaders/glow-orb.vert?raw';
-import particleFragSrc from '../engine/shaders/particle.frag?raw';
-import particleVertSrc from '../engine/shaders/particle.vert?raw';
-import ringFragSrc from '../engine/shaders/ring.frag?raw';
-import ringVertSrc from '../engine/shaders/ring.vert?raw';
-import tendrilFragSrc from '../engine/shaders/tendril.frag?raw';
-import tendrilVertSrc from '../engine/shaders/tendril.vert?raw';
+import glowOrbFragSrc from '../../engine/shaders/glow-orb.frag?raw';
+import glowOrbVertSrc from '../../engine/shaders/glow-orb.vert?raw';
+import particleFragSrc from '../../engine/shaders/particle.frag?raw';
+import particleVertSrc from '../../engine/shaders/particle.vert?raw';
+import ringFragSrc from '../../engine/shaders/ring.frag?raw';
+import ringVertSrc from '../../engine/shaders/ring.vert?raw';
+import tendrilFragSrc from '../../engine/shaders/tendril.frag?raw';
+import tendrilVertSrc from '../../engine/shaders/tendril.vert?raw';
 
-import { STYLE_VARIANTS } from './visual-style';
+import { STYLE_VARIANTS } from '../visual-style';
 
-import type { StyleContext, StyleDeps, VariantOption, VisualStyle } from './visual-style';
+import type { StyleContext, StyleDeps, VariantOption, VisualStyle } from '../visual-style';
 
 const INST_STRIDE = 7 * 4; // x, y, size, alpha, r, g, b
 const MAX_TENDRIL_VERTS = 12 * 48; // MAX_TENDRILS * POINTS_PER_TENDRIL

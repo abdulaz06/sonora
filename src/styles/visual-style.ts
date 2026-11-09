@@ -1,46 +1,51 @@
 /**
- * Visual style abstraction.
+ * Visual style interface (v2).
  *
- * A `VisualStyle` is a self-contained scene: it owns its shaders, GPU
- * resources, and per-frame logic. The renderer hands it a `StyleContext`
- * each frame containing the shared per-frame state (canvas, GL, mapping
- * signals, palette, etc.) and the style decides what to draw into the
- * scene FBO.
+ * A style is described by a `StyleDescriptor` (static metadata + factory, see
+ * `registry.ts`) and implemented as a `VisualStyle` instance that owns its GL
+ * resources. Each frame the renderer builds a `StyleContext` and calls:
  *
- * Lifecycle:
- *   1. `init(deps)` — allocate programs, VAOs, buffers, primitives.
- *   2. `update(ctx)` — per-frame logic (no GL state changes required).
- *   3. `render(ctx)` — bound to scene FBO, draw the scene.
- *   4. `dispose()` — free GL resources when the user switches away.
+ *   onEvent(e, ctx)  for each event detected since the last frame (optional)
+ *   update(ctx)      per-frame logic, no GL state changes required
+ *   render(ctx)      draw; the scene FBO is bound and sized to ctx.width/height
  *
- * Steps 2 and 3 are split so styles can compute logic before any GL
- * binding happens, but it's fine for a style to do everything inside
- * `render` if simpler.
+ * Styles consume the mapping layer (fade, intensity, presence, hits, juiced
+ * FFT, beat) plus events, the world camera, the resolved palette, the quality
+ * parameters, and may tweak `ctx.post` (bloom, grain, tonemap) for this frame.
+ * See CLAUDE.md "Adding a style".
  */
 
 import type { AudioFeatureFrame } from '../types/audio-frame';
 import type { BeatPulse } from '../engine/beat-pulse';
-import type { ColorEngine } from '../engine/color-engine';
+import type { WorldCamera } from '../engine/camera';
+import type { ColorEngine, ResolvedPalette } from '../engine/color-engine';
+import type { EventState, SonoraEvent } from '../engine/events';
 import type { GenerativeState } from '../engine/generative';
+import type { QualityParams } from '../engine/quality';
 
-export type StyleId = 'aura' | 'halo' | 'flow-ink';
+export type StyleId = 'flow-ink' | 'aura' | 'halo';
+export type StyleCategory = 'art' | 'classic';
+/** Background preference: follow the variant's default, or force one. */
+export type LightMode = 'auto' | 'dark' | 'light';
 
-/** A sub-variant within a style (e.g. Halo "Soft" vs "Sharp"). */
 export interface VariantOption {
   id: string;
   label: string;
+  /** True if this variant is ink-on-paper by default. */
+  defaultLight?: boolean;
 }
 
-/**
- * Static variant definitions per style. The settings panel reads this to
- * show variant buttons immediately when a style is selected — no need to
- * wait for the style instance to be created (which happens mid-crossfade).
- */
-export const STYLE_VARIANTS: Partial<Record<StyleId, VariantOption[]>> = {
+/** Static variant definitions per style (UI reads these without an instance). */
+export const STYLE_VARIANTS: Record<StyleId, VariantOption[]> = {
+  'flow-ink': [
+    { id: 'ink', label: 'Ink' },
+    { id: 'sumi', label: 'Sumi', defaultLight: true },
+    { id: 'marble', label: 'Marble' },
+  ],
   aura: [
-    { id: 'circle',   label: 'Circle' },
+    { id: 'circle', label: 'Circle' },
     { id: 'triangle', label: 'Triangle' },
-    { id: 'square',   label: 'Square' },
+    { id: 'square', label: 'Square' },
   ],
   halo: [
     { id: 'soft', label: 'Soft' },
@@ -52,32 +57,70 @@ export const STYLE_VARIANTS: Partial<Record<StyleId, VariantOption[]>> = {
 export interface StyleDeps {
   gl: WebGL2RenderingContext;
   canvas: HTMLCanvasElement;
-  /** Shared fullscreen quad VAO (positions in [-1,1]²). */
+  /** Shared fullscreen quad VAO (positions in [-1,1]², attribute 0). */
   quadVAO: WebGLVertexArrayObject;
+  quality: QualityParams;
+  /** Session seed, so the same song twice looks related but not identical. */
+  seed: number;
 }
 
-/** Per-frame context. Mapping signals are pre-aggregated for convenience. */
-export interface StyleContext {
-  gl: WebGL2RenderingContext;
-  canvas: HTMLCanvasElement;
-  quadVAO: WebGLVertexArrayObject;
+/** Per-frame post-processing controls. Reset to defaults every frame. */
+export interface PostControls {
+  exposure: number;
+  /** Bloom amount added to the scene. */
+  bloom: number;
+  /** HDR luminance above which pixels bloom ("true highlights" ≈ 1). */
+  bloomThreshold: number;
+  grain: number;
+  vignette: number;
+  /** 'filmic' for HDR emissive scenes, 'none' for display-referred (paper) scenes. */
+  tonemap: 'filmic' | 'none';
+  /** Multiplier on the global drop flash (0 disables). */
+  flash: number;
+}
 
-  frame: AudioFeatureFrame;
-  time: number;
-  dt: number;
-
-  // Mapping-layer aggregates (see DOCS/14-MAPPING-LAYER-SPEC.md §"Hierarchy Rule")
+export interface StyleSignals {
   fadeInOut: number;
-  intensity: number;        // raw from frame
-  intensitySmoothed: number; // local envelope (responsiveness slider applies)
+  intensity: number;
+  /** Intensity through the responsiveness envelope. */
+  intensitySmoothed: number;
   bassHits: number;
   bassPresence: number;
   midHits: number;
   midPresence: number;
   highHits: number;
   highPresence: number;
+  beatPhase: number;
+  beatConfidence: number;
+  beatOnset: boolean;
+}
 
-  // Shared scene state
+export interface StyleContext extends StyleSignals {
+  gl: WebGL2RenderingContext;
+  canvas: HTMLCanvasElement;
+  quadVAO: WebGLVertexArrayObject;
+  /** Size of the bound scene target (canvas × render scale for art styles). */
+  width: number;
+  height: number;
+  /** Re-bind the scene target (after rendering into your own FBOs). */
+  bindScene(): void;
+
+  frame: AudioFeatureFrame;
+  time: number;
+  dt: number;
+
+  /** Events detected since the previous render frame. */
+  events: readonly SonoraEvent[];
+  eventState: EventState;
+  camera: WorldCamera;
+  palette: ResolvedPalette;
+  /** Resolved light/dark for this frame (after 'auto' and variant default). */
+  light: boolean;
+  /** Depth (3D) view requested — only meaningful if `supportsDepth`. */
+  depth: boolean;
+  quality: QualityParams;
+  post: PostControls;
+
   beatPulse: BeatPulse;
   colorEngine: ColorEngine;
   generative: GenerativeState;
@@ -85,27 +128,44 @@ export interface StyleContext {
 
 export interface VisualStyle {
   readonly id: StyleId;
-  /** Per-frame logic; safe to do anything except change GL bindings. */
   update(ctx: StyleContext): void;
-  /** Render the scene; the scene FBO is already bound and cleared. */
   render(ctx: StyleContext): void;
-  /** Free all GL resources owned by this style. */
   dispose(): void;
-  /** Optional: react to canvas size changes. Most styles can ignore. */
   resize?(width: number, height: number): void;
 
-  // ── Variant support (optional) ──────────────────────────────
-  /** Available sub-variants. Should match the static STYLE_VARIANTS map. */
+  // ── Optional hooks ──
+  /** Variant list (mirrors STYLE_VARIANTS). */
   variants?: VariantOption[];
-  /** Switch to a sub-variant by id. */
+  /** Called once per event before `update`. */
+  onEvent?(e: SonoraEvent, ctx: StyleContext): void;
+  /** Quality changed: rebuild sims / meshes at the new sizes. */
+  setQuality?(q: QualityParams): void;
   setVariant?(id: string): void;
-  /** Return the currently active variant id. */
   getVariant?(): string;
-
-  // ── Ring count (optional, currently used by Aura) ───────────
-  /** Set the number of concentric rings/shapes rendered. Implementations
-   *  should clamp to their own valid range. */
+  /** Classic Aura only. */
   setRingCount?(n: number): void;
-  /** Return the currently active ring count. */
   getRingCount?(): number;
+}
+
+export interface StyleDescriptor {
+  id: StyleId;
+  label: string;
+  category: StyleCategory;
+  variants: VariantOption[];
+  defaultVariant: string;
+  /** Offers a light (ink-on-paper) look. */
+  supportsLight: boolean;
+  /** Offers a 3D depth view (with a Flat toggle). */
+  supportsDepth: boolean;
+  /** Depth on by default when supported. */
+  defaultDepth: boolean;
+  create(deps: StyleDeps): VisualStyle;
+}
+
+/** Resolve the effective light flag for a style/variant/user preference. */
+export function resolveLight(desc: StyleDescriptor, variant: string, mode: LightMode): boolean {
+  if (!desc.supportsLight) return false;
+  if (mode === 'light') return true;
+  if (mode === 'dark') return false;
+  return desc.variants.find((v) => v.id === variant)?.defaultLight ?? false;
 }

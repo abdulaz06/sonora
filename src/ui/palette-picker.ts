@@ -258,7 +258,7 @@ export function initPalettePicker(colorEngine: ColorEngine, options: PalettePick
   // Number keys 1-N to select (and briefly open for feedback)
   document.addEventListener('keydown', (e) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-    const num = parseInt(e.key);
+    const num = e.key === '0' ? 10 : parseInt(e.key, 10);
     if (num >= 1 && num <= PALETTES.length) {
       selectPalette(colorEngine, num - 1, true);
       setOpen(true);

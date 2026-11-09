@@ -7,6 +7,8 @@ import {
   type Monitor,
 } from '@tauri-apps/api/window';
 
+import { TauriFrameSource } from './audio/tauri-source';
+import { initController } from './app/controller';
 import { initRenderer } from './engine/renderer';
 import {
   getCurrentDevice,
@@ -15,22 +17,7 @@ import {
   setDevice,
 } from './ipc/audio-device';
 import { createSettingsSaver, loadSettings, type PersistedSettings } from './ipc/settings';
-import { listenAudioFrame } from './ipc/bridge';
-import type { StyleId } from './styles/visual-style';
-import { toggleDebugOverlay, updateDebugOverlay } from './ui/debug-overlay';
 import { initFullscreen } from './ui/fullscreen';
-import { initHoverUI } from './ui/hover-ui';
-import { initPalettePicker, syncPalettePicker } from './ui/palette-picker';
-import {
-  initSettingsPanel,
-  syncAudioDevices,
-  syncCurrentAudioDevice,
-  syncPaletteSelection,
-  syncStyleSelection,
-  syncVariantUI,
-} from './ui/settings-panel';
-
-const STYLE_CYCLE: StyleId[] = ['aura', 'halo', 'flow-ink'];
 
 /** Min logical-px overlap between window and a monitor we'll accept. */
 const MIN_VISIBLE_PX = 100;
@@ -282,39 +269,7 @@ async function main(): Promise<void> {
     void setDevice(settings.audioDevice);
   }
 
-  // ── Renderer (initial style applied without crossfade) ──
   const renderer = initRenderer(canvas, { initialStyle: settings.mode });
-  // Apply the persisted color choice straight onto the engine so the first
-  // frame is already the correct palette.
-  if (settings.paletteIndex < 0) {
-    renderer.colorEngine.setCustomHue(settings.customHue);
-  } else {
-    renderer.colorEngine.setPalette(settings.paletteIndex);
-  }
-  // Per-mode variant restore
-  const initialVariant = settings.variants[settings.mode];
-  if (initialVariant) renderer.setVariant(initialVariant);
-  // Ring count restore
-  renderer.setRingCount(settings.ringCount);
-
-  // ── UI ──
-  initHoverUI();
-
-  initPalettePicker(renderer.colorEngine, {
-    initialPaletteIndex: settings.paletteIndex,
-    initialCustomHue: settings.customHue,
-    onPaletteChange: (idx) => {
-      settings.paletteIndex = idx;
-      syncPaletteSelection(idx, settings.customHue);
-      persist();
-    },
-    onCustomHueChange: (hue) => {
-      settings.paletteIndex = -1;
-      settings.customHue = hue;
-      syncPaletteSelection(-1, hue);
-      persist();
-    },
-  });
 
   await initFullscreen({
     initialFullscreen: settings.fullscreen,
@@ -324,102 +279,25 @@ async function main(): Promise<void> {
     },
   });
 
-  // Fetch device list + current capture device for the settings panel.
-  // The backend takes a moment to start its first capture; if `current.name`
-  // is empty here we still render the dropdown — the device-changed event
-  // will fill it in once capture starts.
-  const [audioDevices, currentDevice] = await Promise.all([
-    listDevices(),
-    getCurrentDevice(),
-  ]);
+  // The backend takes a moment to start its first capture; an empty name is
+  // filled in by the device-changed event.
+  const [audioDevices, currentDevice] = await Promise.all([listDevices(), getCurrentDevice()]);
 
-  initSettingsPanel(
-    {
-      onResponsivenessChange: (t) => {
-        renderer.setResponsiveness(t);
-        if (settings.responsiveness !== t) {
-          settings.responsiveness = t;
-          persist();
-        }
-      },
-      onQualityChange: (q) => {
-        renderer.setQuality(q);
-        if (settings.quality !== q) {
-          settings.quality = q;
-          persist();
-        }
-      },
-      onStyleChange: (s) => {
-        renderer.setStyle(s);
-        settings.mode = s;
-        // Re-apply the per-mode variant if we have one saved, otherwise the
-        // first variant for that style.
-        const savedVariant = settings.variants[s];
-        if (savedVariant) renderer.setVariant(savedVariant);
-        // Update the panel's variant section to highlight the right button.
-        syncVariantUI(s, savedVariant);
-        persist();
-      },
-      onVariantChange: (v) => {
-        renderer.setVariant(v);
-        if (settings.variants[settings.mode] !== v) {
-          settings.variants = { ...settings.variants, [settings.mode]: v };
-          persist();
-        }
-      },
-      onRingCountChange: (n) => {
-        renderer.setRingCount(n);
-        if (settings.ringCount !== n) {
-          settings.ringCount = n;
-          persist();
-        }
-      },
-      onPaletteChange: (idx) => {
-        if (idx < 0) {
-          renderer.colorEngine.setCustomHue(settings.customHue);
-          settings.paletteIndex = -1;
-        } else {
-          renderer.colorEngine.setPalette(idx);
-          settings.paletteIndex = idx;
-        }
-        syncPalettePicker(idx, settings.customHue);
-        persist();
-      },
-      onCustomHueChange: (hue) => {
-        renderer.colorEngine.setCustomHue(hue);
-        settings.paletteIndex = -1;
-        settings.customHue = hue;
-        syncPalettePicker(-1, hue);
-        persist();
-      },
-      onAudioDeviceChange: (id) => {
-        if (settings.audioDevice === id) return;
-        settings.audioDevice = id;
-        void setDevice(id);
-        persist();
-      },
+  const controller = initController({
+    renderer,
+    settings,
+    persist,
+    audio: {
+      devices: audioDevices,
+      currentName: currentDevice.name,
+      onChange: (id) => { void setDevice(id); },
     },
-    {
-      style: settings.mode,
-      variant: initialVariant,
-      responsiveness: settings.responsiveness,
-      quality: settings.quality,
-      ringCount: settings.ringCount,
-      paletteIndex: settings.paletteIndex,
-      customHue: settings.customHue,
-      audioDevice: settings.audioDevice,
-      audioDevices,
-      currentAudioDeviceName: currentDevice.name,
-    },
-  );
+  });
 
-  // ── Live device-change subscription ──
-  // Re-fetch the list on every change because the change is often *caused*
-  // by a device appearing or disappearing (plug/unplug). Cheap to call.
+  // Re-fetch the list on every change: plug/unplug is usually the cause.
   void onDeviceChanged(async (name) => {
-    syncCurrentAudioDevice(name);
-    const fresh = await listDevices();
-    syncAudioDevices(fresh);
+    controller.syncAudio(null, name);
+    controller.syncAudio(await listDevices(), null);
   });
 
   // ── Window resize / move persistence ──
@@ -433,30 +311,10 @@ async function main(): Promise<void> {
     persist();
   });
 
-  // ── Audio frames ──
-  listenAudioFrame((frame) => {
-    renderer.updateFrame(frame);
-    updateDebugOverlay(frame);
-  });
-
-  // ── Keyboard shortcuts ──
-  document.addEventListener('keydown', (e) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-    if (e.key === 'd' || e.key === 'D') {
-      toggleDebugOverlay();
-    } else if (e.key === 's' || e.key === 'S') {
-      const cur = renderer.getStyle();
-      const idx = STYLE_CYCLE.indexOf(cur);
-      const next = STYLE_CYCLE[(idx + 1) % STYLE_CYCLE.length];
-      renderer.setStyle(next);
-      settings.mode = next;
-      const savedVariant = settings.variants[next];
-      if (savedVariant) renderer.setVariant(savedVariant);
-      syncStyleSelection(next);
-      syncVariantUI(next, savedVariant);
-      persist();
-    }
-  });
+  // ── Audio frames (WASAPI → Rust → IPC) ──
+  const source = new TauriFrameSource();
+  source.subscribe((frame) => controller.onFrame(frame));
+  await source.start();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

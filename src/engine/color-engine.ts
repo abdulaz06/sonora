@@ -1,6 +1,23 @@
 /**
- * Color system — user-selectable palettes with smooth transitions.
+ * Colour system — curated dark, cinematic palettes, duotones, a custom hue,
+ * and Auto Drift (a slow, near-imperceptible hue rotation applied on top of
+ * whatever palette is active).
+ *
+ * Every palette has five ink slots (bg, primary, secondary, accent, highlight)
+ * plus `paper`, the background used by light (ink-on-paper) variants. Styles
+ * should read `getResolved()` for ready-to-upload RGB; classic styles still
+ * use `getPalette()` / `getRingColors*()`.
  */
+
+// ── Tuning ──────────────────────────────────────────────────────
+/** Default Auto Drift period: one full hue cycle (s). */
+export const DEFAULT_DRIFT_PERIOD_S = 180;
+export const MIN_DRIFT_PERIOD_S = 60;
+export const MAX_DRIFT_PERIOD_S = 600;
+/** Palette crossfade speed (1 / seconds). */
+const TRANSITION_SPEED = 0.35;
+/** Brand bone, the base for paper backgrounds. */
+const BONE: HSL = { h: 36, s: 0.22, l: 0.9 };
 
 export interface HSL {
   h: number; // 0-360
@@ -8,229 +25,245 @@ export interface HSL {
   l: number; // 0-1
 }
 
+export type RGB = [number, number, number];
+
 export interface Palette {
   name: string;
-  /** CSS preview color for the picker UI. */
+  /** CSS preview colour for the picker UI. */
   preview: string;
+  /** Duotone palettes keep every ink slot on (nearly) one hue. */
+  duotone: boolean;
   bg: HSL;
   primary: HSL;
   secondary: HSL;
   accent: HSL;
   highlight: HSL;
+  /** Paper background for light variants. */
+  paper: HSL;
 }
 
-// ── Preset Palettes ──────────────────────────────────────────
+export interface ResolvedPalette {
+  bg: RGB;
+  paper: RGB;
+  primary: RGB;
+  secondary: RGB;
+  accent: RGB;
+  highlight: RGB;
+  duotone: boolean;
+}
 
+const h = (hh: number, s: number, l: number): HSL => ({ h: hh, s, l });
+
+function duo(name: string, preview: string, hue: number, sat: number, light = 0.56): Palette {
+  return {
+    name, preview, duotone: true,
+    bg: h(hue, sat * 0.35, 0.025),
+    primary: h(hue, sat, light),
+    secondary: h(hue + 6, sat * 0.95, light * 0.62),
+    accent: h(hue - 8, sat * 0.9, Math.min(0.82, light + 0.18)),
+    highlight: h(hue - 4, sat * 0.55, 0.88),
+    paper: h(hue, Math.min(0.2, sat * 0.18), 0.9),
+  };
+}
+
+// ── Preset palettes ─────────────────────────────────────────────
 export const PALETTES: Palette[] = [
   {
-    name: 'Ocean',
-    preview: '#3b82f6',
-    bg: { h: 240, s: 0.3, l: 0.04 },
-    primary: { h: 220, s: 0.7, l: 0.55 },
-    secondary: { h: 260, s: 0.5, l: 0.45 },
-    accent: { h: 180, s: 0.6, l: 0.5 },
-    highlight: { h: 200, s: 0.8, l: 0.7 },
+    name: 'Nocturne', preview: '#2f6fd6', duotone: false,
+    bg: h(225, 0.35, 0.03), primary: h(215, 0.72, 0.5), secondary: h(255, 0.45, 0.36),
+    accent: h(186, 0.62, 0.52), highlight: h(200, 0.6, 0.86), paper: BONE,
   },
   {
-    name: 'Aurora',
-    preview: '#22c55e',
-    bg: { h: 270, s: 0.2, l: 0.04 },
-    primary: { h: 150, s: 0.6, l: 0.5 },
-    secondary: { h: 280, s: 0.5, l: 0.5 },
-    accent: { h: 60, s: 0.7, l: 0.55 },
-    highlight: { h: 180, s: 0.7, l: 0.65 },
+    name: 'Ember', preview: '#e8641e', duotone: false,
+    bg: h(15, 0.35, 0.025), primary: h(18, 0.86, 0.5), secondary: h(352, 0.62, 0.36),
+    accent: h(36, 0.9, 0.56), highlight: h(42, 0.85, 0.84), paper: BONE,
   },
   {
-    name: 'Ember',
-    preview: '#f97316',
-    bg: { h: 10, s: 0.3, l: 0.04 },
-    primary: { h: 15, s: 0.8, l: 0.5 },
-    secondary: { h: 35, s: 0.7, l: 0.45 },
-    accent: { h: 350, s: 0.6, l: 0.45 },
-    highlight: { h: 45, s: 0.9, l: 0.6 },
+    name: 'Abyss', preview: '#0ea5b7', duotone: false,
+    bg: h(200, 0.4, 0.025), primary: h(190, 0.75, 0.42), secondary: h(222, 0.55, 0.32),
+    accent: h(168, 0.6, 0.5), highlight: h(180, 0.5, 0.85), paper: BONE,
   },
   {
-    name: 'Neon',
-    preview: '#d946ef',
-    bg: { h: 260, s: 0.25, l: 0.03 },
-    primary: { h: 300, s: 0.8, l: 0.55 },
-    secondary: { h: 180, s: 0.9, l: 0.5 },
-    accent: { h: 60, s: 0.95, l: 0.55 },
-    highlight: { h: 330, s: 0.85, l: 0.65 },
+    name: 'Orchid', preview: '#b04ad8', duotone: false,
+    bg: h(280, 0.3, 0.028), primary: h(290, 0.62, 0.5), secondary: h(330, 0.5, 0.38),
+    accent: h(255, 0.55, 0.6), highlight: h(310, 0.45, 0.86), paper: BONE,
   },
   {
-    name: 'Crimson',
-    preview: '#e11d48',
-    bg: { h: 350, s: 0.3, l: 0.04 },
-    primary: { h: 350, s: 0.8, l: 0.5 },
-    secondary: { h: 15, s: 0.65, l: 0.5 },
-    accent: { h: 320, s: 0.7, l: 0.55 },
-    highlight: { h: 5, s: 0.85, l: 0.65 },
+    name: 'Verdigris', preview: '#2fa38a', duotone: false,
+    bg: h(170, 0.3, 0.025), primary: h(165, 0.55, 0.42), secondary: h(28, 0.5, 0.36),
+    accent: h(140, 0.45, 0.55), highlight: h(60, 0.4, 0.84), paper: BONE,
   },
   {
-    name: 'Gold',
-    preview: '#f59e0b',
-    bg: { h: 30, s: 0.3, l: 0.04 },
-    primary: { h: 42, s: 0.85, l: 0.55 },
-    secondary: { h: 25, s: 0.75, l: 0.48 },
-    accent: { h: 55, s: 0.9, l: 0.6 },
-    highlight: { h: 50, s: 0.95, l: 0.72 },
+    name: 'Gold', preview: '#d9a028', duotone: false,
+    bg: h(32, 0.3, 0.025), primary: h(40, 0.8, 0.5), secondary: h(22, 0.62, 0.34),
+    accent: h(50, 0.85, 0.6), highlight: h(48, 0.6, 0.88), paper: BONE,
   },
-  {
-    name: 'Violet',
-    preview: '#8b5cf6',
-    bg: { h: 270, s: 0.25, l: 0.04 },
-    primary: { h: 270, s: 0.7, l: 0.55 },
-    secondary: { h: 300, s: 0.5, l: 0.45 },
-    accent: { h: 240, s: 0.6, l: 0.55 },
-    highlight: { h: 280, s: 0.75, l: 0.7 },
-  },
+  duo('Ember / Black', '#f07a1a', 24, 0.92, 0.55),
+  duo('Ivory / Black', '#e6dccb', 38, 0.28, 0.82),
+  duo('Cold / Black', '#4f8fe6', 214, 0.78, 0.56),
+  duo('Crimson / Black', '#d8263f', 352, 0.82, 0.48),
 ];
 
-// ── Color Engine ─────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────
+function wrapHue(x: number): number {
+  return ((x % 360) + 360) % 360;
+}
 
 function lerpHSL(a: HSL, b: HSL, t: number): HSL {
   let dh = b.h - a.h;
   if (dh > 180) dh -= 360;
   if (dh < -180) dh += 360;
-  return {
-    h: (a.h + dh * t + 360) % 360,
-    s: a.s + (b.s - a.s) * t,
-    l: a.l + (b.l - a.l) * t,
-  };
+  return { h: wrapHue(a.h + dh * t), s: a.s + (b.s - a.s) * t, l: a.l + (b.l - a.l) * t };
 }
 
 function lerpPalette(a: Palette, b: Palette, t: number): Palette {
   return {
     name: t < 0.5 ? a.name : b.name,
     preview: t < 0.5 ? a.preview : b.preview,
+    duotone: t < 0.5 ? a.duotone : b.duotone,
     bg: lerpHSL(a.bg, b.bg, t),
     primary: lerpHSL(a.primary, b.primary, t),
     secondary: lerpHSL(a.secondary, b.secondary, t),
     accent: lerpHSL(a.accent, b.accent, t),
     highlight: lerpHSL(a.highlight, b.highlight, t),
+    paper: lerpHSL(a.paper, b.paper, t),
   };
 }
 
-/**
- * Generate a coordinated palette from a single base hue.
- * Mirrors the layout of the hand-tuned presets so all five colour
- * slots feel deliberate: primary on the chosen hue, secondary as an
- * analogous neighbour (+30°), accent as the complement (+180°),
- * highlight as a brighter tint of primary, bg as a deep shadow.
- */
+function shiftPalette(p: Palette, dh: number): Palette {
+  if (dh === 0) return p;
+  const s = (c: HSL): HSL => ({ h: wrapHue(c.h + dh), s: c.s, l: c.l });
+  // Paper only takes a whisper of the drift so it stays "paper".
+  return {
+    ...p,
+    bg: s(p.bg), primary: s(p.primary), secondary: s(p.secondary), accent: s(p.accent),
+    highlight: s(p.highlight), paper: { ...p.paper, h: wrapHue(p.paper.h + dh * 0.15) },
+  };
+}
+
+/** Coordinated palette from a single hue (custom picker). */
 export function paletteFromHue(hue: number): Palette {
-  const h = ((hue % 360) + 360) % 360;
+  const hh = wrapHue(hue);
   return {
     name: 'Custom',
-    preview: `hsl(${h.toFixed(0)}, 75%, 55%)`,
-    bg:        { h,                  s: 0.30, l: 0.04 },
-    primary:   { h,                  s: 0.75, l: 0.55 },
-    secondary: { h: (h + 30) % 360,  s: 0.60, l: 0.50 },
-    accent:    { h: (h + 180) % 360, s: 0.65, l: 0.55 },
-    highlight: { h,                  s: 0.85, l: 0.68 },
+    preview: `hsl(${hh.toFixed(0)}, 70%, 52%)`,
+    duotone: false,
+    bg: h(hh, 0.3, 0.028),
+    primary: h(hh, 0.72, 0.5),
+    secondary: h(hh + 28, 0.55, 0.36),
+    accent: h(hh - 24, 0.65, 0.56),
+    highlight: h(hh, 0.5, 0.86),
+    paper: BONE,
   };
 }
 
-export function hslToRgb(hsl: HSL): [number, number, number] {
-  const { h, s, l } = hsl;
+export function hslToRgb(hsl: HSL): RGB {
+  const hh = wrapHue(hsl.h);
+  const { s, l } = hsl;
   const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
   const m = l - c / 2;
-
   let r = 0, g = 0, b = 0;
-  if (h < 60)       { r = c; g = x; }
-  else if (h < 120) { r = x; g = c; }
-  else if (h < 180) { g = c; b = x; }
-  else if (h < 240) { g = x; b = c; }
-  else if (h < 300) { r = x; b = c; }
-  else              { r = c; b = x; }
-
+  if (hh < 60) { r = c; g = x; }
+  else if (hh < 120) { r = x; g = c; }
+  else if (hh < 180) { g = c; b = x; }
+  else if (hh < 240) { g = x; b = c; }
+  else if (hh < 300) { r = x; b = c; }
+  else { r = c; b = x; }
   return [r + m, g + m, b + m];
 }
 
+// ── Engine ──────────────────────────────────────────────────────
 export class ColorEngine {
-  private currentPalette: Palette;
-  private targetPalette: Palette;
-  private transitionProgress = 1;
-  private transitionSpeed = 0.3; // ~3 second transitions
+  private from: Palette;
+  private to: Palette;
+  private progress = 1;
   private _paletteIndex = 0;
+  private autoDrift = true;
+  private driftPeriod = DEFAULT_DRIFT_PERIOD_S;
+  private driftPhase = 0; // degrees
+  private resolved: ResolvedPalette;
+  private current: Palette;
 
   constructor() {
-    this.currentPalette = { ...PALETTES[0] };
-    this.targetPalette = { ...PALETTES[0] };
+    this.from = PALETTES[0];
+    this.to = PALETTES[0];
+    this.current = PALETTES[0];
+    this.resolved = resolve(PALETTES[0]);
   }
 
-  get paletteIndex(): number {
-    return this._paletteIndex;
-  }
+  get paletteIndex(): number { return this._paletteIndex; }
+  get driftEnabled(): boolean { return this.autoDrift; }
+  get driftPeriodSeconds(): number { return this.driftPeriod; }
+  /** Current Auto Drift hue offset in degrees. */
+  get driftDegrees(): number { return this.autoDrift ? this.driftPhase : 0; }
 
-  /** Select a palette by index. */
   setPalette(index: number): void {
-    const newIdx = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
-    if (newIdx === this._paletteIndex && this.transitionProgress >= 1) return;
-    this._paletteIndex = newIdx;
-    this.currentPalette = this.getPalette(); // snapshot current state
-    this.targetPalette = PALETTES[newIdx];
-    this.transitionProgress = 0;
+    const idx = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
+    if (idx === this._paletteIndex && this.progress >= 1) return;
+    this._paletteIndex = idx;
+    this.from = this.basePalette();
+    this.to = PALETTES[idx];
+    this.progress = 0;
   }
 
-  /**
-   * Set a custom palette derived from a single hue (0–360°).
-   * `_paletteIndex = -1` marks "custom" mode so the picker UI can
-   * distinguish it from any named preset. A short residual transition
-   * (0.85 → 1) smooths the slider drag without feeling laggy.
-   */
   setCustomHue(hue: number): void {
     this._paletteIndex = -1;
-    this.currentPalette = this.getPalette();
-    this.targetPalette = paletteFromHue(hue);
-    this.transitionProgress = 0.85;
+    this.from = this.basePalette();
+    this.to = paletteFromHue(hue);
+    this.progress = 0.85;
   }
 
-  /** Advance transition. Call once per frame. */
+  setAutoDrift(on: boolean): void { this.autoDrift = on; }
+
+  setDriftPeriod(seconds: number): void {
+    this.driftPeriod = Math.max(MIN_DRIFT_PERIOD_S, Math.min(MAX_DRIFT_PERIOD_S, seconds));
+  }
+
   update(dt: number): void {
-    if (this.transitionProgress < 1) {
-      this.transitionProgress = Math.min(1, this.transitionProgress + this.transitionSpeed * dt);
-    }
+    if (this.progress < 1) this.progress = Math.min(1, this.progress + TRANSITION_SPEED * dt);
+    if (this.autoDrift) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
+    this.current = shiftPalette(this.basePalette(), this.driftDegrees);
+    this.resolved = resolve(this.current);
   }
 
-  /** Get the current palette (interpolated during transition). */
-  getPalette(): Palette {
-    if (this.transitionProgress >= 1) {
-      return this.targetPalette;
-    }
-    return lerpPalette(this.currentPalette, this.targetPalette, this.transitionProgress);
+  /** Active palette (with transition and Auto Drift applied). */
+  getPalette(): Palette { return this.current; }
+
+  /** Active palette as linear-ish RGB triples, ready for uniforms. */
+  getResolved(): ResolvedPalette { return this.resolved; }
+
+  private basePalette(): Palette {
+    return this.progress >= 1 ? this.to : lerpPalette(this.from, this.to, this.progress);
   }
 
-  /** Generate coordinated ring colors as a gradient from the primary color.
-   *  Always returns exactly 3 entries (inner / middle / outer) — used by code
-   *  paths that want a fixed gradient handle (particles, glow orb tinting). */
-  getRingColors(): [[number, number, number], [number, number, number], [number, number, number]] {
-    const base = this.getPalette().primary;
-    const inner: HSL = { h: (base.h - 10 + 360) % 360, s: base.s * 0.9, l: Math.min(0.75, base.l + 0.15) };
-    const middle: HSL = { h: base.h, s: base.s, l: base.l };
-    const outer: HSL = { h: (base.h + 15) % 360, s: base.s * 0.85, l: Math.max(0.2, base.l - 0.12) };
-    return [hslToRgb(inner), hslToRgb(middle), hslToRgb(outer)];
+  /** Inner / middle / outer gradient from the primary colour (classic styles). */
+  getRingColors(): [RGB, RGB, RGB] {
+    const base = this.current.primary;
+    const inner: HSL = { h: base.h - 10, s: base.s * 0.9, l: Math.min(0.75, base.l + 0.15) };
+    const outer: HSL = { h: base.h + 15, s: base.s * 0.85, l: Math.max(0.2, base.l - 0.12) };
+    return [hslToRgb(inner), hslToRgb(base), hslToRgb(outer)];
   }
 
-  /** Generate N coordinated ring colors interpolated across the same
-   *  inner→outer gradient produced by getRingColors(). With count=1 returns
-   *  the middle color; with count>=2 the inner/outer endpoints match the
-   *  3-color version, so visuals stay consistent as the user drags the
-   *  ring-count slider. */
-  getRingColorsN(count: number): [number, number, number][] {
-    const base = this.getPalette().primary;
-    const inner: HSL = { h: (base.h - 10 + 360) % 360, s: base.s * 0.9, l: Math.min(0.75, base.l + 0.15) };
-    const outer: HSL = { h: (base.h + 15) % 360, s: base.s * 0.85, l: Math.max(0.2, base.l - 0.12) };
-    if (count <= 1) {
-      return [hslToRgb({ h: base.h, s: base.s, l: base.l })];
-    }
-    const out: [number, number, number][] = new Array(count);
-    for (let i = 0; i < count; i++) {
-      const t = i / (count - 1);
-      out[i] = hslToRgb(lerpHSL(inner, outer, t));
-    }
+  getRingColorsN(count: number): RGB[] {
+    const base = this.current.primary;
+    if (count <= 1) return [hslToRgb(base)];
+    const inner: HSL = { h: wrapHue(base.h - 10), s: base.s * 0.9, l: Math.min(0.75, base.l + 0.15) };
+    const outer: HSL = { h: wrapHue(base.h + 15), s: base.s * 0.85, l: Math.max(0.2, base.l - 0.12) };
+    const out: RGB[] = new Array(count);
+    for (let i = 0; i < count; i++) out[i] = hslToRgb(lerpHSL(inner, outer, i / (count - 1)));
     return out;
   }
+}
+
+function resolve(p: Palette): ResolvedPalette {
+  return {
+    bg: hslToRgb(p.bg),
+    paper: hslToRgb(p.paper),
+    primary: hslToRgb(p.primary),
+    secondary: hslToRgb(p.secondary),
+    accent: hslToRgb(p.accent),
+    highlight: hslToRgb(p.highlight),
+    duotone: p.duotone,
+  };
 }

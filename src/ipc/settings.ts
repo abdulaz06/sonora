@@ -7,7 +7,10 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-import type { QualityPreset, StyleId } from '../ui/settings-panel';
+import { DEFAULT_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S } from '../engine/color-engine';
+import type { QualityPreset } from '../engine/quality';
+import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
+import type { LightMode, StyleId } from '../styles/visual-style';
 
 export interface PersistedSettings {
   /** Active visual style. */
@@ -20,8 +23,18 @@ export interface PersistedSettings {
   customHue: number;
   /** 0 = smooth, 1 = punchy. */
   responsiveness: number;
-  /** Quality preset. */
+  /** Quality preset (`auto` adapts to frame time). */
   quality: QualityPreset;
+  /** Show Aura / Halo in the style picker. */
+  showClassic: boolean;
+  /** Slow hue rotation on top of the palette. */
+  autoDrift: boolean;
+  /** Seconds per full Auto Drift hue cycle. */
+  driftPeriod: number;
+  /** Per-style background preference. */
+  lightModes: Partial<Record<StyleId, LightMode>>;
+  /** Per-style depth (3D) view preference. */
+  depth: Partial<Record<StyleId, boolean>>;
   /** Concentric shape count (Aura mode). */
   ringCount: number;
   /** Capture source: `'default'` follows the system default and auto-switches
@@ -39,12 +52,17 @@ export interface PersistedSettings {
 }
 
 export const DEFAULT_SETTINGS: PersistedSettings = {
-  mode: 'aura',
+  mode: DEFAULT_STYLE,
   variants: {},
   paletteIndex: 0,
   customHue: 200,
   responsiveness: 0.6,
   quality: 'medium',
+  showClassic: false,
+  autoDrift: true,
+  driftPeriod: DEFAULT_DRIFT_PERIOD_S,
+  lightModes: {},
+  depth: {},
   ringCount: 3,
   audioDevice: 'default',
   window: {
@@ -119,23 +137,45 @@ export function createSettingsSaver(delayMs = 500): {
 }
 
 /** Validate / fill in missing fields when loading. Tolerant of partial JSON. */
-function mergeWithDefaults(raw: unknown): PersistedSettings {
+export function mergeWithDefaults(raw: unknown): PersistedSettings {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
   const r = raw as Record<string, unknown>;
   const out: PersistedSettings = { ...DEFAULT_SETTINGS };
 
-  if (typeof r.mode === 'string' && (r.mode === 'aura' || r.mode === 'halo' || r.mode === 'flow-ink')) {
-    out.mode = r.mode;
-  }
+  if (isStyleId(r.mode)) out.mode = r.mode;
+  const ids = STYLES.map((d) => d.id);
   if (r.variants && typeof r.variants === 'object') {
     const v = r.variants as Record<string, unknown>;
     const variants: Partial<Record<StyleId, string>> = {};
-    for (const k of ['aura', 'halo', 'flow-ink'] as StyleId[]) {
+    for (const k of ids) {
       const val = v[k];
       if (typeof val === 'string') variants[k] = val;
     }
     out.variants = variants;
   }
+  if (typeof r.showClassic === 'boolean') out.showClassic = r.showClassic;
+  if (typeof r.autoDrift === 'boolean') out.autoDrift = r.autoDrift;
+  if (typeof r.driftPeriod === 'number' && Number.isFinite(r.driftPeriod)) {
+    out.driftPeriod = clamp(r.driftPeriod, MIN_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S);
+  }
+  if (r.lightModes && typeof r.lightModes === 'object') {
+    const lm = r.lightModes as Record<string, unknown>;
+    const modes: Partial<Record<StyleId, LightMode>> = {};
+    for (const k of ids) {
+      const val = lm[k];
+      if (val === 'auto' || val === 'dark' || val === 'light') modes[k] = val;
+    }
+    out.lightModes = modes;
+  }
+  if (r.depth && typeof r.depth === 'object') {
+    const d = r.depth as Record<string, unknown>;
+    const depth: Partial<Record<StyleId, boolean>> = {};
+    for (const k of ids) if (typeof d[k] === 'boolean') depth[k] = d[k] as boolean;
+    out.depth = depth;
+  }
+  // Classic styles stay selectable only while the classic group is shown.
+  const desc = STYLES.find((d) => d.id === out.mode);
+  if (desc?.category === 'classic' && !out.showClassic) out.mode = DEFAULT_STYLE;
   if (typeof r.paletteIndex === 'number' && Number.isFinite(r.paletteIndex)) {
     out.paletteIndex = r.paletteIndex;
   }
@@ -145,7 +185,7 @@ function mergeWithDefaults(raw: unknown): PersistedSettings {
   if (typeof r.responsiveness === 'number' && Number.isFinite(r.responsiveness)) {
     out.responsiveness = clamp(r.responsiveness, 0, 1);
   }
-  if (r.quality === 'low' || r.quality === 'medium' || r.quality === 'high') {
+  if (r.quality === 'low' || r.quality === 'medium' || r.quality === 'high' || r.quality === 'auto') {
     out.quality = r.quality;
   }
   if (typeof r.ringCount === 'number' && Number.isFinite(r.ringCount)) {

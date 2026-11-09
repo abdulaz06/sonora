@@ -32,15 +32,15 @@
  *   - fade_in_out          → overall visibility
  */
 
-import { hslToRgb } from '../engine/color-engine';
-import { EnvelopeFollower, MEDIUM } from '../engine/envelope';
-import { buildProgram } from '../engine/gl-utils';
-import { STYLE_VARIANTS } from './visual-style';
+import { hslToRgb } from '../../engine/color-engine';
+import { EnvelopeFollower, MEDIUM } from '../../engine/envelope';
+import { buildProgram } from '../../engine/gl-utils';
+import { STYLE_VARIANTS } from '../visual-style';
 
-import fullscreenVertSrc from '../engine/shaders/fullscreen.vert?raw';
-import haloFragSrc from '../engine/shaders/halo.frag?raw';
+import fullscreenVertSrc from '../../engine/shaders/fullscreen.vert?raw';
+import haloFragSrc from '../../engine/shaders/halo.frag?raw';
 
-import type { StyleContext, StyleDeps, VariantOption, VisualStyle } from './visual-style';
+import type { StyleContext, StyleDeps, VariantOption, VisualStyle } from '../visual-style';
 
 const N_BARS  = 48;    // bars around the circle
 const N_FFT   = 96;    // juiced-FFT bins from the mapping layer

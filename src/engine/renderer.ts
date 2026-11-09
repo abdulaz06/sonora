@@ -1,324 +1,385 @@
 /**
- * Renderer — owns the GL context, post-process pipeline, and the active
- * `VisualStyle`. Per-frame logic that's specific to a style lives in that
- * style's module (see `src/styles/`). The renderer's job is:
- *   - manage shared resources (canvas, FBOs, color/beat/generative state)
- *   - aggregate the mapping-layer signals into a `StyleContext`
- *   - hand off to `style.update + style.render`
- *   - run post-processing
- *   - cross-fade smoothly when the active style changes
+ * Renderer — owns the GL context, shared engine state and the active style.
+ *
+ *   pushFrame(frame)   every analysis frame (60 Hz of audio): event layer runs
+ *                      here so events are deterministic for a given input
+ *   step(dt)           render one frame (the rAF loop calls this; the
+ *                      verification harness calls it directly with a fixed dt)
+ *
+ * Per render frame: colour + camera + quality update → StyleContext → style
+ * onEvent/update/render into the scene target → post → canvas. Art styles use
+ * `ArtPost` at canvas × renderScale; classic styles keep the legacy pipeline.
  */
 
 import type { AudioFeatureFrame } from '../types/audio-frame';
-import type { QualityPreset } from '../ui/settings-panel';
-import type { StyleId, VisualStyle } from '../styles/visual-style';
+import { emptyFrame } from '../types/audio-frame';
+import { getStyle } from '../styles/registry';
+import {
+  resolveLight,
+  type LightMode,
+  type PostControls,
+  type StyleContext,
+  type StyleDescriptor,
+  type StyleId,
+  type VisualStyle,
+} from '../styles/visual-style';
 
-import { createAuraStyle } from '../styles/aura';
-import { createFlowInkStyle } from '../styles/flow-ink';
-import { createHaloStyle } from '../styles/halo-spectrum';
-
+import { ArtPost } from './art-post';
 import { BeatPulse } from './beat-pulse';
+import { WorldCamera } from './camera';
 import { ColorEngine } from './color-engine';
 import { EnvelopeFollower, lerpParams, MEDIUM } from './envelope';
+import { EventDetector, type SonoraEvent } from './events';
 import { GenerativeState } from './generative';
 import { buildProgram } from './gl-utils';
 import { PostProcessPipeline } from './post-process';
+import { QualityManager, type QualityParams, type QualityPreset } from './quality';
 
 import fullscreenVertSrc from './shaders/fullscreen.vert?raw';
 import postBloomFragSrc from './shaders/post-bloom.frag?raw';
 import postCompositeFragSrc from './shaders/post-composite.frag?raw';
 
-// ── Helpers ─────────────────────────────────────────────────────
+// ── Tuning ──────────────────────────────────────────────────────
+/** Style swap: fade out, swap, fade in (total seconds). */
+const STYLE_FADE_SECONDS = 0.6;
+/** Largest dt a single step may advance (s). */
+const MAX_DT = 0.05;
+/** Cap on the canvas backing store (pixels on the long side). */
+const MAX_BACKING_LONG_SIDE = 3840;
+/** Default post values for art styles. */
+const POST_DEFAULTS: PostControls = {
+  exposure: 1, bloom: 0.55, bloomThreshold: 1.0, grain: 0.04, vignette: 0.28, tonemap: 'filmic', flash: 0,
+};
 
-function resizeCanvas(canvas: HTMLCanvasElement): void {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
+export interface RendererStats {
+  fps: number;
+  frameMs: number;
+  quality: QualityParams;
+  sceneWidth: number;
+  sceneHeight: number;
+}
+
+export interface RendererOptions {
+  initialStyle?: StyleId;
+  /** Start the rAF loop immediately (default true). */
+  autoStart?: boolean;
+  /** Seed for camera/style variation (default random). */
+  seed?: number;
+  /** Keep the drawing buffer for readback (verification harness). */
+  preserveDrawingBuffer?: boolean;
+}
+
+export interface Renderer {
+  readonly canvas: HTMLCanvasElement;
+  readonly colorEngine: ColorEngine;
+  readonly events: EventDetector;
+  readonly camera: WorldCamera;
+  pushFrame(frame: AudioFeatureFrame): void;
+  step(dt: number): void;
+  start(): void;
+  stop(): void;
+  setResponsiveness(t: number): void;
+  setQuality(preset: QualityPreset): void;
+  getQualityPreset(): QualityPreset;
+  setStyle(id: StyleId, immediate?: boolean): void;
+  getStyle(): StyleId;
+  getDescriptor(): StyleDescriptor;
+  setVariant(id: string): void;
+  getVariant(): string;
+  setLightMode(mode: LightMode): void;
+  getLightMode(): LightMode;
+  isLight(): boolean;
+  setDepth(on: boolean): void;
+  getDepth(): boolean;
+  setRingCount(n: number): void;
+  onEvent(cb: (e: SonoraEvent) => void): () => void;
+  stats(): RendererStats;
+}
+
+function sizeCanvas(canvas: HTMLCanvasElement): void {
+  const dpr = window.devicePixelRatio || 1;
+  let w = Math.max(1, Math.round(canvas.clientWidth * dpr));
+  let h = Math.max(1, Math.round(canvas.clientHeight * dpr));
+  const long = Math.max(w, h);
+  if (long > MAX_BACKING_LONG_SIDE) {
+    const k = MAX_BACKING_LONG_SIDE / long;
+    w = Math.round(w * k);
+    h = Math.round(h * k);
+  }
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
   }
 }
 
-// Cross-fade duration (seconds) when swapping styles. Half the time fades
-// the old style out, then the new style is created and faded back in.
-const STYLE_FADE_SECONDS = 0.45;
-
-// ── Public API ──────────────────────────────────────────────────
-
-export interface Renderer {
-  updateFrame(frame: AudioFeatureFrame): void;
-  setResponsiveness(t: number): void;
-  setQuality(preset: QualityPreset): void;
-  setStyle(id: StyleId): void;
-  getStyle(): StyleId;
-  setVariant(id: string): void;
-  getVariant(): string | null;
-  setRingCount(n: number): void;
-  getRingCount(): number | null;
-  /** True if the active style supports a ring-count slider. */
-  styleHasRingCount(): boolean;
-  colorEngine: ColorEngine;
-}
-
-// ── Renderer impl ───────────────────────────────────────────────
-
-export interface RendererOptions {
-  /** Style to start with (no cross-fade). Defaults to 'aura'. */
-  initialStyle?: StyleId;
-}
-
 export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions = {}): Renderer {
-  const _gl = canvas.getContext('webgl2', { alpha: false, antialias: false });
-  if (!_gl) throw new Error('WebGL 2 not supported');
-  const gl: WebGL2RenderingContext = _gl;
-
-  // HDR FBO support — if missing, post-process bloom degrades gracefully.
-  const extFloat = gl.getExtension('EXT_color_buffer_float');
-  if (!extFloat) {
-    console.warn('EXT_color_buffer_float not available — bloom quality may be reduced');
+  const ctxGl = canvas.getContext('webgl2', {
+    alpha: false, antialias: false, depth: true, powerPreference: 'high-performance',
+    preserveDrawingBuffer: options.preserveDrawingBuffer ?? false,
+  });
+  if (!ctxGl) throw new Error('WebGL 2 not supported');
+  const gl: WebGL2RenderingContext = ctxGl;
+  if (!gl.getExtension('EXT_color_buffer_float')) {
+    console.warn('EXT_color_buffer_float not available — float render targets may fail');
   }
+  gl.getExtension('OES_texture_float_linear');
 
-  // ── Shared fullscreen quad (used by post-process and most styles) ──
-  const quadVerts = new Float32Array([
-    -1, -1, 1, -1, -1, 1,
-    1, -1, 1, 1, -1, 1,
-  ]);
+  // ── Shared fullscreen quad ──
   const quadVAO = gl.createVertexArray()!;
   const quadVBO = gl.createBuffer()!;
   gl.bindVertexArray(quadVAO);
   gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
-  gl.bufferData(gl.ARRAY_BUFFER, quadVerts, gl.STATIC_DRAW);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   gl.bindVertexArray(null);
 
-  // ── Post-process programs (renderer-owned, style-independent) ──
-  const bloomProg = buildProgram(gl, fullscreenVertSrc, postBloomFragSrc);
-  const compositeProg = buildProgram(gl, fullscreenVertSrc, postCompositeFragSrc);
-  const postProcess = new PostProcessPipeline(
-    gl, bloomProg, compositeProg,
-    canvas.width || 1024, canvas.height || 768,
+  // ── Post pipelines ──
+  sizeCanvas(canvas);
+  const legacyPost = new PostProcessPipeline(
+    gl,
+    buildProgram(gl, fullscreenVertSrc, postBloomFragSrc),
+    buildProgram(gl, fullscreenVertSrc, postCompositeFragSrc),
+    canvas.width, canvas.height,
   );
+  legacyPost.bloomStrength = 0.25;
+  const artPost = new ArtPost(gl);
 
-  // ── Shared scene state ──────────────────────────────────────
+  // ── Shared state ──
+  const seed = options.seed ?? Math.floor(Math.random() * 1e6);
   const beatPulse = new BeatPulse();
   const colorEngine = new ColorEngine();
-  const generative = new GenerativeState();
-
-  // Local envelope on intensity — respects responsiveness slider for
-  // bloom + flow-field reactivity even though Rust already smooths the
-  // macro signal.
+  const generative = new GenerativeState(seed);
+  const events = new EventDetector();
+  const camera = new WorldCamera(seed % 997);
+  const quality = new QualityManager();
   const envIntensity = new EnvelopeFollower(MEDIUM);
-  const allEnvelopes = [envIntensity];
+  const post: PostControls = { ...POST_DEFAULTS };
 
-  // ── Quality-controlled post-process base values ─────────────
-  let bloomBase = 0.25;
-  let bloomReactive = 0.2;
+  let descriptor = getStyle(options.initialStyle ?? 'flow-ink');
+  let variant = descriptor.defaultVariant;
+  let lightMode: LightMode = 'auto';
+  let depth = descriptor.defaultDepth;
+  let ringCount: number | null = null;
 
-  // ── Active style + cross-fade state ─────────────────────────
-  const styleDeps = { gl, canvas, quadVAO };
-  const styleFactories: Record<StyleId, () => VisualStyle> = {
-    aura: () => createAuraStyle(styleDeps),
-    halo: () => createHaloStyle(styleDeps),
-    'flow-ink': () => createFlowInkStyle(styleDeps),
+  const makeStyle = (d: StyleDescriptor): VisualStyle => {
+    const s = d.create({ gl, canvas, quadVAO, quality: quality.params, seed });
+    s.setVariant?.(variant);
+    if (ringCount !== null) s.setRingCount?.(ringCount);
+    return s;
+  };
+  let style = makeStyle(descriptor);
+  quality.onChange((q) => style.setQuality?.(q));
+
+  let fadeAlpha = 1;
+  let pending: StyleDescriptor | null = null;
+
+  let frame: AudioFeatureFrame = emptyFrame();
+  let time = 0;
+  let running = false;
+  let rafId = 0;
+  let lastWall = 0;
+  let fpsAccum = 0, fpsFrames = 0, fps = 0, frameMs = 0;
+  let classicBloomBase = 0.25;
+
+  const eventListeners: ((e: SonoraEvent) => void)[] = [];
+  let sceneW = 1, sceneH = 1;
+
+  const ctx: StyleContext = {
+    gl, canvas, quadVAO,
+    width: 1, height: 1,
+    bindScene: () => {
+      if (descriptor.category === 'classic') legacyPost.bindSceneFBO();
+      else artPost.bindScene();
+    },
+    frame, time: 0, dt: 0,
+    fadeInOut: 0, intensity: 0, intensitySmoothed: 0,
+    bassHits: 0, bassPresence: 0, midHits: 0, midPresence: 0, highHits: 0, highPresence: 0,
+    beatPhase: 0, beatConfidence: 0, beatOnset: false,
+    events: [], eventState: events.state, camera,
+    palette: colorEngine.getResolved(), light: false, depth,
+    quality: quality.params, post,
+    beatPulse, colorEngine, generative,
   };
 
-  let currentStyleId: StyleId = options.initialStyle ?? 'aura';
-  let activeStyle: VisualStyle = styleFactories[currentStyleId]();
-  let currentVariantId: string | null = null;
-  // Cached ring count so it survives a style swap (re-applied to the new
-  // style if it supports ring counts).
-  let currentRingCount: number | null = null;
-
-  // 1.0 = fully visible, 0.0 = fully hidden. We tween it during a swap.
-  let styleFadeAlpha = 1.0;
-  // null when idle. When set, we're heading toward this style.
-  let pendingStyleId: StyleId | null = null;
-
-  function beginSwap(target: StyleId): void {
-    if (target === currentStyleId && pendingStyleId === null) return;
-    pendingStyleId = target;
-    // The render loop fades alpha to 0, then swaps, then fades back to 1.
-  }
-
-  function performSwap(): void {
-    if (pendingStyleId === null || pendingStyleId === currentStyleId) {
-      pendingStyleId = null;
-      return;
-    }
-    activeStyle.dispose();
-    currentStyleId = pendingStyleId;
-    pendingStyleId = null;
-    activeStyle = styleFactories[currentStyleId]();
-    // Apply saved variant to the freshly created style
-    if (currentVariantId && activeStyle.setVariant) {
-      activeStyle.setVariant(currentVariantId);
-    }
-    // Re-apply saved ring count if the new style supports it
-    if (currentRingCount !== null && activeStyle.setRingCount) {
-      activeStyle.setRingCount(currentRingCount);
-    }
-  }
-
-  // ── Frame state ─────────────────────────────────────────────
-  let currentFrame: AudioFeatureFrame | null = null;
-  let time = 0;
-  let lastTime = performance.now() / 1000;
-
-  gl.clearColor(0.025, 0.02, 0.04, 1.0);
-
-  // ── Render loop ─────────────────────────────────────────────
-  function render(): void {
-    const now = performance.now() / 1000;
-    const dt = Math.min(now - lastTime, 0.05);
-    lastTime = now;
+  function step(rawDt: number): void {
+    const dt = Math.min(Math.max(rawDt, 0), MAX_DT);
     time += dt;
+    sizeCanvas(canvas);
 
-    resizeCanvas(canvas);
-    postProcess.resize(canvas.width, canvas.height);
-    activeStyle.resize?.(canvas.width, canvas.height);
-
-    // Update generative drift even without frames — keeps state moving.
-    generative.update(dt);
-
-    // ── Cross-fade tween ──
-    const fadeRate = 1.0 / (STYLE_FADE_SECONDS * 0.5); // half the time per direction
-    if (pendingStyleId !== null) {
-      // Fading out toward swap
-      styleFadeAlpha = Math.max(0, styleFadeAlpha - fadeRate * dt);
-      if (styleFadeAlpha <= 0) {
-        performSwap();
+    // Crossfade between styles
+    const fadeRate = 2 / STYLE_FADE_SECONDS;
+    if (pending) {
+      fadeAlpha = Math.max(0, fadeAlpha - fadeRate * dt);
+      if (fadeAlpha <= 0) {
+        style.dispose();
+        descriptor = pending;
+        pending = null;
+        variant = descriptor.variants.some((v) => v.id === variant) ? variant : descriptor.defaultVariant;
+        style = makeStyle(descriptor);
       }
-    } else if (styleFadeAlpha < 1) {
-      // Fading back in after swap
-      styleFadeAlpha = Math.min(1, styleFadeAlpha + fadeRate * dt);
+    } else if (fadeAlpha < 1) {
+      fadeAlpha = Math.min(1, fadeAlpha + fadeRate * dt);
     }
 
-    if (!currentFrame) {
-      // No audio yet — just clear and idle.
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-      requestAnimationFrame(render);
-      return;
-    }
-
-    const f = currentFrame;
-
-    // ── Mapping layer aggregates (Hierarchy Rule from spec §4) ──
-    const fadeInOut = f.fade_in_out;
-    const intensity = f.intensity;
-    const bassHits = Math.max(f.hits.sub_bass, f.hits.bass);
-    const bassPresence = Math.max(f.presence.sub_bass, f.presence.bass);
-    const highHits = Math.max(f.hits.high, f.hits.air);
-    const highPresence = Math.max(f.presence.high, f.presence.air);
-    const midPresence = (f.presence.low_mid + f.presence.mid + f.presence.upper_mid) / 3;
-    const midHits = Math.max(f.hits.low_mid, f.hits.mid, f.hits.upper_mid);
-
-    const intensitySmoothed = envIntensity.update(intensity, dt);
-
-    // ── Beat pulse (used by every style) ──
-    beatPulse.update(
-      f.beat.phase,
-      f.beat.onset && fadeInOut > 0.5,
-      dt,
-      f.beat.confidence,
-      f.energy.instant,
-    );
-
-    // ── Color engine ──
+    generative.update(dt);
     colorEngine.update(dt);
 
-    // ── Build per-frame style context ──
-    const ctx = {
-      gl, canvas, quadVAO,
-      frame: f,
-      time, dt,
-      fadeInOut, intensity, intensitySmoothed,
-      bassHits, bassPresence,
-      midHits, midPresence,
-      highHits, highPresence,
-      beatPulse, colorEngine, generative,
-    };
+    const f = frame;
+    const drained = events.drain();
+    for (const e of drained) for (const l of eventListeners) l(e);
 
-    // ── Style logic ──
-    activeStyle.update(ctx);
+    // Mapping aggregates (DOCS/14 hierarchy rule)
+    ctx.frame = f;
+    ctx.time = time;
+    ctx.dt = dt;
+    ctx.fadeInOut = f.fade_in_out;
+    ctx.intensity = f.intensity;
+    ctx.intensitySmoothed = envIntensity.update(f.intensity, dt);
+    ctx.bassHits = Math.max(f.hits.sub_bass, f.hits.bass);
+    ctx.bassPresence = Math.max(f.presence.sub_bass, f.presence.bass);
+    ctx.midHits = Math.max(f.hits.low_mid, f.hits.mid, f.hits.upper_mid);
+    ctx.midPresence = (f.presence.low_mid + f.presence.mid + f.presence.upper_mid) / 3;
+    ctx.highHits = Math.max(f.hits.high, f.hits.air);
+    ctx.highPresence = Math.max(f.presence.high, f.presence.air);
+    ctx.beatPhase = f.beat.phase;
+    ctx.beatConfidence = f.beat.confidence;
+    ctx.beatOnset = beatOnsetLatched;
+    beatOnsetLatched = false;
+    beatPulse.update(f.beat.phase, ctx.beatOnset && f.fade_in_out > 0.5, dt, f.beat.confidence, f.energy.instant);
 
-    // ════════════════════════════════════════════════════════════
-    // RENDER — into scene FBO, then post-process to the canvas
-    // ════════════════════════════════════════════════════════════
-    postProcess.bindSceneFBO();
-    activeStyle.render(ctx);
+    ctx.events = drained;
+    ctx.eventState = events.state;
+    ctx.palette = colorEngine.getResolved();
+    ctx.light = resolveLight(descriptor, variant, lightMode);
+    ctx.depth = descriptor.supportsDepth && depth;
+    ctx.quality = quality.params;
+    Object.assign(post, POST_DEFAULTS);
+    post.grain = quality.params.level === 'low' ? 0.03 : 0.04;
 
-    gl.disable(gl.BLEND);
+    camera.update({
+      dt, intensity: ctx.intensitySmoothed, fadeInOut: f.fade_in_out,
+      beatOnset: ctx.beatOnset, beatConfidence: f.beat.confidence,
+      events: drained, eventState: events.state,
+    });
 
-    // Bloom rides on intensity × fadeInOut so silence genuinely dims.
-    postProcess.bloomStrength = bloomBase + intensitySmoothed * bloomReactive * fadeInOut;
-
-    // The cross-fade tint multiplies the scene during a style swap.
-    const a = styleFadeAlpha;
-    const tint: [number, number, number] = [a, a, a];
-
-    gl.bindVertexArray(quadVAO);
-    postProcess.apply(quadVAO, time, tint);
-
-    requestAnimationFrame(render);
+    if (descriptor.category === 'classic') {
+      legacyPost.resize(canvas.width, canvas.height);
+      sceneW = canvas.width; sceneH = canvas.height;
+      ctx.width = sceneW; ctx.height = sceneH;
+      camera.setAspect(sceneW / sceneH);
+      style.resize?.(sceneW, sceneH);
+      for (const e of drained) style.onEvent?.(e, ctx);
+      style.update(ctx);
+      legacyPost.bindSceneFBO();
+      gl.clearColor(0.025, 0.02, 0.04, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      style.render(ctx);
+      gl.disable(gl.BLEND);
+      legacyPost.bloomStrength = classicBloomBase + ctx.intensitySmoothed * 0.2 * f.fade_in_out;
+      legacyPost.apply(quadVAO, time, [fadeAlpha, fadeAlpha, fadeAlpha]);
+    } else {
+      const q = quality.params;
+      sceneW = Math.max(1, Math.round(canvas.width * q.renderScale));
+      sceneH = Math.max(1, Math.round(canvas.height * q.renderScale));
+      artPost.resize(sceneW, sceneH, canvas.width, canvas.height, q.bloomLevels);
+      ctx.width = sceneW; ctx.height = sceneH;
+      camera.setAspect(sceneW / sceneH);
+      style.resize?.(sceneW, sceneH);
+      for (const e of drained) style.onEvent?.(e, ctx);
+      style.update(ctx);
+      artPost.bindScene();
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      style.render(ctx);
+      artPost.apply(quadVAO, post, time, fadeAlpha);
+    }
   }
 
-  requestAnimationFrame(render);
+  // Beat onsets arrive at analysis rate; latch so a render frame never misses one.
+  let beatOnsetLatched = false;
 
-  return {
-    updateFrame(frame: AudioFeatureFrame): void {
-      currentFrame = frame;
+  function loop(now: number): void {
+    if (!running) return;
+    const nowS = now / 1000;
+    const wallDt = lastWall ? nowS - lastWall : 1 / 60;
+    lastWall = nowS;
+    const t0 = performance.now();
+    step(wallDt);
+    frameMs = frameMs * 0.9 + (performance.now() - t0) * 0.1;
+    quality.sample(wallDt * 1000);
+    fpsAccum += wallDt; fpsFrames++;
+    if (fpsAccum >= 0.5) { fps = fpsFrames / fpsAccum; fpsAccum = 0; fpsFrames = 0; }
+    rafId = requestAnimationFrame(loop);
+  }
+
+  const api: Renderer = {
+    canvas, colorEngine, events, camera,
+    pushFrame(fr: AudioFeatureFrame): void {
+      events.process(fr);
+      if (fr.beat.onset) beatOnsetLatched = true;
+      frame = fr;
+    },
+    step,
+    start(): void {
+      if (running) return;
+      running = true;
+      lastWall = 0;
+      rafId = requestAnimationFrame(loop);
+    },
+    stop(): void {
+      running = false;
+      cancelAnimationFrame(rafId);
     },
     setResponsiveness(t: number): void {
-      const params = lerpParams(Math.max(0, Math.min(1, t)));
-      for (const env of allEnvelopes) env.setParams(params);
+      envIntensity.setParams(lerpParams(Math.max(0, Math.min(1, t))));
     },
-    setQuality(preset: QualityPreset): void {
-      switch (preset) {
-        case 'low':
-          bloomBase = 0.08; bloomReactive = 0.1;
-          postProcess.grainAmount = 0.0;
-          postProcess.vignetteStrength = 0.2;
-          break;
-        case 'medium':
-          bloomBase = 0.25; bloomReactive = 0.2;
-          postProcess.grainAmount = 0.03;
-          postProcess.vignetteStrength = 0.3;
-          break;
-        case 'high':
-          bloomBase = 0.4; bloomReactive = 0.25;
-          postProcess.grainAmount = 0.05;
-          postProcess.vignetteStrength = 0.4;
-          break;
+    setQuality(p: QualityPreset): void {
+      quality.setPreset(p);
+      classicBloomBase = quality.params.level === 'low' ? 0.08 : quality.params.level === 'high' ? 0.4 : 0.25;
+      legacyPost.grainAmount = quality.params.level === 'low' ? 0 : 0.03;
+    },
+    getQualityPreset: () => quality.currentPreset,
+    setStyle(id: StyleId, immediate = false): void {
+      const d = getStyle(id);
+      if (d.id === descriptor.id && !pending) return;
+      depth = d.defaultDepth;
+      if (immediate) {
+        style.dispose();
+        descriptor = d;
+        pending = null;
+        variant = d.defaultVariant;
+        style = makeStyle(d);
+        return;
       }
+      pending = d;
     },
-    setStyle(id: StyleId): void {
-      beginSwap(id);
-    },
-    getStyle(): StyleId {
-      return pendingStyleId ?? currentStyleId;
-    },
+    getStyle: () => (pending ?? descriptor).id,
+    getDescriptor: () => pending ?? descriptor,
     setVariant(id: string): void {
-      currentVariantId = id;
-      if (activeStyle.setVariant) {
-        activeStyle.setVariant(id);
-      }
+      variant = id;
+      style.setVariant?.(id);
     },
-    getVariant(): string | null {
-      return activeStyle.getVariant?.() ?? currentVariantId;
-    },
+    getVariant: () => style.getVariant?.() ?? variant,
+    setLightMode(m: LightMode): void { lightMode = m; },
+    getLightMode: () => lightMode,
+    isLight: () => resolveLight(descriptor, variant, lightMode),
+    setDepth(on: boolean): void { depth = on; },
+    getDepth: () => depth,
     setRingCount(n: number): void {
-      currentRingCount = n;
-      activeStyle.setRingCount?.(n);
+      ringCount = n;
+      style.setRingCount?.(n);
     },
-    getRingCount(): number | null {
-      return activeStyle.getRingCount?.() ?? currentRingCount;
+    onEvent(cb: (e: SonoraEvent) => void): () => void {
+      eventListeners.push(cb);
+      return () => {
+        const i = eventListeners.indexOf(cb);
+        if (i >= 0) eventListeners.splice(i, 1);
+      };
     },
-    styleHasRingCount(): boolean {
-      return typeof activeStyle.setRingCount === 'function';
-    },
-    colorEngine,
+    stats: () => ({ fps, frameMs, quality: quality.params, sceneWidth: sceneW, sceneHeight: sceneH }),
   };
+
+  if (options.autoStart ?? true) api.start();
+  return api;
 }

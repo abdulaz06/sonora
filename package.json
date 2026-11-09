@@ -12,7 +12,8 @@
     "check:parity": "node scripts/check-parity.mjs",
     "verify": "node scripts/verify.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "events": "esbuild scripts/event-report.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/event-report.mjs --log-level=warning && node node_modules/.cache/event-report.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -20,7 +21,8 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
-    "vite": "^6.0.3",
-    "typescript": "~5.6.2"
+    "playwright": "^1.65.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
   }
 }
