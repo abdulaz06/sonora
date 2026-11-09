@@ -237,7 +237,11 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
   /** Random placement: mostly in view, some at the edges, some off-screen. */
   function randomScreen(): [number, number] {
     const r = rng();
-    if (r < 0.6) return [rng() * 1.7 - 0.85, rng() * 1.5 - 0.85];
+    if (r < 0.55) {
+      // In view, biased away from the centre so compositions stay off-axis.
+      const x = (rng() < 0.5 ? -1 : 1) * (0.2 + 0.75 * Math.sqrt(rng()));
+      return [x, rng() * 1.6 - 0.85];
+    }
     const a = rng() * Math.PI * 2;
     const rad = r < 0.85 ? 0.95 + rng() * 0.25 : 1.25 + rng() * 0.35;
     return [Math.cos(a) * rad, Math.sin(a) * rad * 0.8];
@@ -266,9 +270,11 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, 0.9 * strength],
       vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (rng() < 0.5 ? -1 : 1)), detail: 1,
     });
-    const base = rng() * Math.PI * 2;
-    for (let i = 0; i < BASS_JETS; i++) {
-      const a = base + (i / BASS_JETS) * Math.PI * 2 + (rng() - 0.5) * 0.9;
+    // 1–3 jets at irregular angles: symmetric jets read as propellers.
+    const jets = 1 + Math.floor(rng() * BASS_JETS);
+    let a = rng() * Math.PI * 2;
+    for (let i = 0; i < jets; i++) {
+      a += 1.2 + rng() * 2.6;
       const off = radius * 0.4;
       jet(x + Math.cos(a) * off, y + Math.sin(a) * off, Math.cos(a), Math.sin(a),
         BASS_JET_SPEED * strength * (0.6 + 0.6 * rng()), radius * 0.55);
@@ -346,7 +352,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       const sy = Math.sin(p * 0.51 + e.speed * 7) * 0.85 - 0.05;
       const [x, y] = screenToUv(ctx, sx, sy);
       // Jet roughly toward the view centre, wobbling.
-      const [cx, cy] = screenToUv(ctx, Math.sin(p * 0.37) * 0.3, Math.cos(p * 0.29) * 0.3);
+      const [cx, cy] = screenToUv(ctx, Math.sin(p * 0.37) * 0.9, Math.cos(p * 0.29) * 0.7);
       let dx = cx - x, dy = cy - y;
       dx -= Math.round(dx); dy -= Math.round(dy);
       const len = Math.hypot(dx, dy) || 1;
@@ -413,7 +419,8 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       noiseZ += dt * (0.05 + 0.18 * turbulence) * (marble ? 0.7 : 1);
       params.noiseZ = noiseZ;
       params.noiseAmp = tps(STIR_MIN + (STIR_MAX - STIR_MIN) * turbulence) * (marble ? 1.2 : 1) * (0.35 + 0.65 * fade);
-      params.curlStrength = CURL_MIN + (CURL_MAX - CURL_MIN) * turbulence;
+      // Flat shows the sim at higher magnification; less confinement avoids a crumpled look.
+      params.curlStrength = (CURL_MIN + (CURL_MAX - CURL_MIN) * turbulence) * (ctx.depth ? 1 : 0.55);
       params.damping = 0.25 + silence * 1.2;
       params.noisePeriod = marble ? 2 : 4;
       params.noiseDetail = marble ? 0.15 : 0.8;
