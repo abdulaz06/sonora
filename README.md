@@ -1,135 +1,98 @@
-# Sonora
+# sonora
 
-Sonora is a personal Windows desktop music visualizer built with Rust, TypeScript, WebGL 2, and Tauri 2. It captures a selected output endpoint through WASAPI loopback, derives real-time audio control signals, and renders three GPU-driven visual modes.
+A visual instrument for whatever's playing. Sonora listens to your system audio on Windows and paints it, live, in styles built to look like art rather than a spectrum analyser.
 
-## See Sonora in Action
-
-Watch **Flow Ink** respond to music in real time. This one-minute recording shows Sonora's audio-reactive fluid visuals in motion.
+Built with Rust, TypeScript, raw WebGL 2 and Tauri 2.
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI" title="Watch Sonora — Flow Ink with sound">
     <img src="DOCS/assets/flow-ink-thumbnail.png" alt="Sonora Flow Ink audio-reactive visualization — click to watch the demo" width="900" />
   </a>
 </p>
+<p align="center"><a href="https://www.youtube.com/watch?v=kDKyOMpcxeI"><strong>▶ Flow Ink (v0.1) with sound</strong></a></p>
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI"><strong>▶ Watch the 60-second Flow Ink demo with sound</strong></a>
-</p>
+## Flow Ink 2.0
 
-## Highlights
+The flagship style is a real fluid simulation: stable fluids (advection, pressure projection, vorticity confinement) on a periodic world several screens wide, with ink advected at high resolution so it stretches into fine filaments.
 
-- Captures the system's default output device or a user-selected output device, with automatic switching when the default changes.
-- Runs a 4,096-point Hann-windowed FFT and derives seven frequency bands, spectral descriptors, adaptive onsets, RMS energy, and beat/tempo estimates in Rust.
-- Converts raw analysis into smoothed visual controls: sustained band presence, short transient hits, long-window intensity, silence fades, and a 96-bin adaptive spectrum.
-- Renders three raw WebGL 2 scenes with GLSL shaders, instanced geometry, floating-point framebuffers, and bloom/composite post-processing.
-- Persists visual, audio-device, fullscreen, and window settings; also includes a tray menu, clean mode, and a live DSP debug overlay.
+- **Depth view (default):** the ink becomes a lit, displaced surface; a camera glides low over it through fog, banks on beats and lurches on drops. **Flat** is a drifting top-down view.
+- **Looks:** **Ink** (luminous palette ink on night), **Sumi** (black ink on bone paper), **Marble** (duotone marbling with stipple grain). Each has a light or dark background.
+- **Listening:** mid-range presence feeds ink inflow, bass hits throw ink in from all sides (including off-screen), highs scatter fine sparkle, intensity drives turbulence and camera speed, and a detected drop fires a burst plus a camera lurch. Silence lets the ink settle and fade.
 
-The kick, snare, hi-hat, bass, vocal, pad, lead, mood, and rhythmic labels in the debug data are heuristic estimates built from frequency-band energy, onsets, and temporal smoothing. They are not source separation, machine learning, or semantic music recognition.
+Aura and Halo from v0.1 remain available under **Show classic styles** in settings.
 
-## Pipeline
+## How it works
 
 ```text
-Windows output endpoint
-        |
-        v
-CPAL / WASAPI loopback -> mono circular buffer
-        |
-        v
-Rust DSP: FFT -> bands/onsets -> energy/tempo/proxy features
-        |
-        v
-Art-facing mapping: fade + intensity + presence + hits + 96-bin spectrum
-        |
-        v
-Tauri audio-frame events -> TypeScript render loop
-        |
-        v
-WebGL 2 scene FBO -> bloom passes -> final composite
+WASAPI loopback (desktop)        Web Audio + AudioWorklet (browser)
+            \                      /
+             sonora-dsp (Rust; native or WebAssembly)
+             FFT → bands → per-band normalisation → onsets → beat/tempo
+             mapping layer: fade, intensity, presence ×7, hits ×7, 96-bin spectrum
+                          |
+                 AudioFeatureFrame, 60 per second of audio
+                          |
+   event layer (drop, build, breakdown, big hit, track change)
+                          |
+   style (world camera, palette, quality) → bloom / tonemap / grain → screen
 ```
 
-The audio worker targets roughly 60 analysis updates per second. Rendering runs independently through `requestAnimationFrame` and always consumes the most recent feature frame.
-
-## Visual modes
-
-| Mode | Rendering approach | Variants |
-| --- | --- | --- |
-| **Aura** | Concentric signed-distance shapes, instanced particles and glow orbs, and CPU-traced flow-field tendrils | Circle, Triangle, Square |
-| **Halo** | 48 radial spectrum bars driven by a shuffled and smoothed 96-bin FFT signal | Soft, Sharp |
-| **Flow Ink** | 384×384 floating-point ping-pong simulation with curl-noise advection and band-driven dye injection | — |
-
-All modes render into a floating-point scene framebuffer before half-resolution horizontal/vertical bloom and a final grain, vignette, and tone-mapped composite.
+The same analysis crate runs in the desktop app and in the browser; a parity check confirms both produce the same frames. Instrument and section labels are heuristics derived from band energy and onsets, not source separation or machine learning.
 
 ## Controls
 
-The settings panel exposes the visual mode and variant, Aura ring count, seven preset palettes plus a custom hue, responsiveness, post-processing preset, and audio source.
-
 | Key | Action |
 | --- | --- |
-| `F11` or `F` | Toggle fullscreen |
-| `H` | Toggle clean mode |
-| `D` | Toggle the DSP debug overlay |
-| `S` | Cycle visual mode |
-| `1`–`7` | Select a preset palette |
-| `Esc` | Exit fullscreen or clean mode; close an open panel |
+| `F11` / `F` | Fullscreen |
+| `H` | Clean mode (hide all UI) |
+| `D` | Debug overlay (signals, events, fps) |
+| `S` | Next style |
+| `V` | Depth / Flat |
+| `1`–`0` | Palette |
+| `Esc` | Leave fullscreen / clean mode, close panels |
 
-The tray menu provides Show, Hide, Toggle Fullscreen, and Quit. Left-clicking the tray icon toggles the window's visibility.
+Settings: style and look, view, background, palette (presets, duotones, custom hue), Auto Drift (slow hue rotation, 1–10 min per cycle), responsiveness, quality (Low / Medium / High / Auto), audio source. The tray menu offers Show, Hide, Fullscreen and Quit.
 
-## Download
-
-Version 0.1.0 Windows x64 installers are available from the [latest release](https://github.com/abdulaz06/sonora/releases/latest):
-
-- `Sonora_0.1.0_x64-setup.exe` — NSIS installer
-- `Sonora_0.1.0_x64_en-US.msi` — MSI installer
-
-The installers are currently unsigned and install per machine, so Windows may request administrator approval and show an unknown-publisher warning. The installer can download the Microsoft Edge WebView2 runtime when it is missing.
+Quality presets change real work, not only post effects: render resolution, simulation and ink resolution, solver iterations and mesh density. Auto watches frame time and steps down or up.
 
 ## Build from source
 
-Sonora's audio path is Windows-specific. Development requires:
+Windows, with:
 
-- Node.js 18, 20, or 22+ with npm
-- stable Rust using the MSVC toolchain
-- Microsoft C++ Build Tools with **Desktop development with C++**
-- Microsoft Edge WebView2
-- the Windows VBSCRIPT optional feature when producing MSI packages
+- Node.js 20+ and npm
+- stable Rust (MSVC) with the WebAssembly target: `rustup target add wasm32-unknown-unknown`
+- `wasm-pack`: `cargo install wasm-pack`
+- Microsoft C++ Build Tools (Desktop development with C++), WebView2
+- the VBSCRIPT optional feature for MSI packaging
 
-See the [Tauri Windows prerequisites](https://v2.tauri.app/start/prerequisites/) for setup details.
-
-From the repository root:
+See the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```powershell
 npm ci
-npm run tauri dev
+npm run tauri dev        # desktop app with system audio
+npm run dev:web          # renderer in a browser: test tracks, audio files, mic, tab audio
+npm run tauri build      # installers in target/release/bundle/
 ```
 
-Create the production frontend and both Windows installers with:
+### Verification
 
 ```powershell
-npm run build
-npm run tauri build
+npm run gen:audio                                   # procedural test tracks (no copyrighted music)
+npm run check:parity -- house-124                   # desktop vs browser analysis frames
+npm run verify -- --variant sumi --track all        # screenshots at silence/fade-in/build/drop/breakdown
 ```
 
-Generated installers are written to `src-tauri/target/release/bundle/`.
-
-## Tech stack
-
-- **Desktop and IPC:** Tauri 2
-- **Audio and DSP:** Rust, CPAL, WASAPI loopback, rustfft
-- **Rendering:** TypeScript, WebGL 2, GLSL ES 3.0
-- **Frontend tooling:** Vite and TypeScript
+`npm run verify` renders in a real browser on the GPU, in audio time, and writes screenshots, an 8-frame strip across the drop, the detected events and frame timing to `verify/`.
 
 ## Audio and privacy
 
-Audio analysis starts with the application and continues while the window is hidden through the tray. Raw samples remain in an in-memory circular buffer; Sonora emits only derived feature frames to its frontend. The application does not save or upload audio and contains no telemetry or network client. Visual preferences, the selected audio-device display name, and window state are stored locally in the operating system's application-data directory.
+Audio stays in memory and is never saved or uploaded. Only derived feature frames reach the renderer. There is no telemetry or network client in the desktop app. Preferences and window state are stored locally in the app-data directory (the browser build uses localStorage).
 
-## Current limitations
+## Known limitations
 
-- Instrument and rhythm labels are heuristic proxies and can be wrong, especially when frequency ranges overlap.
-- There is no explicit buildup, drop, breakdown, or song-section detector. Mood descriptors are visible in the debug overlay but do not currently select colors.
-- Output devices are pinned by display name rather than a stable endpoint identifier.
-- Rendering requires WebGL 2 and effectively relies on `EXT_color_buffer_float`; there is no non-float framebuffer fallback.
-- The Low/Medium/High setting changes post-processing values, not render resolution or simulation size.
-- The project has no automated test suite yet; current verification is based on type checking, compilation, lint diagnostics, release builds, and startup smoke testing.
-- Desktop hardening is incomplete: the Tauri content security policy is unset and the default opener capability is enabled.
+- Devices are pinned by display name, not a stable endpoint id.
+- Requires WebGL 2 with float render targets.
+- Tempo on half-time music may read at half the notated BPM.
+- The Tauri content security policy is unset.
 
-For a deeper look at the signal layer that connects DSP to rendering, see [Audio-to-visual mapping](DOCS/14-MAPPING-LAYER-SPEC.md).
+Deeper reading: [visual direction](DOCS/16-VISUAL-DIRECTION.md) · [mapping layer](DOCS/14-MAPPING-LAYER-SPEC.md) · [brand](DOCS/brand/17-BRAND.md) · [decisions](DOCS/DECISIONS.md).

@@ -9,6 +9,7 @@ uniform float u_domain;
 uniform sampler2D u_height;
 uniform float u_height_scale;
 uniform float u_lift_scale;
+uniform vec3 u_cam_pos;
 out vec2 v_world;
 out vec3 v_pos;
 float inkHeightV(vec4 blur) { return 1.0 - exp(-(blur.r + blur.g) * 0.9); }
@@ -16,6 +17,9 @@ void main() {
   vec2 world = u_grid_origin + a_grid * u_grid_size;
   vec4 hb = textureLod(u_height, world / u_domain, 0.0);
   float h = inkHeightV(hb) * u_height_scale + hb.a * u_lift_scale;
+  // Far vertices are sparse relative to the field: flatten them so distant
+  // ridges don't alias into spikes (fog hides the rest).
+  h *= 1.0 - smoothstep(1.4, 3.2, length(world - u_cam_pos.xz));
   vec3 pos = vec3(world.x, h, world.y);
   v_world = world;
   v_pos = pos;
