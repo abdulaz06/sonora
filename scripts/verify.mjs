@@ -196,12 +196,15 @@ try {
         requestAnimationFrame(tick);
       }), BENCH_SECONDS);
     }
+    let frameCost = null;
+    if (opts.bench) frameCost = await page.evaluate(() => window.__sonora.frameCost(180, 1 / 60));
     const stats = await page.evaluate(() => window.__sonora.stats());
-    const line = { track: name, outDir, events, fps, scene: `${stats.sceneWidth}x${stats.sceneHeight}`, quality: stats.quality.level, seconds: (Date.now() - t0) / 1000 };
+    const line = { track: name, outDir, events, fps, frameCost, scene: `${stats.sceneWidth}x${stats.sceneHeight}`, quality: stats.quality.level, seconds: (Date.now() - t0) / 1000 };
     summary.push(line);
     console.log(`\n${name}: ${outDir}`);
     console.log(`  events: ${events.join(', ') || '(none)'}`);
     if (fps) console.log(`  fps: ${fps.fps.toFixed(1)} avg, p95 frame ${fps.p95.toFixed(1)} ms over ${fps.frames} frames (scene ${line.scene}, ${line.quality})`);
+    if (frameCost !== null) console.log(`  frame cost (step + GPU sync): ${frameCost.toFixed(2)} ms  → ~${(1000 / frameCost).toFixed(0)} fps uncapped`);
     writeFileSync(join(outDir, 'summary.json'), JSON.stringify({ gpu, opts, ...line }, null, 2));
   }
   await browser.close();

@@ -31,7 +31,8 @@ InkSample sampleInk(vec2 uv, float lod) {
   InkSample s;
   vec4 raw = lod < 0.5 ? sampleBicubic(u_dye, uv, vec2(u_dye_res)) : texture(u_dye, uv);
   s.blur = texture(u_height, uv);
-  s.d = max(raw + u_sharpen * (raw - s.blur), 0.0);
+  // Unsharp mask with a clamped negative lobe: crisper filaments, no halos.
+  s.d = max(raw + u_sharpen * clamp(raw - s.blur, -0.2 * raw, vec4(8.0)), 0.0);
   s.d.a = raw.a;
   s.edge = clamp((raw.r + raw.g) - (s.blur.r + s.blur.g), 0.0, 1.5);
   return s;

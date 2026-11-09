@@ -52,7 +52,7 @@ void main() {
   float fres = pow(1.0 - max(dot(n, V), 0.0), 4.0);
 
   if (u_light == 1) {
-    col *= 0.86 + 0.2 * diff;
+    col *= mix(1.0, 0.94 + 0.09 * diff, cover);
     col += vec3(spec * 0.25 * cover);
   } else {
     col *= mix(1.0, 0.82 + 0.3 * diff, cover);

@@ -39,6 +39,8 @@ export interface HarnessApi {
   events: SonoraEvent[];
   stats(): ReturnType<ReturnType<typeof initRenderer>['stats']>;
   gpu(): string;
+  /** Mean ms per fully finished frame (step + GPU sync), i.e. real GPU+CPU cost. */
+  frameCost(frames: number, dt: number): number;
 }
 
 declare global {
@@ -230,8 +232,19 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       if (o.depth !== undefined) renderer.setDepth(o.depth);
       if (o.light) renderer.setLightMode(o.light);
       if (o.quality) renderer.setQuality(o.quality);
-      if (o.palette !== undefined) renderer.colorEngine.setPalette(o.palette);
+      if (o.palette !== undefined) renderer.colorEngine.setPalette(o.palette, true);
       if (o.drift !== undefined) renderer.colorEngine.setAutoDrift(o.drift);
+    },
+    frameCost(frames: number, dt: number): number {
+      if (!gl) return 0;
+      // readPixels forces the GPU to finish (gl.finish is a no-op in Chromium).
+      const px = new Uint8Array(4);
+      const sync = (): void => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      for (let i = 0; i < 10; i++) { source.stepOffline(dt); renderer.step(dt); }
+      sync();
+      const t0 = performance.now();
+      for (let i = 0; i < frames; i++) { source.stepOffline(dt); renderer.step(dt); sync(); }
+      return (performance.now() - t0) / frames;
     },
     time: () => source.offlineTime,
     events,

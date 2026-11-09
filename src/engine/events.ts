@@ -33,7 +33,7 @@ const SILENCE_RMS = 0.0025;
 const HISTORY_S = 6;
 
 /** Build: evidence seconds to enter / exit, and cap. */
-const BUILD_ENTER = 2.5;
+const BUILD_ENTER = 2.0;
 const BUILD_EXIT = 0.6;
 const BUILD_CAP = 6;
 /** Mid-level rise over 4 s that counts as a rising trend. */
@@ -271,7 +271,7 @@ export class EventDetector {
       (low < 0.3 && highs > 0.4 && highsTrend > 0.05)
     );
     const recentlyDropped = t - this.lastDrop < 6;
-    this.buildScore = Math.min(BUILD_CAP, Math.max(0, this.buildScore + (tension && !recentlyDropped ? dt : -1.5 * dt)));
+    this.buildScore = Math.min(BUILD_CAP, Math.max(0, this.buildScore + (tension && !recentlyDropped ? dt : -dt)));
     if (!this.inBuild && this.buildScore > BUILD_ENTER) {
       this.inBuild = true;
       this.buildStart = t - this.buildScore;

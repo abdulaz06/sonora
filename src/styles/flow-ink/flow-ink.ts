@@ -45,6 +45,8 @@ const GRID_AHEAD = 2.6;
 const HEIGHT_SCALE = 0.018;
 const LIFT_SCALE = 0.03;
 const BREATH_AMOUNT = 0.14;
+/** Flat view: world units visible vertically per camera view-height. */
+const FLAT_VIEW_SCALE = 1.6;
 
 /** Inflow emitters attached to the view. */
 const EMITTERS = 4;
@@ -60,7 +62,7 @@ const BASS_DYE = 0.9;
 /** Jets per bass splat and their speed (uv/s): jets become vortex pairs. */
 const BASS_JETS = 3;
 const BASS_JET_SPEED = 0.55;
-const BASS_SWIRL = 0.08;
+const BASS_SWIRL = 0.025;
 /** Sparkle on high hits. */
 const HIGH_THRESHOLD = 0.3;
 const HIGH_COOLDOWN = 0.045;
@@ -452,6 +454,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
         post.vignette = 0.16;
         post.grain = 0.028;
       } else {
+        post.exposure = vIdx === 2 ? 1.1 : 1.35;
         post.bloom = vIdx === 2 ? 0.35 : 0.6;
         post.bloomThreshold = 1.0;
         post.flash = 0.03 * ctx.eventState.dropEnvelope;
@@ -484,7 +487,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
         setCommon(uFlat);
         gl.uniform2f(uFlat.u_resolution, ctx.width, ctx.height);
         gl.uniform2f(uFlat.u_cam_center, ctx.camera.center[0], ctx.camera.center[1]);
-        gl.uniform1f(uFlat.u_cam_view_h, ctx.camera.viewHeight * 1.15);
+        gl.uniform1f(uFlat.u_cam_view_h, ctx.camera.viewHeight * FLAT_VIEW_SCALE);
         gl.uniform1f(uFlat.u_cam_rot, ctx.camera.rotation);
         gl.bindVertexArray(quadVAO);
         gl.drawArrays(gl.TRIANGLES, 0, 6);

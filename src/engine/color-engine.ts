@@ -183,6 +183,7 @@ export class ColorEngine {
   private driftPeriod = DEFAULT_DRIFT_PERIOD_S;
   private driftPhase = 0; // degrees
   private resolved: ResolvedPalette;
+  private fromResolved: ResolvedPalette;
   private current: Palette;
 
   constructor() {
@@ -190,6 +191,7 @@ export class ColorEngine {
     this.to = PALETTES[0];
     this.current = PALETTES[0];
     this.resolved = resolve(PALETTES[0]);
+    this.fromResolved = this.resolved;
   }
 
   get paletteIndex(): number { return this._paletteIndex; }
@@ -198,17 +200,21 @@ export class ColorEngine {
   /** Current Auto Drift hue offset in degrees. */
   get driftDegrees(): number { return this.autoDrift ? this.driftPhase : 0; }
 
-  setPalette(index: number): void {
+  /** Select a preset; `immediate` skips the crossfade. */
+  setPalette(index: number, immediate = false): void {
     const idx = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
     if (idx === this._paletteIndex && this.progress >= 1) return;
     this._paletteIndex = idx;
+    this.fromResolved = this.resolved;
     this.from = this.basePalette();
     this.to = PALETTES[idx];
-    this.progress = 0;
+    this.progress = immediate ? 1 : 0;
+    if (immediate) this.update(0);
   }
 
   setCustomHue(hue: number): void {
     this._paletteIndex = -1;
+    this.fromResolved = this.resolved;
     this.from = this.basePalette();
     this.to = paletteFromHue(hue);
     this.progress = 0.85;
@@ -224,7 +230,9 @@ export class ColorEngine {
     if (this.progress < 1) this.progress = Math.min(1, this.progress + TRANSITION_SPEED * dt);
     if (this.autoDrift) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
     this.current = shiftPalette(this.basePalette(), this.driftDegrees);
-    this.resolved = resolve(this.current);
+    // Crossfade in RGB (an HSL crossfade sweeps through unrelated hues).
+    const target = resolve(shiftPalette(this.to, this.driftDegrees));
+    this.resolved = this.progress >= 1 ? target : lerpResolved(this.fromResolved, target, smoothT(this.progress));
   }
 
   /** Active palette (with transition and Auto Drift applied). */
@@ -254,6 +262,19 @@ export class ColorEngine {
     for (let i = 0; i < count; i++) out[i] = hslToRgb(lerpHSL(inner, outer, i / (count - 1)));
     return out;
   }
+}
+
+function smoothT(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
+function lerpResolved(a: ResolvedPalette, b: ResolvedPalette, t: number): ResolvedPalette {
+  const l = (x: RGB, y: RGB): RGB => [x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t];
+  return {
+    bg: l(a.bg, b.bg), paper: l(a.paper, b.paper), primary: l(a.primary, b.primary),
+    secondary: l(a.secondary, b.secondary), accent: l(a.accent, b.accent), highlight: l(a.highlight, b.highlight),
+    duotone: t < 0.5 ? a.duotone : b.duotone,
+  };
 }
 
 function resolve(p: Palette): ResolvedPalette {
