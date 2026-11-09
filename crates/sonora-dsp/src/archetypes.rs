@@ -1,4 +1,4 @@
-use crate::audio::frame::{BeatData, Elements, RhythmData};
+use crate::frame::{BeatData, Elements, RhythmData};
 
 const HISTORY_SIZE: usize = 256;
 
@@ -10,6 +10,12 @@ pub struct ArchetypeClassifier {
     write_pos: usize,
     /// Smoothed archetype weights.
     weights: [f32; 6],
+}
+
+impl Default for ArchetypeClassifier {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ArchetypeClassifier {

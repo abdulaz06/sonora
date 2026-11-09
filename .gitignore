@@ -41,3 +41,15 @@ Desktop.ini
 *.temp
 *.bak
 *.orig
+
+# Build outputs
+/target
+src/audio/wasm-pkg/
+
+# Generated test audio and harness output
+test-audio/*.wav
+verify/
+
+# Large media (reference reels stay local)
+*.mp4
+*.mov

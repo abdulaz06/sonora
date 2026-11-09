@@ -1,0 +1,13 @@
+[package]
+name = "sonora-dsp"
+description = "Platform-free audio analysis and mapping layer for Sonora"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+rustfft = "6"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

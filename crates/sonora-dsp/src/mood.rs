@@ -1,5 +1,5 @@
-use crate::audio::frame::{EnergyData, MoodData, SpectralFeatures};
-use crate::audio::onsets::OnsetFrame;
+use crate::frame::{EnergyData, MoodData, SpectralFeatures};
+use crate::onsets::OnsetFrame;
 
 pub struct MoodAnalyzer {
     warmth: f32,
@@ -7,6 +7,12 @@ pub struct MoodAnalyzer {
     aggression: f32,
     smoothness: f32,
     spaciousness: f32,
+}
+
+impl Default for MoodAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MoodAnalyzer {

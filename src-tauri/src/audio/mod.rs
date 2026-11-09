@@ -1,43 +1,17 @@
-pub mod archetypes;
-pub mod bands;
-pub mod beat;
 pub mod capture;
 pub mod commands;
 pub mod devices;
-pub mod elements;
-pub mod energy;
-pub mod fft;
-pub mod frame;
-pub mod mapping;
-pub mod mood;
-pub mod onsets;
-pub mod spectral;
 
-use archetypes::ArchetypeClassifier;
-use bands::BandExtractor;
-use beat::BeatTracker;
-use capture::{
-    default_output_device, find_output_device_by_name, start_capture_on, AudioBuffer,
-};
+use capture::{default_output_device, find_output_device_by_name, start_capture_on};
 use devices::{DevicePreference, DeviceState};
-use elements::ElementDetector;
-use energy::EnergyTracker;
-use fft::{bins_to_bars, FftProcessor};
-use frame::AudioFeatureFrame;
-use mapping::MappingLayer;
-use mood::{compute_motion_density, MoodAnalyzer};
-use onsets::OnsetDetector;
 use parking_lot::Mutex;
-use spectral::SpectralAnalyzer;
+use sonora_dsp::{hop_size, Analyzer, AudioBuffer};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
 
-const FFT_SIZE: usize = 4096;
+/// Ring-buffer capacity shared with the capture callback (samples).
 const BUFFER_CAPACITY: usize = 16384;
-const NUM_BARS: usize = 128;
-const MIN_HOP: usize = 735;
-const TARGET_FPS: f32 = 60.0;
 
 /// How often the pipeline polls for default-device changes (ms).
 const DEVICE_POLL_INTERVAL_MS: u128 = 1000;
@@ -54,48 +28,6 @@ pub fn start(app_handle: tauri::AppHandle, device_state: Arc<DeviceState>) {
     });
 }
 
-/// Owned by the pipeline thread. Lives as long as a single capture session;
-/// torn down + recreated on every device switch (so per-stream-rate state
-/// like band-bin indices and per-frame envelopes start fresh).
-struct AnalysisState {
-    fft_proc: FftProcessor,
-    samples: Vec<f32>,
-    magnitudes_db: Vec<f32>,
-    bars: Vec<f32>,
-    band_ext: BandExtractor,
-    spectral_an: SpectralAnalyzer,
-    energy_tr: EnergyTracker,
-    onset_det: OnsetDetector,
-    beat_tr: BeatTracker,
-    element_det: ElementDetector,
-    archetype_cl: ArchetypeClassifier,
-    mood_an: MoodAnalyzer,
-    mapping: MappingLayer,
-    sample_rate: u32,
-}
-
-impl AnalysisState {
-    fn new(sample_rate: u32) -> Self {
-        let sr = sample_rate as f32;
-        Self {
-            fft_proc: FftProcessor::new(FFT_SIZE),
-            samples: vec![0.0_f32; FFT_SIZE],
-            magnitudes_db: vec![0.0_f32; FFT_SIZE / 2],
-            bars: vec![0.0_f32; NUM_BARS],
-            band_ext: BandExtractor::new(sr, FFT_SIZE),
-            spectral_an: SpectralAnalyzer::new(sr, FFT_SIZE),
-            energy_tr: EnergyTracker::new(),
-            onset_det: OnsetDetector::new(),
-            beat_tr: BeatTracker::new(TARGET_FPS),
-            element_det: ElementDetector::new(),
-            archetype_cl: ArchetypeClassifier::new(),
-            mood_an: MoodAnalyzer::new(),
-            mapping: MappingLayer::new(sr, FFT_SIZE),
-            sample_rate,
-        }
-    }
-}
-
 /// Live capture session. The cpal `Stream` is `!Send` on Windows, so it lives
 /// for the entire pipeline thread and is dropped/recreated in place on swap.
 struct ActiveCapture {
@@ -110,15 +42,13 @@ fn run_pipeline(
     let buffer = Arc::new(Mutex::new(AudioBuffer::new(BUFFER_CAPACITY)));
 
     let mut active: Option<ActiveCapture> = None;
-    let mut analysis: Option<AnalysisState> = None;
+    let mut analysis: Option<Analyzer> = None;
 
     // Debounce: if the desired device has been different from the active one
     // for at least DEVICE_DEBOUNCE_MS, swap. Reset whenever it changes again.
     let mut pending_change: Option<(String, Instant)> = None;
     // `None` forces a poll on the first tick.
     let mut last_poll: Option<Instant> = None;
-
-    let dt = 1.0 / TARGET_FPS;
 
     loop {
         std::thread::sleep(Duration::from_millis(16));
@@ -145,76 +75,13 @@ fn run_pipeline(
             _ => continue,
         };
 
-        let new_count = {
-            let buf = buffer.lock();
-            buf.new_sample_count()
-        };
-
-        if new_count < MIN_HOP {
+        let hop = hop_size(analysis.sample_rate());
+        let new_count = buffer.lock().new_sample_count();
+        if new_count < hop {
             continue;
         }
-
-        {
-            let mut buf = buffer.lock();
-            buf.read_latest(&mut analysis.samples);
-        }
-
-        let sample_rate = analysis.sample_rate as f32;
-
-        // Layer 1: Signal processing
-        analysis
-            .fft_proc
-            .process(&analysis.samples, &mut analysis.magnitudes_db);
-        bins_to_bars(
-            &analysis.magnitudes_db,
-            NUM_BARS,
-            sample_rate,
-            &mut analysis.bars,
-        );
-
-        let bands = analysis.band_ext.process(&analysis.magnitudes_db);
-        let spectral = analysis.spectral_an.process(&analysis.magnitudes_db);
-        let energy = analysis.energy_tr.process(&analysis.samples, dt);
-
-        // Layer 2: Musical features
-        let onsets = analysis.onset_det.process(&bands);
-        let beat = analysis.beat_tr.process(&onsets, dt);
-        let elements = analysis
-            .element_det
-            .process(&bands, &onsets, spectral.centroid, dt);
-        let rhythm = analysis.archetype_cl.process(&elements, &beat, dt);
-
-        // Layer 3: State / mood
-        let mood = analysis.mood_an.process(&spectral, &energy, &onsets, dt);
-        let motion_density = compute_motion_density(&onsets, &energy, &spectral);
-
-        // Layer 4: Mapping — art-ready control signals
-        let mapping_out = analysis.mapping.process(
-            &analysis.magnitudes_db,
-            &bands,
-            &onsets,
-            &energy,
-            motion_density,
-            dt,
-        );
-
-        let frame = AudioFeatureFrame {
-            bands,
-            spectral,
-            energy,
-            beat,
-            rhythm,
-            elements,
-            mood,
-            motion_density,
-            spectrum_bars: round_vec(&analysis.bars),
-            fade_in_out: round_f32(mapping_out.fade_in_out),
-            intensity: round_f32(mapping_out.intensity),
-            presence: mapping_out.presence,
-            hits: mapping_out.hits,
-            juiced_fft: round_vec(&mapping_out.juiced_fft),
-        };
-
+        buffer.lock().read_latest(analysis.window_mut());
+        let frame = analysis.analyze();
         let _ = app_handle.emit("audio-frame", &frame);
     }
 }
@@ -226,7 +93,7 @@ fn try_apply_device(
     device_state: &DeviceState,
     buffer: &Arc<Mutex<AudioBuffer>>,
     active: &mut Option<ActiveCapture>,
-    analysis: &mut Option<AnalysisState>,
+    analysis: &mut Option<Analyzer>,
     pending_change: &mut Option<(String, Instant)>,
     now: Instant,
 ) {
@@ -305,7 +172,7 @@ fn apply_swap(
     device_state: &DeviceState,
     buffer: &Arc<Mutex<AudioBuffer>>,
     active: &mut Option<ActiveCapture>,
-    analysis: &mut Option<AnalysisState>,
+    analysis: &mut Option<Analyzer>,
     target: (cpal::Device, String),
 ) {
     let (device, name) = target;
@@ -321,7 +188,7 @@ fn apply_swap(
                 ),
                 None => println!("Audio capture started on {name} ({sample_rate} Hz)"),
             }
-            *analysis = Some(AnalysisState::new(sample_rate));
+            *analysis = Some(Analyzer::new(sample_rate));
             *active = Some(ActiveCapture {
                 _stream: stream,
                 device_name: name.clone(),
@@ -335,12 +202,4 @@ fn apply_swap(
             let _ = app_handle.emit("audio-device-changed", "");
         }
     }
-}
-
-fn round_f32(v: f32) -> f32 {
-    (v * 1000.0).round() / 1000.0
-}
-
-fn round_vec(v: &[f32]) -> Vec<f32> {
-    v.iter().map(|x| (x * 1000.0).round() / 1000.0).collect()
 }

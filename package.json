@@ -1,11 +1,16 @@
 {
   "name": "sonora",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "dev:web": "npm run build:wasm && vite --port 5173 --open /web.html",
+    "build": "npm run build:wasm && tsc && vite build",
+    "build:wasm": "wasm-pack build crates/sonora-dsp-wasm --release --target web --out-dir ../../src/audio/wasm-pkg --out-name sonora_dsp",
+    "gen:audio": "node scripts/gen-test-audio.mjs",
+    "check:parity": "node scripts/check-parity.mjs",
+    "verify": "node scripts/verify.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

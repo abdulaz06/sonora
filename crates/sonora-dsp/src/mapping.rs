@@ -6,8 +6,8 @@
 //!
 //! See `DOCS/14-MAPPING-LAYER-SPEC.md` for the design intent.
 
-use crate::audio::frame::{BandHits, BandPresence, Bands, EnergyData};
-use crate::audio::onsets::OnsetFrame;
+use crate::frame::{BandHits, BandPresence, EnergyData};
+use crate::norm::NormBands;
 
 /// Number of bins in the juiced-FFT output.
 pub const JUICED_FFT_BINS: usize = 96;
@@ -21,16 +21,23 @@ const JFFT_F_HIGH: f32 = 20_000.0;
 const PRESENCE_ATTACK_TAU: f32 = 0.2;
 /// Release time constant for per-band presence (s).
 const PRESENCE_RELEASE_TAU: f32 = 1.5;
-/// Soft-compression knee for presence: `y = x / (x + knee)`.
-const PRESENCE_KNEE: f32 = 0.15;
+/// Soft-compression knee for presence on normalised energy:
+/// `y = x (1 + k) / (x + k)`, so 1 stays 1 and quiet bands are lifted.
+const PRESENCE_KNEE: f32 = 0.35;
 
 // ── Hits tuning ─────────────────────────────────────────────
 /// Decay time constant for per-band hits (s).
 const HIT_DECAY_TAU: f32 = 0.08;
-/// Gain applied to raw band flux when using it as a hit-event fallback.
-const HIT_FLUX_GAIN: f32 = 8.0;
-/// Multiplier on detected hit strength to ensure visible spikes.
-const HIT_STRENGTH_BOOST: f32 = 1.5;
+/// Gain applied to normalised band flux above the adaptive threshold.
+const HIT_FLUX_GAIN: f32 = 3.2;
+/// Multiplier on hit strength when it re-triggers the envelope.
+const HIT_STRENGTH_BOOST: f32 = 1.0;
+/// Adaptive hit threshold: running mean + this many standard deviations.
+const HIT_THRESHOLD_STD: f32 = 1.2;
+/// Absolute minimum normalised flux for a hit.
+const HIT_MIN_FLUX: f32 = 0.05;
+/// Smoothing factor for the flux mean/variance trackers.
+const HIT_STATS_ALPHA: f32 = 0.06;
 
 // ── Fade-in-out tuning ──────────────────────────────────────
 /// RMS threshold below which audio is considered silent.
@@ -43,10 +50,16 @@ const FADE_FALL_RATE: f32 = 0.15;
 // ── Intensity tuning ────────────────────────────────────────
 const INTENSITY_ATTACK_TAU: f32 = 4.0;
 const INTENSITY_RELEASE_TAU: f32 = 6.0;
-/// Energy value above which short-term energy counts as "full".
+/// Energy value above which short-term energy counts as "full" (absolute term).
 const INTENSITY_ENERGY_CEIL: f32 = 0.3;
-/// Threshold above which a band counts as "active" for the active-band-count term.
-const INTENSITY_BAND_ACTIVE_THRESHOLD: f32 = 0.05;
+/// Normalised energy above which a band counts as "active".
+const INTENSITY_BAND_ACTIVE_THRESHOLD: f32 = 0.25;
+/// Half-life of the loudness reference used by the relative term (s).
+const INTENSITY_REF_HALF_LIFE_S: f32 = 45.0;
+/// Floor for the loudness reference so near-silence is not normalised up.
+const INTENSITY_REF_FLOOR: f32 = 0.02;
+/// Weight of loudness relative to the track's own recent peak vs absolute.
+const INTENSITY_RELATIVE_WEIGHT: f32 = 0.7;
 
 // ── Juiced FFT tuning ───────────────────────────────────────
 /// Temporal IIR blend factor: `y = ALPHA * x + (1 - ALPHA) * y_prev`.
@@ -114,10 +127,13 @@ pub struct MappingLayer {
     // Band state
     presence_env: [AsymEnv; 7],
     hit_env: [HitEnv; 7],
+    flux_mean: [f32; 7],
+    flux_var: [f32; 7],
 
     // Globals
     fade_in_out: f32,
     intensity_env: AsymEnv,
+    loudness_ref: f32,
 
     // Juiced FFT
     jfft_bin_ranges: Vec<(usize, usize)>,
@@ -164,8 +180,11 @@ impl MappingLayer {
         Self {
             presence_env: [AsymEnv::default(); 7],
             hit_env: [HitEnv::default(); 7],
+            flux_mean: [0.0; 7],
+            flux_var: [0.0; 7],
             fade_in_out: 0.0,
             intensity_env: AsymEnv::default(),
+            loudness_ref: INTENSITY_REF_FLOOR,
             jfft_bin_ranges,
             jfft_boost,
             jfft_smoothed: vec![0.0; JUICED_FFT_BINS],
@@ -182,46 +201,16 @@ impl MappingLayer {
     pub fn process(
         &mut self,
         magnitudes_db: &[f32],
-        bands: &Bands,
-        onsets: &OnsetFrame,
+        norm: &NormBands,
         energy: &EnergyData,
         motion_density: f32,
         dt: f32,
     ) -> MappingOutput {
-        // Pack bands/onsets into flat arrays indexed identically to presence/hit envs.
-        let band_energies = [
-            bands.sub_bass.energy,
-            bands.bass.energy,
-            bands.low_mid.energy,
-            bands.mid.energy,
-            bands.upper_mid.energy,
-            bands.high.energy,
-            bands.air.energy,
-        ];
-        let band_fluxes = [
-            bands.sub_bass.flux,
-            bands.bass.flux,
-            bands.low_mid.flux,
-            bands.mid.flux,
-            bands.upper_mid.flux,
-            bands.high.flux,
-            bands.air.flux,
-        ];
-        let onset_strengths = [
-            (onsets.sub_bass.detected, onsets.sub_bass.strength),
-            (onsets.bass.detected, onsets.bass.strength),
-            (onsets.low_mid.detected, onsets.low_mid.strength),
-            (onsets.mid.detected, onsets.mid.strength),
-            (onsets.upper_mid.detected, onsets.upper_mid.strength),
-            (onsets.high.detected, onsets.high.strength),
-            (onsets.air.detected, onsets.air.strength),
-        ];
-
         // ── Presence ────────────────────────────────────────
         let mut presence = [0.0_f32; 7];
         for i in 0..7 {
-            // Soft compression pulls typical low-RMS values into a useful range
-            let compressed = band_energies[i] / (band_energies[i] + PRESENCE_KNEE);
+            let x = norm.energy[i];
+            let compressed = x * (1.0 + PRESENCE_KNEE) / (x + PRESENCE_KNEE);
             let smoothed = self.presence_env[i].update(
                 compressed,
                 dt,
@@ -235,18 +224,20 @@ impl MappingLayer {
         let mut hits = [0.0_f32; 7];
         let mut active_band_count = 0_u32;
         for i in 0..7 {
-            let (detected, strength) = onset_strengths[i];
-            // Use the onset strength when detected; otherwise fall back to a
-            // flux-derived estimate so subtle transients still register.
-            let event_strength = if detected {
-                strength.max(band_fluxes[i] * HIT_FLUX_GAIN)
+            let flux = norm.flux[i];
+            let diff = flux - self.flux_mean[i];
+            self.flux_mean[i] += HIT_STATS_ALPHA * diff;
+            self.flux_var[i] += HIT_STATS_ALPHA * (diff * diff - self.flux_var[i]);
+            let threshold = (self.flux_mean[i] + HIT_THRESHOLD_STD * self.flux_var[i].sqrt())
+                .max(HIT_MIN_FLUX);
+            let event_strength = if flux > threshold {
+                (flux * HIT_FLUX_GAIN).clamp(0.0, 1.0)
             } else {
-                band_fluxes[i] * HIT_FLUX_GAIN
-            }
-            .clamp(0.0, 1.0);
+                0.0
+            };
             hits[i] = self.hit_env[i].update(event_strength, dt).clamp(0.0, 1.0);
 
-            if band_energies[i] > INTENSITY_BAND_ACTIVE_THRESHOLD {
+            if norm.energy[i] > INTENSITY_BAND_ACTIVE_THRESHOLD {
                 active_band_count += 1;
             }
         }
@@ -262,7 +253,14 @@ impl MappingLayer {
         let fade_in_out_out = x * x * (3.0 - 2.0 * x);
 
         // ── Intensity ───────────────────────────────────────
-        let energy_term = (energy.short_term / INTENSITY_ENERGY_CEIL).clamp(0.0, 1.0);
+        let ref_decay = 0.5_f32.powf(dt / INTENSITY_REF_HALF_LIFE_S);
+        self.loudness_ref = (self.loudness_ref * ref_decay)
+            .max(energy.short_term)
+            .max(INTENSITY_REF_FLOOR);
+        let relative = (energy.short_term / self.loudness_ref).clamp(0.0, 1.0);
+        let absolute = (energy.short_term / INTENSITY_ENERGY_CEIL).clamp(0.0, 1.0);
+        let energy_term = INTENSITY_RELATIVE_WEIGHT * relative
+            + (1.0 - INTENSITY_RELATIVE_WEIGHT) * absolute;
         let band_term = active_band_count as f32 / 7.0;
         let activity = 0.55 * energy_term + 0.25 * motion_density + 0.20 * band_term;
         let intensity = self

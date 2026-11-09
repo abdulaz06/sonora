@@ -1,4 +1,4 @@
-use crate::audio::frame::Bands;
+use crate::frame::Bands;
 
 /// Per-band onset detection result.
 #[derive(Clone, Default)]
@@ -28,6 +28,12 @@ pub struct OnsetDetector {
     alpha: f32,
     /// Multiplier above mean for onset threshold.
     threshold_mult: f32,
+}
+
+impl Default for OnsetDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl OnsetDetector {

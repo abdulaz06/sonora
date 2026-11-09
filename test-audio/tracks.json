@@ -1,0 +1,148 @@
+{
+  "house-124": {
+    "file": "house-124.wav",
+    "duration": 105.645,
+    "sampleRate": 44100,
+    "markers": {
+      "silence": 1.5,
+      "fadeIn": 6.870967741935484,
+      "build": 43.645161290322584,
+      "drop": 49.45161290322581,
+      "breakdown": 86.22580645161291
+    },
+    "sections": [
+      [
+        "silence",
+        0,
+        3
+      ],
+      [
+        "intro",
+        3,
+        18.483870967741936
+      ],
+      [
+        "build",
+        18.483870967741936,
+        49.45161290322581
+      ],
+      [
+        "drop",
+        49.45161290322581,
+        80.41935483870968
+      ],
+      [
+        "breakdown",
+        80.41935483870968,
+        95.90322580645162
+      ],
+      [
+        "outro",
+        95.90322580645162,
+        105.64516129032259
+      ]
+    ]
+  },
+  "halftime-140": {
+    "file": "halftime-140.wav",
+    "duration": 65.714,
+    "sampleRate": 44100,
+    "markers": {
+      "silence": 1,
+      "fadeIn": 3.7142857142857144,
+      "build": 19.142857142857142,
+      "drop": 22.57142857142857,
+      "breakdown": 53.42857142857142
+    },
+    "sections": [
+      [
+        "silence",
+        0,
+        2
+      ],
+      [
+        "intro",
+        2,
+        8.857142857142858
+      ],
+      [
+        "build",
+        8.857142857142858,
+        22.57142857142857
+      ],
+      [
+        "drop",
+        22.57142857142857,
+        50
+      ],
+      [
+        "breakdown",
+        50,
+        65.71428571428571
+      ]
+    ]
+  },
+  "ambient-pad": {
+    "file": "ambient-pad.wav",
+    "duration": 92,
+    "sampleRate": 44100,
+    "markers": {
+      "silence": 1,
+      "fadeIn": 5,
+      "build": 30,
+      "drop": 46,
+      "breakdown": 80
+    },
+    "sections": [
+      [
+        "silence",
+        0,
+        2
+      ],
+      [
+        "swell",
+        2,
+        46
+      ],
+      [
+        "peak",
+        46,
+        60
+      ],
+      [
+        "fade",
+        60,
+        92
+      ]
+    ]
+  },
+  "silence-fadein": {
+    "file": "silence-fadein.wav",
+    "duration": 44,
+    "sampleRate": 44100,
+    "markers": {
+      "silence": 5,
+      "fadeIn": 16,
+      "build": 24,
+      "drop": 31,
+      "breakdown": 40
+    },
+    "sections": [
+      [
+        "silence",
+        0,
+        10
+      ],
+      [
+        "fade-in",
+        10,
+        30
+      ],
+      [
+        "steady",
+        30,
+        44
+      ]
+    ]
+  }
+}

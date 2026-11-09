@@ -1,8 +1,10 @@
-use crate::audio::frame::SpectralFeatures;
+use crate::frame::SpectralFeatures;
 
 pub struct SpectralAnalyzer {
     sample_rate: f32,
     fft_size: usize,
+    /// Scratch buffer for linear magnitudes (reused every frame).
+    linear: Vec<f32>,
 }
 
 impl SpectralAnalyzer {
@@ -10,19 +12,21 @@ impl SpectralAnalyzer {
         Self {
             sample_rate,
             fft_size,
+            linear: vec![0.0; fft_size / 2],
         }
     }
 
     /// Compute spectral features from the magnitude spectrum (dB scale).
-    pub fn process(&self, magnitudes_db: &[f32]) -> SpectralFeatures {
+    pub fn process(&mut self, magnitudes_db: &[f32]) -> SpectralFeatures {
         let num_bins = magnitudes_db.len();
         let freq_resolution = self.sample_rate / self.fft_size as f32;
 
         // Convert to linear magnitudes for the calculations
-        let linear: Vec<f32> = magnitudes_db
-            .iter()
-            .map(|&db| 10.0_f32.powf(db / 20.0))
-            .collect();
+        self.linear.resize(num_bins, 0.0);
+        for (l, &db) in self.linear.iter_mut().zip(magnitudes_db) {
+            *l = 10.0_f32.powf(db / 20.0);
+        }
+        let linear = &self.linear;
 
         let total_energy: f32 = linear.iter().map(|&m| m * m).sum();
 

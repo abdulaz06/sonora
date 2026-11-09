@@ -1,10 +1,16 @@
-use crate::audio::frame::EnergyData;
+use crate::frame::EnergyData;
 
 pub struct EnergyTracker {
     short_term: f32,
     long_term: f32,
     recent_peak: f32,
     peak_decay: f32,
+}
+
+impl Default for EnergyTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EnergyTracker {

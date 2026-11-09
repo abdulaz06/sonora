@@ -1,4 +1,4 @@
-use crate::audio::frame::{BandData, Bands};
+use crate::frame::{BandData, Bands};
 
 /// Frequency ranges for the 7 musically meaningful bands.
 const BAND_RANGES: [(f32, f32); 7] = [
@@ -71,13 +71,13 @@ impl BandExtractor {
 
         // Destructure into named fields — array index matches BAND_RANGES order
         Bands {
-            sub_bass: band_array[0].clone(),
-            bass: band_array[1].clone(),
-            low_mid: band_array[2].clone(),
-            mid: band_array[3].clone(),
-            upper_mid: band_array[4].clone(),
-            high: band_array[5].clone(),
-            air: band_array[6].clone(),
+            sub_bass: band_array[0],
+            bass: band_array[1],
+            low_mid: band_array[2],
+            mid: band_array[3],
+            upper_mid: band_array[4],
+            high: band_array[5],
+            air: band_array[6],
         }
     }
 }

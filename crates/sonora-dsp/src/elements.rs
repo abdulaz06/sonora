@@ -1,5 +1,5 @@
-use crate::audio::frame::{Bands, ElementData, Elements};
-use crate::audio::onsets::OnsetFrame;
+use crate::frame::{Bands, ElementData, Elements};
+use crate::onsets::OnsetFrame;
 
 pub struct ElementDetector {
     /// Smoothed element energies for presence tracking.
@@ -10,6 +10,12 @@ pub struct ElementDetector {
     vocal_smooth: f32,
     pad_smooth: f32,
     lead_smooth: f32,
+}
+
+impl Default for ElementDetector {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ElementDetector {
