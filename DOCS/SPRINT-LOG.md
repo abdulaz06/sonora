@@ -42,7 +42,7 @@
 
 ### 1. Repo reset
 - [x] 1.1 Audit code/docs; remove superseded docs
-- [x] 1.2 New `CLAUDE.md` (architecture, art-style system, Quality Bar, brand, git rules, harness)
+- [x] 1.2 New local working notes (architecture, art-style system, Quality Bar, brand, git rules, harness)
 - [x] 1.3 Aura + Halo moved to hidden Classic group ("Show classic styles", off by default)
 
 ### 2. Shared DSP crate + browser build
@@ -81,9 +81,9 @@
 - DSP: per-band normalisation + beat tracker rewrite were needed for signals to be usable (see DECISIONS D3/D4). Parity native vs WASM: max diff one rounding quantum (1e-3).
 - Event detector verified offline (`npm run events -- <track>`): house-124 build@40.4 drop@49.7 breakdown@83.2; halftime-140 build@16.2 drop@23.0 breakdown@52.8; ambient builds only on swells; silence-fadein no false drop.
 - Harness runs on the RX 7700S via system Edge (Playwright's bundled browser build not cached). House track, 1080p Medium: ~165 fps.
-- 4.5 interface is in code; documented in CLAUDE.md ("Art-style system").
+- 4.5 interface is in code; documented in the local working notes ("Art-style system") and in `src/styles/visual-style.ts`.
 - 1.1: the repo only tracked DOCS/14 (kept) besides assets; the superseded material was the README's old modes/limitations sections, rewritten. Older planning docs referenced by DOCS/16 (05, 15) were never committed.
-- CLAUDE.md and .claude/ are gitignored by design (D12); CLAUDE.md exists locally.
+- The working-notes file is gitignored by design (D12) and exists locally.
 - 6.1: release build OK (MSI 3.5 MB, NSIS 2.3 MB); built exe captured "Speakers (Realtek(R) Audio) 48000 Hz" and rendered Flow Ink with a quiet test clip.
 
 ## Blocked on Abdul

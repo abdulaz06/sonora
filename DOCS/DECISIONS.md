@@ -38,5 +38,5 @@ A radial splat is pure divergence and the pressure projection deletes it (only s
 ## D11 — Auto Drift on by default
 DOCS/16 lists palette drift under "never static"; drift defaults on with a 3-minute cycle and can be turned off or slowed to 10 minutes in settings.
 
-## D12 — CLAUDE.md and .claude/ stay untracked
-They are listed in `.gitignore` as local development-assistant files; the project-facing docs live in `DOCS/` and `README.md`.
+## D12 — Local working notes stay untracked
+The local working-notes file and tool settings are listed in `.gitignore`; the project-facing docs live in `DOCS/` and `README.md`.

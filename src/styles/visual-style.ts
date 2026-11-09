@@ -12,7 +12,9 @@
  * Styles consume the mapping layer (fade, intensity, presence, hits, juiced
  * FFT, beat) plus events, the world camera, the resolved palette, the quality
  * parameters, and may tweak `ctx.post` (bloom, grain, tonemap) for this frame.
- * See CLAUDE.md "Adding a style".
+ * Adding a style: write the module, add the id to `StyleId` and
+ * `STYLE_VARIANTS`, add a descriptor to `registry.ts`, then verify with
+ * `npm run verify` on all test tracks against the Quality Bar (DOCS/16).
  */
 
 import type { AudioFeatureFrame } from '../types/audio-frame';
