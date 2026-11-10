@@ -40,6 +40,9 @@ import fullscreenVertSrc from './shaders/fullscreen.vert?raw';
 import postBloomFragSrc from './shaders/post-bloom.frag?raw';
 import postCompositeFragSrc from './shaders/post-composite.frag?raw';
 
+/** A display frame up to this early still counts as on time for the cap (ms). */
+const CAP_SLACK_MS = 2;
+
 // ── Tuning ──────────────────────────────────────────────────────
 /** Style swap: fade out, swap, fade in (total seconds). */
 const STYLE_FADE_SECONDS = 0.6;
@@ -83,6 +86,8 @@ export interface Renderer {
   stop(): void;
   setResponsiveness(t: number): void;
   setQuality(preset: QualityPreset): void;
+  /** Frame-rate cap in fps; 0 = match the display. */
+  setFpsCap(fps: number): void;
   getQualityPreset(): QualityPreset;
   setStyle(id: StyleId, immediate?: boolean): void;
   getStyle(): StyleId;
@@ -159,6 +164,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   const envIntensity = new EnvelopeFollower(MEDIUM);
   const post: PostControls = { ...POST_DEFAULTS };
   const flash = new FlashGuard();
+  quality.setFrameBudget(1000 / 60);
 
   let descriptor = getStyle(options.initialStyle ?? 'flow-ink');
   let variant = descriptor.defaultVariant;
@@ -307,8 +313,19 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   // Beat onsets arrive at analysis rate; latch so a render frame never misses one.
   let beatOnsetLatched = false;
 
+  // Frame-rate cap: render on the display frame closest to each due time,
+  // keeping the average at the cap even when it does not divide the refresh.
+  let fpsCap = 60;
+  let nextDue = 0;
+
   function loop(now: number): void {
     if (!running) return;
+    if (fpsCap > 0) {
+      const interval = 1000 / fpsCap;
+      if (nextDue === 0 || now - nextDue > interval * 2) nextDue = now;
+      if (now < nextDue - CAP_SLACK_MS) { rafId = requestAnimationFrame(loop); return; }
+      nextDue += interval;
+    }
     const nowS = now / 1000;
     const wallDt = lastWall ? nowS - lastWall : 1 / 60;
     lastWall = nowS;
@@ -343,6 +360,11 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       const r = Math.max(0, Math.min(1, t));
       envIntensity.setParams(lerpParams(r));
       ctx.responsiveness = r;
+    },
+    setFpsCap(n: number): void {
+      fpsCap = n > 0 ? n : 0;
+      nextDue = 0;
+      quality.setFrameBudget(fpsCap > 0 ? 1000 / fpsCap : 0);
     },
     setQuality(p: QualityPreset): void {
       quality.setPreset(p);

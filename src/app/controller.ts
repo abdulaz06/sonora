@@ -64,6 +64,7 @@ export function initController(opts: ControllerOptions): Controller {
   renderer.colorEngine.setAutoDrift(settings.autoDrift);
   renderer.colorEngine.setDriftPeriod(settings.driftPeriod);
   renderer.setQuality(settings.quality);
+  renderer.setFpsCap(settings.fpsCap);
   renderer.setResponsiveness(settings.responsiveness);
   renderer.setRingCount(settings.ringCount);
   renderer.camera.setView(settings.camera);
@@ -154,6 +155,7 @@ export function initController(opts: ControllerOptions): Controller {
     onDriftPeriodChange: (s) => { renderer.colorEngine.setDriftPeriod(s); settings.driftPeriod = s; persist(); },
     onResponsivenessChange: (t) => { renderer.setResponsiveness(t); settings.responsiveness = t; persist(); },
     onQualityChange: (q) => { renderer.setQuality(q); settings.quality = q; persist(); },
+    onFpsCapChange: (n) => { renderer.setFpsCap(n); settings.fpsCap = n; persist(); },
     onAudioDeviceChange: opts.audio
       ? (id) => {
         if (settings.audioDevice === id) return;
@@ -173,6 +175,7 @@ export function initController(opts: ControllerOptions): Controller {
     driftPeriod: settings.driftPeriod,
     responsiveness: settings.responsiveness,
     quality: settings.quality,
+    fpsCap: settings.fpsCap,
     audioDevice: settings.audioDevice,
     audioDevices: opts.audio?.devices ?? [],
     currentAudioDeviceName: opts.audio?.currentName ?? '',

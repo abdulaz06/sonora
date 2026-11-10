@@ -5,7 +5,7 @@
  *   Camera       presets + height / tilt / curve (Depth view only)
  *   Colour       palette, custom hue, colour drift + drift speed
  *   Feel         responsiveness
- *   Performance  quality
+ *   Performance  quality, frame-rate cap
  *   Audio        source device (desktop only)
  *
  * Every control carries a one-line plain-language hint. Shared by the desktop
@@ -16,6 +16,7 @@
 import { CAMERA_PRESETS, type CameraView } from '../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
+import { FPS_CAPS } from '../ipc/settings';
 import { getStyle, visibleStyles } from '../styles/registry';
 import { variantSupportsLight, type LightMode, type StyleId } from '../styles/visual-style';
 import type { DeviceInfo } from '../ipc/audio-device';
@@ -82,6 +83,7 @@ export interface SettingsCallbacks {
   onDriftPeriodChange: (seconds: number) => void;
   onResponsivenessChange: (t: number) => void;
   onQualityChange: (preset: QualityPreset) => void;
+  onFpsCapChange: (fps: number) => void;
   /** Desktop: pick an output device to listen to. */
   onAudioDeviceChange?: (id: string) => void;
   /** Web: open the audio source chooser. */
@@ -102,6 +104,7 @@ export interface SettingsState {
   driftPeriod: number;
   responsiveness: number;
   quality: QualityPreset;
+  fpsCap: number;
   audioDevice: string;
   audioDevices: DeviceInfo[];
   currentAudioDeviceName: string;
@@ -308,6 +311,13 @@ function render(): void {
       <div class="title">Quality</div>
       <div class="seg">${(['low', 'medium', 'high', 'auto'] as QualityPreset[]).map((q) => segBtn('quality', q, q, state.quality === q)).join('')}</div>
       ${hint(QUALITY_HINTS[state.quality])}
+      <div class="field"><div class="label">Frame rate</div>
+        <div class="seg">${FPS_CAPS.map((n) => segBtn('fps', String(n), n === 0 ? 'max' : String(n), state.fpsCap === n)).join('')}</div>
+        ${hint(state.fpsCap === 0 ? 'Matches your display’s refresh rate. Smoothest on fast screens, but works the graphics card hardest.'
+          : state.fpsCap < 60 ? 'Caps at 30 fps to ease the load on slower computers. Motion is less smooth.'
+          : state.fpsCap === 60 ? 'Smooth on any screen. Raise it on high-refresh displays if your graphics card keeps up; lower it if it stutters.'
+          : `Caps at ${state.fpsCap} fps for high-refresh displays. Needs a capable graphics card; pair with Auto quality if it stutters.`)}
+      </div>
     </div>
     ${audio}
     <div class="sec">
@@ -359,6 +369,7 @@ function onClick(e: MouseEvent): void {
     }
     case 'drift': state.autoDrift = v === '1'; cb.onAutoDriftChange(state.autoDrift); break;
     case 'quality': state.quality = v as QualityPreset; cb.onQualityChange(state.quality); break;
+    case 'fps': state.fpsCap = Number(v); cb.onFpsCapChange(state.fpsCap); break;
     case 'audio-source': setOpen(false); cb.onOpenAudioSource?.(); return;
     default: return;
   }

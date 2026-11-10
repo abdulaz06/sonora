@@ -65,6 +65,8 @@ export class QualityManager {
   private level: QualityLevel = 'medium';
   private samples: number[] = [];
   private displayMs = 1000 / 60;
+  /** Frame interval the cap allows (ms); 0 = uncapped. */
+  private budgetMs = 0;
   private fastFor = 0;
   private sinceChange = 0;
   private bannedUntil: Partial<Record<QualityLevel, number>> = {};
@@ -83,6 +85,10 @@ export class QualityManager {
     this.setLevel(p === 'auto' ? 'medium' : p);
   }
 
+  /** The frame-rate cap's interval (ms), or 0 when uncapped. Capped frames
+   *  alternate between display intervals, so Auto judges against the cap. */
+  setFrameBudget(ms: number): void { this.budgetMs = Math.max(0, ms); }
+
   /** Feed the real wall-clock frame delta (ms). */
   sample(frameMs: number): void {
     if (frameMs <= 0 || frameMs > AUTO_MAX_SAMPLE_MS) return;
@@ -98,7 +104,7 @@ export class QualityManager {
     this.samples = [];
     if (this.preset !== 'auto') return;
 
-    const ratio = avg / this.displayMs;
+    const ratio = avg / Math.max(this.displayMs, this.budgetMs);
     const idx = ORDER.indexOf(this.level);
     if (ratio > AUTO_SLOW_RATIO && idx > 0 && this.sinceChange > AUTO_COOLDOWN_S) {
       this.bannedUntil[this.level] = this.clock + AUTO_BAN_S;

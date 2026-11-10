@@ -64,7 +64,7 @@ const CFG: Record<Variant, VariantCfg> = {
   silk: { count: 1, decay: 0.84, point: 1, gain: 0.03, display: 1.1, paint: false },
   lumen: { count: 0.12, decay: 0.8, point: 1, gain: 0.005, display: 1.0, paint: false },
   wisp: { count: 0.06, decay: 0.975, point: 1, gain: 0.014, display: 1.5, paint: false },
-  starry: { count: 0.25, decay: 0.9, point: 1, gain: 1, display: 1, paint: true },
+  starry: { count: 0.13, decay: 0.9, point: 1, gain: 1, display: 1, paint: true },
   warp: { count: 0.06, decay: 0.5, point: 1, gain: 0.75, display: 1, paint: false },
 };
 
@@ -363,7 +363,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_stateA: state.read.tex[0], u_stateB: state.read.tex[1], u_side: side,
         u_point: cfg.point * Math.max(1, ctx.height / 1080), u_gain: cfg.gain * (variant === 'silk' ? 0.6 + 0.8 * ctx.fadeInOut : 1),
         u_sparkle: sparkle, u_res: [ctx.width, ctx.height],
-        u_stroke_len: 0.026 + 0.022 * speedEnv, u_stroke_w: 0.0065 + 0.0035 * speedEnv,
+        u_stroke_len: 0.026 + 0.022 * speedEnv, u_stroke_w: 0.0078 + 0.0042 * speedEnv,
         u_stars_w: starsWorld, u_star_w_count: variant === 'starry' ? starsWorld.length / 4 : 0,
         u_vp: [simplex2(time * 0.07, 4) * 0.25, simplex2(time * 0.06, 5) * 0.18], u_roll: cam.roll * 3,
         u_streak: 0.016 + 0.012 * ctx.intensitySmoothed,

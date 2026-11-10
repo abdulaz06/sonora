@@ -31,6 +31,8 @@ export interface PersistedSettings {
   responsiveness: number;
   /** Quality preset (`auto` adapts to frame time). */
   quality: QualityPreset;
+  /** Frame-rate cap (fps); 0 = match the display. */
+  fpsCap: number;
   /** Show Aura / Halo in the style picker. */
   showClassic: boolean;
   /** Slow hue rotation on top of the palette. */
@@ -59,6 +61,9 @@ export interface PersistedSettings {
   fullscreen: boolean;
 }
 
+/** Frame-rate cap choices; 0 = match the display. */
+export const FPS_CAPS = [30, 60, 90, 120, 144, 0] as const;
+
 export const DEFAULT_SETTINGS: PersistedSettings = {
   settingsVersion: SETTINGS_VERSION,
   mode: DEFAULT_STYLE,
@@ -67,6 +72,7 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   customHue: 200,
   responsiveness: 0.6,
   quality: 'medium',
+  fpsCap: 60,
   showClassic: false,
   autoDrift: false,
   driftPeriod: DEFAULT_DRIFT_PERIOD_S,
@@ -164,6 +170,7 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     out.variants = variants;
   }
   if (typeof r.showClassic === 'boolean') out.showClassic = r.showClassic;
+  if (typeof r.fpsCap === 'number' && (FPS_CAPS as readonly number[]).includes(r.fpsCap)) out.fpsCap = r.fpsCap;
   // v3: Auto Drift defaults off (it made palettes look wrong); older saves reset it.
   const version = typeof r.settingsVersion === 'number' ? r.settingsVersion : 1;
   if (typeof r.autoDrift === 'boolean' && version >= 3) out.autoDrift = r.autoDrift;
