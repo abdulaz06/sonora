@@ -9,6 +9,7 @@ import { createFlowInkStyle } from './flow-ink/flow-ink';
 import { createStrandsStyle } from './strands/strands';
 import { createTuringStyle } from './turing/turing';
 import { createMoshStyle } from './mosh/mosh';
+import { createFractalStyle } from './fractal/fractal';
 import { STYLE_VARIANTS, type StyleCategory, type StyleDescriptor, type StyleId } from './visual-style';
 
 export const STYLES: StyleDescriptor[] = [
@@ -35,6 +36,12 @@ export const STYLES: StyleDescriptor[] = [
     variants: STYLE_VARIANTS.mosh, defaultVariant: 'concrete',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: createMoshStyle,
+  },
+  {
+    id: 'fractal', label: 'Fractal', category: 'art',
+    variants: STYLE_VARIANTS.fractal, defaultVariant: 'voyage',
+    supportsLight: false, supportsDepth: false, defaultDepth: false,
+    create: createFractalStyle,
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',

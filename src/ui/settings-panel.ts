@@ -30,6 +30,10 @@ const PRESET_MATCH = 0.03;
 /** Plain-language descriptions shown under controls. */
 const STYLE_HINTS: Partial<Record<StyleId, string>> = {
   'flow-ink': 'Liquid ink that splashes on every beat and drifts with the music.',
+  strands: 'Millions of light particles drawn into threads, beams and trails.',
+  turing: 'A living pattern that grows spots, mazes and stripes with the music. Song titles grow into it.',
+  mosh: 'A glitchy tunnel of nested frames that smears, tears and freezes on the drop.',
+  fractal: 'A flight through an endless 3D fractal. Heavy on the graphics card; try Low on laptops.',
   aura: 'Classic v0.1 rings, particles and glow.',
   halo: 'Classic v0.1 circular spectrum.',
 };
@@ -39,6 +43,17 @@ const VARIANT_HINTS: Record<string, string> = {
   marble: 'Two-tone marbling with a fine stippled grain.',
   circle: 'Round rings.', triangle: 'Triangular rings.', square: 'Square rings.',
   soft: 'Soft, glowing bars.', sharp: 'Crisp, thin bars.',
+  silk: 'Flowing silk threads that ripple out from the bass.',
+  lumen: 'Fine light filaments bursting from a moving source.',
+  wisp: 'Three flames trailing smoke rings on the beat.',
+  starry: 'Brushstrokes swirling around stars, like a night painting.',
+  warp: 'Streaking stars at hyperspace speed. Builds speed up, drops jump.',
+  coral: 'Ink-on-paper coral, spots and mazes.',
+  bio: 'Glowing deep-sea patterns on black.',
+  concrete: 'Worn concrete and asphalt with cracks and paint.',
+  signal: 'Squares, rings and spectrum bars from Sonora itself.',
+  voyage: 'Fly through fractal halls and canyons. Drops dive.',
+  kaleido: 'The flight folded into a mirrored mandala. Drops flip the symmetry.',
 };
 const QUALITY_HINTS: Record<QualityPreset, string> = {
   low: 'Smaller simulation and render size. Use on laptops or integrated graphics.',
@@ -47,7 +62,7 @@ const QUALITY_HINTS: Record<QualityPreset, string> = {
   auto: 'Starts at Medium and steps up or down to keep motion smooth.',
 };
 const LIGHT_HINTS: Record<LightMode, string> = {
-  auto: 'Uses each look’s natural background (Sumi is paper, the others are dark).',
+  auto: 'Uses each look’s natural background (Sumi and Coral are paper, the others are dark).',
   dark: 'Always a dark background.',
   light: 'Always a light, paper-like background.',
 };

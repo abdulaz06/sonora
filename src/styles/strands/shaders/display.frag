@@ -42,13 +42,15 @@ void main() {
   float dust = clamp(acc.g, 0.0, 1.5);
   if (u_light == 1) {
     vec3 ink = mix(vec3(0.02), u_c1 * 0.25, 0.2);
-    col = mix(u_paper, ink, c * 0.96);
+    col = mix(u_paper, ink, min(c * (0.96 + 0.5 * u_pulse), 1.0));
     col = mix(col, ink, dust * 0.6);
   } else {
+    // Threads light up on the frame of each bass hit (energy glow).
+    float e = 1.0 + 1.3 * u_pulse;
     col = u_bg * 0.6;
-    col += u_c0 * c * 1.1;
-    col += u_c3 * smoothstep(0.55, 1.0, c) * 1.6;
-    col += mix(u_c0, u_c3, 0.6) * dust * 0.9;
+    col += u_c0 * c * 1.1 * e;
+    col += u_c3 * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 1.6 * e;
+    col += mix(u_c0, u_c3, 0.6) * dust * 0.9 * e;
   }
 #elif VARIANT == 1
   // Lumen: filaments + a hot core with anamorphic streaks.

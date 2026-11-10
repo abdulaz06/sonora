@@ -129,6 +129,7 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
     <span class="brand">sonora</span>
     <span id="src-slot"></span>
     <button id="play" style="display:none">Pause</button>
+    <button id="seed" title="Grow a word into the Turing pattern (fires a track change with this title)">Seed text</button>
     <span id="clock" class="dim" style="display:none"></span>
     <span id="fps" class="dim">-- fps</span>
   `;
@@ -146,7 +147,12 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
     const buf = await source.loadFile(data);
     await source.playBuffer(buf, 0, () => { playBtn.textContent = 'Play'; }, label);
     playBtn.textContent = 'Pause';
+    renderer.events.notifyTrackChange({ title: label.replace(/\.[a-z0-9]+$/i, '') });
   };
+  bar.querySelector<HTMLButtonElement>('#seed')!.addEventListener('click', () => {
+    const text = window.prompt('Text to grow into the pattern (Turing style)', 'SONORA');
+    if (text && text.trim()) renderer.events.notifyTrackChange({ title: text.trim() });
+  });
   const ui = createSourceUi(source, Object.entries(tracks).map(([id, m]) => ({ id, file: m.file })), playData);
   bar.querySelector('#src-slot')!.replaceWith(ui.chip);
 
