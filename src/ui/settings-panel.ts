@@ -1,16 +1,19 @@
 /**
  * Settings panel — gear button bottom-right opens a side panel:
- *   Visual       style (classic group hidden behind a toggle), variant,
- *                Depth/Flat view, background (auto/dark/light), rings (Aura)
- *   Colour       palette swatches, custom hue, Auto Drift + cycle length
+ *   Style        style, look, Depth/Flat view, background, rings (Aura),
+ *                classic-styles toggle
+ *   Camera       presets + height / tilt / curve (Depth view only)
+ *   Colour       palette, custom hue, colour drift + drift speed
  *   Feel         responsiveness
- *   Performance  Low / Medium / High / Auto
+ *   Performance  quality
  *   Audio        source device (desktop only)
  *
- * Shared by the desktop app and the web dev page. Brand rules: Night/Bone
- * only, mono uppercase labels, square corners, 1 px Bone/12% dividers.
+ * Every control carries a one-line plain-language hint. Shared by the desktop
+ * app and the web dev page. Brand rules: Night/Bone only, mono uppercase
+ * labels, square corners, 1 px Bone/12% dividers.
  */
 
+import { CAMERA_PRESETS, type CameraView } from '../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
 import { getStyle, visibleStyles } from '../styles/registry';
@@ -21,6 +24,33 @@ export type { StyleId, QualityPreset };
 
 const RING_COUNT_MIN = 2;
 const RING_COUNT_MAX = 10;
+/** Two camera views count as "the same preset" within this distance. */
+const PRESET_MATCH = 0.03;
+
+/** Plain-language descriptions shown under controls. */
+const STYLE_HINTS: Partial<Record<StyleId, string>> = {
+  'flow-ink': 'Liquid ink that splashes on every beat and drifts with the music.',
+  aura: 'Classic v0.1 rings, particles and glow.',
+  halo: 'Classic v0.1 circular spectrum.',
+};
+const VARIANT_HINTS: Record<string, string> = {
+  ink: 'Glowing coloured ink on a dark background.',
+  sumi: 'Black ink on bone paper, like ink dropped in water.',
+  marble: 'Two-tone marbling with a fine stippled grain.',
+  circle: 'Round rings.', triangle: 'Triangular rings.', square: 'Square rings.',
+  soft: 'Soft, glowing bars.', sharp: 'Crisp, thin bars.',
+};
+const QUALITY_HINTS: Record<QualityPreset, string> = {
+  low: 'Smaller simulation and render size. Use on laptops or integrated graphics.',
+  medium: 'Balanced detail. Smooth on most dedicated graphics cards.',
+  high: 'Full resolution and the finest ink detail.',
+  auto: 'Starts at Medium and steps up or down to keep motion smooth.',
+};
+const LIGHT_HINTS: Record<LightMode, string> = {
+  auto: 'Uses each look’s natural background (Sumi is paper, the others are dark).',
+  dark: 'Always a dark background.',
+  light: 'Always a light, paper-like background.',
+};
 
 export interface SettingsCallbacks {
   onStyleChange: (style: StyleId) => void;
@@ -29,6 +59,7 @@ export interface SettingsCallbacks {
   onLightModeChange: (mode: LightMode) => void;
   onShowClassicChange: (on: boolean) => void;
   onRingCountChange: (n: number) => void;
+  onCameraChange: (view: CameraView) => void;
   /** -1 means custom (use the custom hue). */
   onPaletteChange: (paletteIndex: number) => void;
   onCustomHueChange: (hue: number) => void;
@@ -47,6 +78,7 @@ export interface SettingsState {
   lightMode: LightMode;
   showClassic: boolean;
   ringCount: number;
+  camera: CameraView;
   paletteIndex: number;
   customHue: number;
   autoDrift: boolean;
@@ -69,28 +101,30 @@ const CSS = `
 #settings-btn:hover, #settings-btn.active { color: #ECE7DF; border-color: rgba(236, 231, 223, 0.5); }
 #settings-btn svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; }
 #settings-panel {
-  position: fixed; top: 0; right: 0; bottom: 0; width: 304px;
-  background: rgba(8, 8, 10, 0.9); border-left: 1px solid rgba(236, 231, 223, 0.12);
+  position: fixed; top: 0; right: 0; bottom: 0; width: 320px;
+  background: rgba(8, 8, 10, 0.92); border-left: 1px solid rgba(236, 231, 223, 0.12);
   color: rgba(236, 231, 223, 0.86); z-index: 998; padding: 20px 20px 72px;
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 12px;
-  transform: translateX(320px); opacity: 0; pointer-events: none;
+  transform: translateX(340px); opacity: 0; pointer-events: none;
   transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s;
   overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(236,231,223,0.2) transparent;
 }
 #settings-panel.open { transform: none; opacity: 1; pointer-events: auto; }
 #settings-panel .sec { padding: 16px 0; border-top: 1px solid rgba(236, 231, 223, 0.12); }
 #settings-panel .sec:first-child { border-top: 0; padding-top: 0; }
-#settings-panel .mono, #settings-panel .title, #settings-panel .label, #settings-panel button,
-#settings-panel select, #settings-panel .val {
+#settings-panel .title, #settings-panel .label, #settings-panel button, #settings-panel select, #settings-panel .val, #settings-panel .mono {
   font-family: 'IBM Plex Mono', 'JetBrains Mono', Consolas, monospace;
   text-transform: uppercase; letter-spacing: 0.12em; font-size: 10px;
 }
 #settings-panel .title { color: rgba(236, 231, 223, 0.38); margin-bottom: 12px; }
-#settings-panel .field { margin-bottom: 12px; }
+#settings-panel .field { margin-bottom: 14px; }
 #settings-panel .field:last-child { margin-bottom: 0; }
-#settings-panel .label { color: rgba(236, 231, 223, 0.6); margin-bottom: 6px; display: flex; justify-content: space-between; }
-#settings-panel .val { color: rgba(236, 231, 223, 0.9); }
-#settings-panel .seg { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid rgba(236, 231, 223, 0.12); }
+#settings-panel .label { color: rgba(236, 231, 223, 0.62); margin-bottom: 6px; display: flex; justify-content: space-between; }
+#settings-panel .val { color: rgba(236, 231, 223, 0.9); letter-spacing: 0.06em; }
+#settings-panel .hint { font-size: 11px; line-height: 1.45; color: rgba(236, 231, 223, 0.45); margin-top: 6px; }
+#settings-panel .ends { display: flex; justify-content: space-between; font-family: 'IBM Plex Mono', Consolas, monospace;
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(236, 231, 223, 0.35); margin-top: 3px; }
+#settings-panel .seg { display: flex; flex-wrap: wrap; border: 1px solid rgba(236, 231, 223, 0.12); }
 #settings-panel .seg button {
   flex: 1 1 auto; min-width: 25%; background: transparent; border: 0;
   border-right: 1px solid rgba(236, 231, 223, 0.12); color: rgba(236, 231, 223, 0.55);
@@ -106,10 +140,9 @@ const CSS = `
 #settings-panel .sw { aspect-ratio: 1; cursor: pointer; border: 1px solid transparent; outline: 1px solid rgba(236,231,223,0.12); }
 #settings-panel .sw.on { border-color: #08080A; outline: 1px solid #ECE7DF; }
 #settings-panel .sw.custom { background: conic-gradient(#d33, #dd3, #3d6, #3cd, #36d, #c3d, #d33); }
-#settings-panel .check { display: flex; align-items: center; gap: 8px; cursor: pointer; color: rgba(236,231,223,0.6); }
+#settings-panel .check { display: flex; align-items: center; gap: 8px; cursor: pointer; color: rgba(236,231,223,0.62); }
 #settings-panel .check input { accent-color: #ECE7DF; }
 #settings-panel select { width: 100%; background: #08080A; color: #ECE7DF; border: 1px solid rgba(236,231,223,0.18); padding: 6px; }
-#settings-panel .small { font-size: 11px; color: rgba(236, 231, 223, 0.42); margin-top: 6px; text-transform: none; letter-spacing: 0; }
 #settings-panel kbd { font-family: inherit; border: 1px solid rgba(236,231,223,0.2); padding: 0 4px; margin-right: 6px; }
 #settings-panel .keys { line-height: 1.9; color: rgba(236,231,223,0.55); }
 `;
@@ -122,79 +155,141 @@ let panel: HTMLDivElement | null = null;
 let btn: HTMLButtonElement | null = null;
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
-const segBtn = (action: string, value: string, label: string, on: boolean): string =>
-  `<button data-a="${action}" data-v="${esc(value)}" class="${on ? 'on' : ''}">${esc(label)}</button>`;
+const segBtn = (action: string, value: string, label: string, on: boolean, title = ''): string =>
+  `<button data-a="${action}" data-v="${esc(value)}" class="${on ? 'on' : ''}"${title ? ` title="${esc(title)}"` : ''}>${esc(label)}</button>`;
+const hint = (text: string, id = ''): string => `<div class="hint"${id ? ` id="${id}"` : ''}>${esc(text)}</div>`;
+const ends = (a: string, b: string, c = ''): string =>
+  `<div class="ends"><span>${esc(a)}</span>${c ? `<span>${esc(c)}</span>` : ''}<span>${esc(b)}</span></div>`;
+
+function activePreset(v: CameraView): string | null {
+  for (const p of CAMERA_PRESETS) {
+    if (Math.abs(p.view.height - v.height) < PRESET_MATCH && Math.abs(p.view.tilt - v.tilt) < PRESET_MATCH
+      && Math.abs(p.view.curve - v.curve) < PRESET_MATCH) return p.id;
+  }
+  return null;
+}
+
+function cycleText(seconds: number): string {
+  const m = seconds / 60;
+  return `One full colour cycle every ${m < 1.5 ? `${Math.round(seconds)} seconds` : `${m.toFixed(m < 10 ? 1 : 0)} minutes`}.`;
+}
 
 function render(): void {
   if (!panel) return;
   const desc = getStyle(state.style);
   const styles = visibleStyles(state.showClassic);
   const palName = state.paletteIndex >= 0 ? PALETTES[state.paletteIndex]?.name ?? '' : 'Custom';
+  const preset = activePreset(state.camera);
+  const presetHint = CAMERA_PRESETS.find((p) => p.id === preset)?.hint ?? 'Custom view.';
+  const depthOn = desc.supportsDepth && state.depth;
+
+  const camera = depthOn ? `
+    <div class="sec">
+      <div class="title">Camera</div>
+      <div class="field"><div class="label">View preset</div>
+        <div class="seg">${CAMERA_PRESETS.map((p) => segBtn('preset', p.id, p.label, p.id === preset, p.hint)).join('')}</div>
+        ${hint(presetHint)}
+      </div>
+      <div class="field"><div class="label">Height</div>
+        <input type="range" data-a="cam-height" min="0" max="100" value="${Math.round(state.camera.height * 100)}">
+        ${ends('Skim the surface', 'High above')}
+      </div>
+      <div class="field"><div class="label">Tilt</div>
+        <input type="range" data-a="cam-tilt" min="0" max="100" value="${Math.round(state.camera.tilt * 100)}">
+        ${ends('Toward horizon', 'Straight down')}
+      </div>
+      <div class="field"><div class="label">Curve</div>
+        <input type="range" data-a="cam-curve" min="-100" max="100" value="${Math.round(state.camera.curve * 100)}">
+        ${ends('Bowl  U', 'Planet  ∩', 'Flat')}
+      </div>
+      ${hint('Drag on the picture to look around. Scroll to change height. Double-click to reset the preset.')}
+    </div>` : desc.supportsDepth ? `
+    <div class="sec">
+      <div class="title">Camera</div>
+      ${hint('Drag on the picture to move around. Scroll to zoom in and out. Switch View to Depth for camera presets.')}
+    </div>` : '';
+
   const audio = cb.onAudioDeviceChange ? `
     <div class="sec">
       <div class="title">Audio</div>
       <div class="field"><div class="label">Source</div>
         <select data-a="device">${deviceOptions()}</select>
-        <div class="small">${state.currentAudioDeviceName ? `Capturing: ${esc(state.currentAudioDeviceName)}` : 'No audio device'}</div>
+        ${hint(state.currentAudioDeviceName ? `Listening to: ${state.currentAudioDeviceName}. "Default" follows whatever Windows is playing through.` : 'No audio device found.')}
       </div>
     </div>` : '';
 
   panel.innerHTML = `
     <div class="sec">
-      <div class="title">Visual</div>
-      <div class="field"><div class="label">Style</div>
+      <div class="title">Style</div>
+      <div class="field">
         <div class="seg">${styles.map((s) => segBtn('style', s.id, s.label, s.id === state.style)).join('')}</div>
+        ${hint(STYLE_HINTS[state.style] ?? '')}
       </div>
       <div class="field"><div class="label">Look</div>
         <div class="seg">${desc.variants.map((v) => segBtn('variant', v.id, v.label, v.id === state.variant)).join('')}</div>
+        ${hint(VARIANT_HINTS[state.variant] ?? '')}
       </div>
       ${desc.supportsDepth ? `<div class="field"><div class="label">View</div>
-        <div class="seg">${segBtn('depth', '1', 'Depth', state.depth)}${segBtn('depth', '0', 'Flat', !state.depth)}</div></div>` : ''}
+        <div class="seg">${segBtn('depth', '1', 'Depth', state.depth)}${segBtn('depth', '0', 'Flat', !state.depth)}</div>
+        ${hint(state.depth ? 'Fly over the ink as a 3D surface.' : 'Look straight down at the ink, like a canvas.')}</div>` : ''}
       ${desc.supportsLight ? `<div class="field"><div class="label">Background</div>
-        <div class="seg">${(['auto', 'dark', 'light'] as LightMode[]).map((m) => segBtn('light', m, m, state.lightMode === m)).join('')}</div></div>` : ''}
+        <div class="seg">${(['auto', 'dark', 'light'] as LightMode[]).map((m) => segBtn('light', m, m, state.lightMode === m)).join('')}</div>
+        ${hint(LIGHT_HINTS[state.lightMode])}</div>` : ''}
       ${desc.id === 'aura' ? `<div class="field"><div class="label">Rings <span class="val" id="ring-val">${state.ringCount}</span></div>
         <input type="range" data-a="rings" min="${RING_COUNT_MIN}" max="${RING_COUNT_MAX}" step="1" value="${state.ringCount}"></div>` : ''}
       <label class="check mono"><input type="checkbox" data-a="classic" ${state.showClassic ? 'checked' : ''}> Show classic styles</label>
+      ${hint('Adds Aura and Halo from Sonora 0.1 to the style list.')}
     </div>
+    ${camera}
     <div class="sec">
       <div class="title">Colour</div>
       <div class="field"><div class="label">Palette <span class="val">${esc(palName)}</span></div>
         <div class="swatches">
           ${PALETTES.map((p, i) => `<div class="sw ${i === state.paletteIndex ? 'on' : ''}" data-a="palette" data-v="${i}" title="${esc(p.name)}" style="background:${p.duotone ? `linear-gradient(135deg, ${p.preview} 50%, #08080A 50%)` : p.preview}"></div>`).join('')}
-          <div class="sw custom ${state.paletteIndex < 0 ? 'on' : ''}" data-a="palette" data-v="-1" title="Custom"></div>
+          <div class="sw custom ${state.paletteIndex < 0 ? 'on' : ''}" data-a="palette" data-v="-1" title="Custom colour"></div>
         </div>
+        ${hint('Split swatches are two-tone palettes: one colour plus black.')}
       </div>
-      ${state.paletteIndex < 0 ? `<div class="field"><div class="label">Hue <span class="val" id="hue-val">${state.customHue}°</span></div>
-        <input type="range" class="hue" data-a="hue" min="0" max="360" step="1" value="${state.customHue}"></div>` : ''}
-      <div class="field"><div class="label">Auto drift</div>
-        <div class="seg">${segBtn('drift', '1', 'On', state.autoDrift)}${segBtn('drift', '0', 'Off', !state.autoDrift)}</div>
+      ${state.paletteIndex < 0 ? `<div class="field"><div class="label">Custom colour <span class="val" id="hue-val">${state.customHue}°</span></div>
+        <input type="range" class="hue" data-a="hue" min="0" max="360" step="1" value="${state.customHue}">
+        ${hint('Builds a matching palette around the colour you pick.')}</div>` : ''}
+      <div class="field"><div class="label">Colour drift</div>
+        <div class="seg">${segBtn('drift', '0', 'Off', !state.autoDrift)}${segBtn('drift', '1', 'On', state.autoDrift)}</div>
+        ${hint(state.autoDrift ? 'Slowly rotates every colour of the palette around the colour wheel.' : 'Colours stay exactly as the palette defines them.')}
       </div>
-      ${state.autoDrift ? `<div class="field"><div class="label">Cycle <span class="val" id="drift-val">${(state.driftPeriod / 60).toFixed(1)} min</span></div>
-        <input type="range" data-a="period" min="${MIN_DRIFT_PERIOD_S}" max="${MAX_DRIFT_PERIOD_S}" step="10" value="${state.driftPeriod}"></div>` : ''}
+      ${state.autoDrift ? `<div class="field"><div class="label">Drift speed</div>
+        <input type="range" data-a="period" min="${MIN_DRIFT_PERIOD_S}" max="${MAX_DRIFT_PERIOD_S}" step="10" value="${MAX_DRIFT_PERIOD_S + MIN_DRIFT_PERIOD_S - state.driftPeriod}">
+        ${ends('Slow', 'Fast')}
+        ${hint(cycleText(state.driftPeriod), 'drift-val')}</div>` : ''}
     </div>
     <div class="sec">
       <div class="title">Feel</div>
-      <div class="field"><div class="label">Responsiveness <span class="val">smooth — punchy</span></div>
-        <input type="range" data-a="resp" min="0" max="100" value="${Math.round(state.responsiveness * 100)}"></div>
+      <div class="field"><div class="label">Responsiveness</div>
+        <input type="range" data-a="resp" min="0" max="100" value="${Math.round(state.responsiveness * 100)}">
+        ${ends('Smooth', 'Punchy')}
+        ${hint('How hard the visuals react to each beat. Smooth flows and glows gently; punchy snaps and flashes on every hit.')}
+      </div>
     </div>
     <div class="sec">
-      <div class="title">Performance</div>
+      <div class="title">Quality</div>
       <div class="seg">${(['low', 'medium', 'high', 'auto'] as QualityPreset[]).map((q) => segBtn('quality', q, q, state.quality === q)).join('')}</div>
+      ${hint(QUALITY_HINTS[state.quality])}
     </div>
     ${audio}
     <div class="sec">
       <div class="title">Keys</div>
       <div class="keys mono">
-        <div><kbd>F</kbd>Fullscreen</div><div><kbd>H</kbd>Clean mode</div><div><kbd>D</kbd>Debug overlay</div>
-        <div><kbd>S</kbd>Next style</div><div><kbd>V</kbd>Depth / flat</div><div><kbd>1</kbd>–<kbd>0</kbd>Palette</div>
+        <div><kbd>F</kbd>Fullscreen</div><div><kbd>H</kbd>Hide all controls</div><div><kbd>D</kbd>Show audio signals</div>
+        <div><kbd>S</kbd>Next style</div><div><kbd>V</kbd>Depth / flat</div><div><kbd>C</kbd>Next camera preset</div>
+        <div><kbd>1</kbd>–<kbd>0</kbd>Palette</div>
       </div>
     </div>
-    <div class="sec small">sonora 0.2.0 — a visual instrument for whatever's playing.</div>
+    <div class="sec hint">sonora 0.2.0 — a visual instrument for whatever's playing.</div>
   `;
 }
 
 function deviceOptions(): string {
-  const opts = [`<option value="default">Default (auto-switch)</option>`];
+  const opts = [`<option value="default">Default (follows Windows)</option>`];
   let seen = state.audioDevice === 'default';
   for (const d of state.audioDevices) {
     if (d.id === state.audioDevice) seen = true;
@@ -214,6 +309,13 @@ function onClick(e: MouseEvent): void {
     case 'variant': state.variant = v; cb.onVariantChange(v); break;
     case 'depth': state.depth = v === '1'; cb.onDepthChange(state.depth); break;
     case 'light': state.lightMode = v as LightMode; cb.onLightModeChange(state.lightMode); break;
+    case 'preset': {
+      const p = CAMERA_PRESETS.find((x) => x.id === v);
+      if (!p) return;
+      state.camera = { ...p.view };
+      cb.onCameraChange(state.camera);
+      break;
+    }
     case 'palette': {
       const idx = Number(v);
       state.paletteIndex = idx;
@@ -232,11 +334,20 @@ function onInput(e: Event): void {
   const el = e.target as HTMLInputElement | HTMLSelectElement;
   const a = el.dataset.a;
   const setText = (id: string, t: string): void => { const n = panel?.querySelector(`#${id}`); if (n) n.textContent = t; };
-  if (a === 'rings') { state.ringCount = Number(el.value); setText('ring-val', el.value); cb.onRingCountChange(state.ringCount); }
-  else if (a === 'hue') { state.customHue = Number(el.value); setText('hue-val', `${el.value}°`); cb.onCustomHueChange(state.customHue); }
-  else if (a === 'period') { state.driftPeriod = Number(el.value); setText('drift-val', `${(state.driftPeriod / 60).toFixed(1)} min`); cb.onDriftPeriodChange(state.driftPeriod); }
-  else if (a === 'resp') { state.responsiveness = Number(el.value) / 100; cb.onResponsivenessChange(state.responsiveness); }
-  else if (a === 'classic' && el instanceof HTMLInputElement) {
+  const n = Number(el.value);
+  if (a === 'rings') { state.ringCount = n; setText('ring-val', el.value); cb.onRingCountChange(n); }
+  else if (a === 'hue') { state.customHue = n; setText('hue-val', `${el.value}°`); cb.onCustomHueChange(n); }
+  else if (a === 'period') {
+    // Slider runs slow → fast, so invert to a period.
+    state.driftPeriod = MAX_DRIFT_PERIOD_S + MIN_DRIFT_PERIOD_S - n;
+    setText('drift-val', cycleText(state.driftPeriod));
+    cb.onDriftPeriodChange(state.driftPeriod);
+  } else if (a === 'resp') { state.responsiveness = n / 100; cb.onResponsivenessChange(state.responsiveness); }
+  else if (a === 'cam-height' || a === 'cam-tilt' || a === 'cam-curve') {
+    const key = a === 'cam-height' ? 'height' : a === 'cam-tilt' ? 'tilt' : 'curve';
+    state.camera = { ...state.camera, [key]: n / 100 };
+    cb.onCameraChange(state.camera);
+  } else if (a === 'classic' && el instanceof HTMLInputElement) {
     state.showClassic = el.checked;
     cb.onShowClassicChange(el.checked);
     render();
@@ -271,14 +382,18 @@ export function initSettingsPanel(callbacks: SettingsCallbacks, initial: Setting
   panel.addEventListener('change', (e) => {
     const el = e.target as HTMLElement;
     if (el.tagName === 'SELECT' || (el as HTMLInputElement).type === 'checkbox') onInput(e);
+    // Re-render after a camera slider is released so the preset highlight updates.
+    if ((el as HTMLInputElement).dataset?.a?.startsWith('cam-')) render();
   });
   document.body.appendChild(panel);
   render();
 
   document.addEventListener('click', (e) => {
     if (!panel?.classList.contains('open')) return;
-    const t = e.target as Node;
-    if (panel.contains(t) || btn?.contains(t)) return;
+    // composedPath() still holds the panel when a click re-rendered (and
+    // detached) its own target.
+    const path = e.composedPath();
+    if ((panel && path.includes(panel)) || (btn && path.includes(btn))) return;
     setOpen(false);
   });
   document.addEventListener('keydown', (e) => {
@@ -286,7 +401,7 @@ export function initSettingsPanel(callbacks: SettingsCallbacks, initial: Setting
   });
 }
 
-/** Push external changes (keyboard shortcuts, other widgets) into the panel. */
+/** Push external changes (keyboard shortcuts, mouse, other widgets) into the panel. */
 export function syncSettings(patch: Partial<SettingsState>): void {
   if (!panel) return;
   state = { ...state, ...patch };

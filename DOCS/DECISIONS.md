@@ -40,3 +40,17 @@ DOCS/16 lists palette drift under "never static"; drift defaults on with a 3-min
 
 ## D12 — Local working notes stay untracked
 The local working-notes file and tool settings are listed in `.gitignore`; the project-facing docs live in `DOCS/` and `README.md`.
+
+## D13 — Beat response bypasses the solver
+**Context:** Flow Ink 2.0 looked good but lost v0.1's lock to the beat. Measured: only 9% of kicks produced a visible change in Flat. The DSP was fine (95–100% of kicks detected, ~30 ms); the incompressible solver needs hundreds of ms to turn a splat into motion, and hits added no brightness.
+**Decision:** three frame-accurate layers keyed to the bass-hit envelope: (1) dye-only "kicks", a divergent, lopsided outward push applied to ink advection but not to the velocity field (so the pressure solve cannot cancel it); (2) an "energy" dye channel injected by hits that glows past 1.0 and decays in ~150 ms; (3) a global ink-brightness pulse. Responsiveness scales (1) and (3).
+**Result:** `npm run verify -- --sync`: Ink Flat/Depth and Marble see 100% of kicks with 40–66% luminance jumps at 33–60 ms; Sumi (paper) 43–90% on the luminance metric, which undersells motion on paper.
+
+## D14 — v0.1 palettes restored; drift off by default
+The first seven palettes are v0.1's, in v0.1 order, so names and saved indices mean the same colours; four duotones follow. Flow Ink maps ink A = primary, ink B = accent, sparkle = highlight, as v0.1 did. Auto Drift (renamed "Colour drift") is off by default; settings v3 resets older saves that had it on.
+
+## D15 — User camera for Depth
+`CameraView` = height, tilt, curve (−1 bowl … +1 planet). Presets: Glide, Horizon, Planet, Valley, Overhead. Curvature is applied in the ground vertex shader around the camera (−k·d²) with matching normals; fog grows with altitude, and the sky's horizon band brightens with planet curvature (atmosphere). Mouse: drag turns/tilts (pans in Flat), wheel changes height (zooms in Flat), double-click snaps to the nearest preset, `C` cycles presets.
+
+## D16 — Sync metric in the harness
+`--sync` renders 12 s around the drop and scores, per known kick (exported by the generator), the largest relative luminance change within 133 ms. It is the regression test for "music and visuals in sync".

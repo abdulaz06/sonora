@@ -15,9 +15,9 @@ Built with Rust, TypeScript, raw WebGL 2 and Tauri 2.
 
 The flagship style is a real fluid simulation: stable fluids (advection, pressure projection, vorticity confinement) on a periodic world several screens wide, with ink advected at high resolution so it stretches into fine filaments.
 
-- **Depth view (default):** the ink becomes a lit, displaced surface; a camera glides low over it through fog, banks on beats and lurches on drops. **Flat** is a drifting top-down view.
+- **Depth view (default):** the ink becomes a lit, displaced surface; a camera glides over it through fog, banks on beats and lurches on drops. Camera presets (Glide, Horizon, Planet, Valley, Overhead) and sliders for height, tilt and curvature — curve the world away like a planet or up like a bowl. **Flat** is a drifting top-down view.
 - **Looks:** **Ink** (luminous palette ink on night), **Sumi** (black ink on bone paper), **Marble** (duotone marbling with stipple grain). Each has a light or dark background.
-- **Listening:** mid-range presence feeds ink inflow, bass hits throw ink in from all sides (including off-screen), highs scatter fine sparkle, intensity drives turbulence and camera speed, and a detected drop fires a burst plus a camera lurch. Silence lets the ink settle and fade.
+- **Listening:** every bass hit bursts and brightens the ink on the same frame (about 40 ms after the sound), mid-range presence feeds ink inflow, highs scatter fine sparkle, intensity drives turbulence and camera speed, and a detected drop fires a burst plus a camera lurch. Silence lets the ink settle and fade.
 
 Aura and Halo from v0.1 remain available under **Show classic styles** in settings.
 
@@ -48,10 +48,12 @@ The same analysis crate runs in the desktop app and in the browser; a parity che
 | `D` | Debug overlay (signals, events, fps) |
 | `S` | Next style |
 | `V` | Depth / Flat |
+| `C` | Next camera preset (Depth) |
+| Drag / scroll | Depth: look around / change height. Flat: move / zoom. Double-click resets the camera |
 | `1`–`0` | Palette |
 | `Esc` | Leave fullscreen / clean mode, close panels |
 
-Settings: style and look, view, background, palette (presets, duotones, custom hue), Auto Drift (slow hue rotation, 1–10 min per cycle), responsiveness, quality (Low / Medium / High / Auto), audio source. The tray menu offers Show, Hide, Fullscreen and Quit.
+Settings (each with a one-line explanation): style and look, view, background, camera, palette (Ocean, Aurora, Ember, Neon, Crimson, Gold, Violet, four two-tone palettes, or any custom colour), colour drift (off by default), responsiveness (how hard visuals snap to each beat), quality (Low / Medium / High / Auto), audio source. The tray menu offers Show, Hide, Fullscreen and Quit.
 
 Quality presets change real work, not only post effects: render resolution, simulation and ink resolution, solver iterations and mesh density. Auto watches frame time and steps down or up.
 
@@ -80,6 +82,7 @@ npm run tauri build      # installers in target/release/bundle/
 npm run gen:audio                                   # procedural test tracks (no copyrighted music)
 npm run check:parity -- house-124                   # desktop vs browser analysis frames
 npm run verify -- --variant sumi --track all        # screenshots at silence/fade-in/build/drop/breakdown
+npm run verify -- --sync --flat --track house-124   # beat sync: share of kicks with a visible response
 ```
 
 `npm run verify` renders in a real browser on the GPU, in audio time, and writes screenshots, an 8-frame strip across the drop, the detected events and frame timing to `verify/`.

@@ -36,7 +36,7 @@ const GLIDE_SPEED_MAX = 0.22;
 /** 3D altitude (world units) and look-down pitch (rad). */
 const ALTITUDE_BASE = 0.34;
 const ALTITUDE_WANDER = 0.12;
-const PITCH_BASE = -0.36;
+
 const PITCH_WANDER = 0.08;
 const FOV_BASE = (52 * Math.PI) / 180;
 /** Bank on beats (rad) and how fast it eases (s). */
@@ -56,6 +56,50 @@ const SILENT_SPEED = 0.25;
 /** Fog distances for 3D styles (world units). */
 const FOG_NEAR = 0.5;
 const FOG_FAR = 3.4;
+/** Altitude range (world units) mapped from view.height 0..1. */
+const ALT_MIN = 0.1;
+const ALT_MAX = 2.0;
+/** Look-down angle (rad) mapped from view.tilt 0..1 (0 = horizon, 1 = straight down). */
+const TILT_MIN = 0.1;
+const TILT_MAX = 1.5;
+/** Surface curvature (1/units) at view.curve = ±1. */
+const CURVE_STRENGTH = 0.32;
+/** How quickly the camera eases to a new view / preset (s). */
+const VIEW_TAU = 0.7;
+/** Mouse sensitivity: radians per pixel dragged, height per wheel notch. */
+const DRAG_YAW = 0.004;
+const DRAG_TILT = 0.0022;
+const WHEEL_HEIGHT = 0.05;
+/** Flat view: zoom range from the wheel, and pan per pixel (view heights). */
+const FLAT_ZOOM_MIN = 0.5;
+const FLAT_ZOOM_MAX = 2.5;
+
+/** User-facing camera view for depth styles. */
+export interface CameraView {
+  /** 0 = skimming the surface, 1 = high above it. */
+  height: number;
+  /** 0 = looking at the horizon, 1 = looking straight down. */
+  tilt: number;
+  /** -1 = curves up like a bowl (U), 0 = flat, 1 = curves away like a planet (∩). */
+  curve: number;
+}
+
+export interface CameraPreset {
+  id: string;
+  label: string;
+  hint: string;
+  view: CameraView;
+}
+
+export const CAMERA_PRESETS: CameraPreset[] = [
+  { id: 'glide', label: 'Glide', hint: 'Low over the surface, looking ahead', view: { height: 0.22, tilt: 0.18, curve: 0 } },
+  { id: 'horizon', label: 'Horizon', hint: 'Skimming the surface toward a curved horizon', view: { height: 0.04, tilt: 0.04, curve: 0.25 } },
+  { id: 'planet', label: 'Planet', hint: 'High up; the surface curves away like a planet', view: { height: 0.6, tilt: 0.55, curve: 0.6 } },
+  { id: 'valley', label: 'Valley', hint: 'The surface rises around you like a bowl', view: { height: 0.3, tilt: 0.2, curve: -0.7 } },
+  { id: 'overhead', label: 'Overhead', hint: 'Looking straight down from above', view: { height: 0.55, tilt: 1, curve: 0 } },
+];
+
+export const DEFAULT_CAMERA_VIEW: CameraView = { ...CAMERA_PRESETS[0].view };
 
 export interface CameraInput {
   dt: number;
@@ -75,14 +119,18 @@ export class WorldCamera {
   // ── 3D state ──
   position: Vec3 = [0, ALTITUDE_BASE, 0];
   yaw = 0;
-  pitch = PITCH_BASE;
+  pitch = -0.36;
   roll = 0;
   fov = FOV_BASE;
   aspect = 16 / 9;
   readonly near = 0.02;
-  readonly far = 12;
-  readonly fogNear = FOG_NEAR;
-  readonly fogFar = FOG_FAR;
+  readonly far = 14;
+  /** Target view (from settings / presets) and the eased view in use. */
+  private viewTarget: CameraView = { ...DEFAULT_CAMERA_VIEW };
+  private viewNow: CameraView = { ...DEFAULT_CAMERA_VIEW };
+  /** Flat-view zoom from the wheel. */
+  private flatZoom = 1;
+  private onViewChange: ((v: CameraView) => void) | null = null;
   readonly view: Mat4 = mat4();
   readonly proj: Mat4 = mat4();
   readonly viewProj: Mat4 = mat4();
@@ -108,6 +156,51 @@ export class WorldCamera {
     this.seed = seed % 1000;
     this.t = this.seed * 7.31;
     this.yaw = this.seed;
+  }
+
+  /** Fog distances grow with altitude so high views can see further. */
+  get fogNear(): number { return FOG_NEAR + this.position[1] * 0.5; }
+  get fogFar(): number { return FOG_FAR + this.position[1] * 1.4; }
+  /** Surface curvature in 1/world units (positive = planet, negative = bowl). */
+  get curvature(): number { return this.viewNow.curve * CURVE_STRENGTH; }
+
+  /** Set the target view (eases there). */
+  setView(v: Partial<CameraView>): void {
+    this.viewTarget = {
+      height: clamp(v.height ?? this.viewTarget.height, 0, 1),
+      tilt: clamp(v.tilt ?? this.viewTarget.tilt, 0, 1),
+      curve: clamp(v.curve ?? this.viewTarget.curve, -1, 1),
+    };
+  }
+
+  getView(): CameraView { return { ...this.viewTarget }; }
+
+  /** Called when the user changes the view with the mouse (for persistence). */
+  setViewListener(cb: ((v: CameraView) => void) | null): void { this.onViewChange = cb; }
+
+  /** Mouse drag: turn (dx) and tilt (dy) in Depth; pan in Flat. Pixels. */
+  drag(dx: number, dy: number, depth: boolean): void {
+    if (depth) {
+      this.yaw += dx * DRAG_YAW;
+      const t = clamp(this.viewTarget.tilt + dy * DRAG_TILT / (TILT_MAX - TILT_MIN), 0, 1);
+      this.viewTarget.tilt = t;
+      this.onViewChange?.(this.getView());
+    } else {
+      const k = this.viewHeight / 900;
+      const c = Math.cos(this.rotation), s = Math.sin(this.rotation);
+      this.center[0] -= (dx * c + dy * s) * k;
+      this.center[1] += (-dx * s + dy * c) * k;
+    }
+  }
+
+  /** Mouse wheel: height in Depth, zoom in Flat. `notches` > 0 = away from the surface / zoom out. */
+  wheel(notches: number, depth: boolean): void {
+    if (depth) {
+      this.viewTarget.height = clamp(this.viewTarget.height + notches * WHEEL_HEIGHT, 0, 1);
+      this.onViewChange?.(this.getView());
+    } else {
+      this.flatZoom = clamp(this.flatZoom * Math.pow(1.1, notches), FLAT_ZOOM_MIN, FLAT_ZOOM_MAX);
+    }
   }
 
   /** Kick the camera (drops call this; styles may too). 0–1. */
@@ -140,7 +233,7 @@ export class WorldCamera {
     this.center[0] += Math.cos(heading) * v2 * dt * this.viewHeight;
     this.center[1] += Math.sin(heading) * v2 * dt * this.viewHeight;
     const zoomN = 0.5 + 0.5 * simplex2(t * 0.021, this.seed + 31);
-    this.viewHeight = (ZOOM_MIN + (ZOOM_MAX - ZOOM_MIN) * zoomN) * (1 - LURCH_ZOOM * this.lurch);
+    this.viewHeight = (ZOOM_MIN + (ZOOM_MAX - ZOOM_MIN) * zoomN) * (1 - LURCH_ZOOM * this.lurch) * this.flatZoom;
     this.rotation = simplex2(t * 0.009, this.seed + 57) * ROTATION_WANDER + this.lurch * LURCH_SPIN * this.spinDir * 0.4;
 
     // ── 3D ──
@@ -152,16 +245,28 @@ export class WorldCamera {
     const wanderRoll = simplex2(t * 0.03, this.seed + 91) * 0.05;
     this.roll += expApproach(dt, BANK_TAU) * (this.bankTarget + wanderRoll + this.lurch * 0.06 * this.spinDir - this.roll);
 
-    this.yaw += simplex2(t * 0.017, this.seed + 13) * 0.11 * dt + this.lurch * this.spinDir * 0.25 * dt;
-    const glide = GLIDE_SPEED_MIN + (GLIDE_SPEED_MAX - GLIDE_SPEED_MIN) * this.speed + this.lurch * LURCH_SURGE * 0.35;
+    // Ease toward the user's view.
+    const ve = expApproach(dt, VIEW_TAU);
+    this.viewNow.height += ve * (this.viewTarget.height - this.viewNow.height);
+    this.viewNow.tilt += ve * (this.viewTarget.tilt - this.viewNow.tilt);
+    this.viewNow.curve += ve * (this.viewTarget.curve - this.viewNow.curve);
+    const altitude = ALT_MIN + (ALT_MAX - ALT_MIN) * Math.pow(this.viewNow.height, 1.5);
+    const tilt = TILT_MIN + (TILT_MAX - TILT_MIN) * Math.pow(this.viewNow.tilt, 1.2);
+    // Straight-down views wander less so they stay steady.
+    const wander = 1 - this.viewNow.tilt * 0.7;
+
+    this.yaw += simplex2(t * 0.017, this.seed + 13) * 0.11 * dt * wander + this.lurch * this.spinDir * 0.25 * dt;
+    // Higher views travel faster so motion stays visible.
+    const glide = (GLIDE_SPEED_MIN + (GLIDE_SPEED_MAX - GLIDE_SPEED_MIN) * this.speed) * (1 + altitude * 0.9)
+      + this.lurch * LURCH_SURGE * 0.35;
     const fx = Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     this.position[0] += fx * glide * dt;
     this.position[2] += fz * glide * dt;
     this.travel += glide * dt;
     const lift = section === 'breakdown' ? 0.12 : section === 'silence' ? 0.08 : 0;
-    const altTarget = ALTITUDE_BASE + ALTITUDE_WANDER * simplex2(t * 0.025, this.seed + 71) + lift;
-    this.position[1] += expApproach(dt, 2.5) * (altTarget - this.position[1]);
-    this.pitch = PITCH_BASE + PITCH_WANDER * simplex2(t * 0.02, this.seed + 3) + LURCH_PITCH * this.lurch;
+    const altTarget = altitude * (1 + (ALTITUDE_WANDER / ALTITUDE_BASE) * 0.5 * simplex2(t * 0.025, this.seed + 71)) + lift;
+    this.position[1] += expApproach(dt, 1.2) * (altTarget - this.position[1]);
+    this.pitch = clamp(-tilt + PITCH_WANDER * wander * simplex2(t * 0.02, this.seed + 3) + LURCH_PITCH * this.lurch, -1.53, -0.03);
     this.fov = FOV_BASE + LURCH_FOV * this.lurch;
 
     this.updateMatrices();

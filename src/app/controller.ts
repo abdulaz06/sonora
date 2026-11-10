@@ -5,6 +5,7 @@
  * supplies its own persistence and (optionally) audio-device hooks.
  */
 
+import { CAMERA_PRESETS, type CameraView } from '../engine/camera';
 import type { Renderer } from '../engine/renderer';
 import type { PersistedSettings } from '../ipc/settings';
 import type { DeviceInfo } from '../ipc/audio-device';
@@ -43,6 +44,7 @@ export function initController(opts: ControllerOptions): Controller {
     return v && d.variants.some((x) => x.id === v) ? v : d.defaultVariant;
   };
   const depthFor = (id: StyleId): boolean => settings.depth[id] ?? getStyle(id).defaultDepth;
+  const depthActive = (): boolean => getStyle(settings.mode).supportsDepth && depthFor(settings.mode);
   const lightFor = (id: StyleId) => settings.lightModes[id] ?? 'auto';
 
   function applyStyle(id: StyleId, immediate = false): void {
@@ -62,6 +64,7 @@ export function initController(opts: ControllerOptions): Controller {
   renderer.setQuality(settings.quality);
   renderer.setResponsiveness(settings.responsiveness);
   renderer.setRingCount(settings.ringCount);
+  renderer.camera.setView(settings.camera);
 
   const panelState = () => ({
     style: settings.mode,
@@ -94,8 +97,22 @@ export function initController(opts: ControllerOptions): Controller {
     },
   });
 
+  const setCamera = (v: CameraView): void => {
+    renderer.camera.setView(v);
+    settings.camera = { ...v };
+    persist();
+  };
+  // Mouse changes come from the camera itself; mirror them into settings/UI.
+  let cameraSyncTimer = 0;
+  renderer.camera.setViewListener((v) => {
+    settings.camera = v;
+    window.clearTimeout(cameraSyncTimer);
+    cameraSyncTimer = window.setTimeout(() => { syncSettings({ camera: v }); persist(); }, 150);
+  });
+
   initSettingsPanel({
     onStyleChange: setStyle,
+    onCameraChange: setCamera,
     onVariantChange: (v) => {
       renderer.setVariant(v);
       settings.variants = { ...settings.variants, [settings.mode]: v };
@@ -146,6 +163,7 @@ export function initController(opts: ControllerOptions): Controller {
   }, {
     ...panelState(),
     ringCount: settings.ringCount,
+    camera: settings.camera,
     paletteIndex: settings.paletteIndex,
     customHue: settings.customHue,
     autoDrift: settings.autoDrift,
@@ -166,6 +184,12 @@ export function initController(opts: ControllerOptions): Controller {
       const list = visibleStyles(settings.showClassic);
       const i = list.findIndex((s) => s.id === settings.mode);
       setStyle(list[(i + 1) % list.length].id);
+    } else if (k === 'c' && depthActive()) {
+      const i = CAMERA_PRESETS.findIndex((p) => Math.abs(p.view.height - settings.camera.height) < 0.03
+        && Math.abs(p.view.tilt - settings.camera.tilt) < 0.03 && Math.abs(p.view.curve - settings.camera.curve) < 0.03);
+      const next = CAMERA_PRESETS[(i + 1) % CAMERA_PRESETS.length];
+      setCamera({ ...next.view });
+      syncSettings({ camera: settings.camera });
     } else if (k === 'v' && getStyle(settings.mode).supportsDepth) {
       const on = !depthFor(settings.mode);
       renderer.setDepth(on);
@@ -173,6 +197,42 @@ export function initController(opts: ControllerOptions): Controller {
       syncSettings({ depth: on });
       persist();
     }
+  });
+
+  // ── Mouse camera control on the canvas ──
+  // Depth: drag to turn/tilt, wheel for height. Flat: drag to pan, wheel to zoom.
+  // Double-click returns to the nearest preset (or Glide).
+  const canvas = renderer.canvas;
+  let dragging = false, lastX = 0, lastY = 0;
+  canvas.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    dragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+    canvas.style.cursor = 'grabbing';
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    renderer.camera.drag(e.clientX - lastX, e.clientY - lastY, depthActive());
+    lastX = e.clientX; lastY = e.clientY;
+  });
+  const endDrag = (): void => { dragging = false; canvas.style.cursor = ''; };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    renderer.camera.wheel(Math.sign(e.deltaY), depthActive());
+  }, { passive: false });
+  canvas.addEventListener('dblclick', () => {
+    if (!depthActive()) return;
+    let best = CAMERA_PRESETS[0], bestD = Infinity;
+    for (const p of CAMERA_PRESETS) {
+      const d = Math.abs(p.view.height - settings.camera.height) + Math.abs(p.view.tilt - settings.camera.tilt)
+        + Math.abs(p.view.curve - settings.camera.curve);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    setCamera({ ...best.view });
+    syncSettings({ camera: settings.camera });
   });
 
   return {

@@ -25,6 +25,17 @@
 - Tauri npm packages were aligned to the Rust crates (2.12 / 2.7) after the workspace lockfile refresh.
 - README video still shows Flow Ink v0.1.
 
+## Feedback round (after Prompt 1) — done
+Abdul's side-by-side video (v0.1 vs 2.0, same song) showed 2.0 had lost beat sync, Flat was weaker than v0.1, colours looked wrong, controls were unclear, and asked for camera control and planet/bowl curvature.
+- [x] Measured sync: DSP fine (95–100% kicks, ~30 ms); visuals responded to 9% of kicks (Flat). Added `npm run verify -- --sync`.
+- [x] Beat response: dye-only kicks, energy glow channel, ink pulse (D13). Now 100% of kicks seen in Ink/Marble, 40–66% luminance jumps, 33–60 ms.
+- [x] Flat: bolder v0.1-like ink masses (bigger soft splats, closer view, less decay) with filament detail; no more starburst splats.
+- [x] Colours: v0.1 palettes restored in order; drift off by default + settings migration (D14). The video showed drift cycling hue every ~70 s.
+- [x] Camera: presets Glide/Horizon/Planet/Valley/Overhead, Height/Tilt/Curve sliders, drag/scroll/double-click, `C` key (D15).
+- [x] Controls explained: every setting has a plain-language hint; "Cycle" became "Drift speed — one full colour cycle every N minutes"; quality and background options describe what they do. Responsiveness now actually scales kick strength and pulse.
+- [x] Live input latency: AudioWorklet block 1024 → 256 samples.
+- [x] Bug: settings panel closed itself when a button re-rendered it.
+
 ## Quality Bar — Flow Ink 2.0 (self-assessed from harness screenshots, all four tracks)
 1. Layered: inflow ← mid presence, jets/splats ← bass hits, sparkle ← high hits, turbulence + camera ← intensity, surface breathing ← beat. Pass.
 2. Never static: camera drift, evolving flow, Auto Drift, seeded variation. Pass.
