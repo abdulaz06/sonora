@@ -256,6 +256,7 @@ function house124() {
   return {
     samples: tr.master(),
     markers: { silence: 1.5, fadeIn: B(2), build: B(21), drop: B(24), breakdown: B(43) },
+    kicks,
     sections: [
       ['silence', 0, off], ['intro', off, B(8)], ['build', B(8), B(24)],
       ['drop', B(24), B(40)], ['breakdown', B(40), B(48)], ['outro', B(48), total],
@@ -302,6 +303,7 @@ function halftime140() {
   return {
     samples: tr.master(),
     markers: { silence: 1.0, fadeIn: B(1), build: B(10), drop: B(12), breakdown: B(30) },
+    kicks,
     sections: [['silence', 0, off], ['intro', off, B(4)], ['build', B(4), B(12)], ['drop', B(12), B(28)], ['breakdown', B(28), total]],
   };
 }
@@ -347,6 +349,7 @@ function silenceFadeIn() {
   return {
     samples: tr.master(),
     markers: { silence: 5, fadeIn: 16, build: 24, drop: 31, breakdown: 40 },
+    kicks,
     sections: [['silence', 0, off], ['fade-in', off, off + 20], ['steady', off + 20, total]],
   };
 }
@@ -357,9 +360,10 @@ const tracks = { 'house-124': house124, 'halftime-140': halftime140, 'ambient-pa
 const meta = {};
 for (const [name, fn] of Object.entries(tracks)) {
   const t0 = Date.now();
-  const { samples, markers, sections } = fn();
+  const { samples, markers, sections, kicks = [] } = fn();
   writeWav(join(OUT_DIR, `${name}.wav`), samples);
-  meta[name] = { file: `${name}.wav`, duration: +(samples.length / SR).toFixed(3), sampleRate: SR, markers, sections };
+  meta[name] = { file: `${name}.wav`, duration: +(samples.length / SR).toFixed(3), sampleRate: SR, markers, sections,
+    kicks: kicks.map((k) => +k.toFixed(4)).sort((a, b) => a - b) };
   console.log(`${name}.wav  ${(samples.length / SR).toFixed(1)} s  (${Date.now() - t0} ms)`);
 }
 writeFileSync(join(OUT_DIR, 'tracks.json'), JSON.stringify(meta, null, 2) + '\n');

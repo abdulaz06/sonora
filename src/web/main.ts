@@ -9,6 +9,7 @@
 
 import { initController } from '../app/controller';
 import { decodeWavMono, WasmFrameSource } from '../audio/wasm-source';
+import { CAMERA_PRESETS } from '../engine/camera';
 import { initRenderer } from '../engine/renderer';
 import { DEFAULT_SETTINGS, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
 import type { QualityPreset } from '../engine/quality';
@@ -34,13 +35,15 @@ export interface HarnessApi {
   /** Advance audio only (no rendering) — for fast seeking. */
   analyseOnly(seconds: number): number;
   snapshot(): string;
-  configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean }): void;
+  configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string }): void;
   time(): number;
   events: SonoraEvent[];
   stats(): ReturnType<ReturnType<typeof initRenderer>['stats']>;
   gpu(): string;
   /** Mean ms per fully finished frame (step + GPU sync), i.e. real GPU+CPU cost. */
   frameCost(frames: number, dt: number): number;
+  /** Advance in steps of `dt` and return the mean screen luminance after each step. */
+  lumaTrace(seconds: number, dt: number): number[];
 }
 
 declare global {
@@ -234,6 +237,26 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       if (o.quality) renderer.setQuality(o.quality);
       if (o.palette !== undefined) renderer.colorEngine.setPalette(o.palette, true);
       if (o.drift !== undefined) renderer.colorEngine.setAutoDrift(o.drift);
+      const preset = CAMERA_PRESETS.find((p) => p.id === o.camera);
+      if (preset) renderer.camera.setView(preset.view);
+    },
+    lumaTrace(seconds: number, dt: number): number[] {
+      if (!gl) return [];
+      const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+      const buf = new Uint8Array(w * h * 4);
+      const out: number[] = [];
+      for (let t = 0; t < seconds - 1e-9; t += dt) {
+        source.stepOffline(dt);
+        renderer.step(dt);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+        let sum = 0, n = 0;
+        for (let i = 0; i < buf.length; i += 4 * 7) {
+          sum += 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2];
+          n++;
+        }
+        out.push(sum / n / 255);
+      }
+      return out;
     },
     frameCost(frames: number, dt: number): number {
       if (!gl) return 0;

@@ -51,6 +51,8 @@ function parseArgs(argv) {
     else if (a === '--out') o.out = next();
     else if (a === '--headed') o.headed = true;
     else if (a === '--no-bench') o.bench = false;
+    else if (a === '--sync') o.sync = true;
+    else if (a === '--camera') o.camera = next();
   }
   return o;
 }
@@ -108,13 +110,20 @@ try {
   const summary = [];
   console.log(`GPU: ${gpu}`);
 
+  if (opts.sync) {
+    for (const name of names) await runSync(page, tracks[name], name);
+    await browser.close();
+    cleanup();
+    process.exit(0);
+  }
+
   for (const name of names) {
     const meta = tracks[name];
     if (!meta) throw new Error(`unknown track ${name}`);
     const variant = opts.variant || '';
     const outDir = opts.out
       ? join(ROOT, opts.out, name)
-      : join(ROOT, 'verify', `${opts.style}-${variant || 'default'}-${view}${opts.light !== 'auto' ? '-' + opts.light : ''}`, name);
+      : join(ROOT, 'verify', `${opts.style}-${variant || 'default'}-${view}${opts.camera ? '-' + opts.camera : ''}${opts.light !== 'auto' ? '-' + opts.light : ''}`, name);
     mkdirSync(outDir, { recursive: true });
 
     // Fresh page state per track
@@ -122,7 +131,7 @@ try {
     await page.waitForFunction(() => window.__sonora?.ready === true);
     await page.evaluate((o) => window.__sonora.configure({
       style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality,
-      palette: o.palette, drift: false,
+      palette: o.palette, drift: false, camera: o.camera,
     }), opts);
     await page.evaluate((n) => window.__sonora.loadTrack(n), name);
 
@@ -214,4 +223,50 @@ try {
   console.error(err);
   cleanup();
   process.exit(1);
+}
+
+// ── Beat-sync measurement ───────────────────────────────────────────
+// Renders a window around the drop at the harness frame rate, records mean
+// screen luminance per frame and scores how the picture responds to each
+// known kick: rise = (peak in 0–133 ms after the kick − level just before) /
+// level before. A kick counts as "seen" if the rise is ≥ SYNC_SEEN.
+async function runSync(page, meta, name) {
+  const SYNC_SEEN = 0.06;
+  const kicks = meta.kicks ?? [];
+  if (!kicks.length) { console.log(`${name}: no kicks, skipped`); return; }
+  const start = name === 'silence-fadein' ? 26 : meta.markers.drop - 1;
+  const len = 12;
+  const dt = 1 / opts.fps;
+  await page.reload();
+  await page.waitForFunction(() => window.__sonora?.ready === true);
+  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera }), opts);
+  await page.evaluate((n) => window.__sonora.loadTrack(n), name);
+  await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
+  await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);
+  const luma = await page.evaluate(([s, d]) => window.__sonora.lumaTrace(s, d), [len, dt]);
+  const rises = [];
+  const lags = [];
+  for (const k of kicks) {
+    if (k < start + 0.1 || k > start + len - 0.2) continue;
+    const i = Math.round((k - start) / dt);
+    const before = (luma[i - 2] + luma[i - 1]) / 2;
+    let peak = -1, at = 0;
+    for (let j = 0; j <= Math.round(0.133 / dt); j++) if (luma[i + j] > peak) { peak = luma[i + j]; at = j; }
+    // Paper looks darken on a hit, so score the largest change either way.
+    let trough = Infinity;
+    for (let j = 0; j <= Math.round(0.133 / dt); j++) trough = Math.min(trough, luma[i + j]);
+    const up = (peak - before) / Math.max(before, 0.01);
+    const down = (before - trough) / Math.max(before, 0.01);
+    rises.push(Math.max(up, down));
+    lags.push(at * dt * 1000);
+  }
+  const seen = rises.filter((r) => r >= SYNC_SEEN).length;
+  const sorted = [...rises].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
+  const meanLuma = luma.reduce((a, b) => a + b, 0) / luma.length;
+  const meanLag = lags.reduce((a, b) => a + b, 0) / Math.max(1, lags.length);
+  console.log(`${name} [${opts.variant || 'default'} ${opts.flat ? 'flat' : 'depth'}]: kicks ${rises.length}, seen ${seen} (${(100 * seen / Math.max(1, rises.length)).toFixed(0)}%), median rise ${(100 * median).toFixed(1)}%, peak lag ${meanLag.toFixed(0)} ms, mean luma ${meanLuma.toFixed(3)}`);
+  const outDir = join(ROOT, 'verify', 'sync');
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(join(outDir, `${name}-${opts.variant || 'default'}-${opts.flat ? 'flat' : 'depth'}.json`), JSON.stringify({ start, dt, kicks, luma, rises }, null, 1));
 }
