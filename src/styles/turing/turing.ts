@@ -234,7 +234,7 @@ void main() { vec2 uv = gl_FragCoord.xy * u_texel; vec2 cell = floor(uv * 24.0);
         u_view: cam.viewHeight, u_rot: cam.rotation * 0.5, u_domain: domain(), u_grid: grid,
         u_variant: variant === 'coral' ? 0 : 1, u_light: ctx.light, u_invert: time < invertUntil,
         u_bg: pal.bg, u_paper: pal.paper, u_ink: pal.duotone ? pal.primary : mixRgb(pal.primary, pal.secondary, 0.25),
-        u_glow: pal.accent, u_hot: pal.highlight, u_pulse: pulse, u_time: time,
+        u_glow: pal.accent, u_hot: pal.highlight, u_pulse: pulse, u_hit: ctx.bassHits * (0.4 + 0.6 * ctx.fadeInOut), u_time: time,
       }, ['u_variant']);
       drawQuad(gl, quadVAO);
       const post = ctx.post;

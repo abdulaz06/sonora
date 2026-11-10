@@ -46,7 +46,7 @@ void main() {
     col = mix(col, ink, dust * 0.6);
   } else {
     // Threads light up on the frame of each bass hit (energy glow).
-    float e = 1.0 + 1.3 * u_pulse;
+    float e = 1.0 + 0.6 * u_pulse;
     col = u_bg * 0.6;
     col += u_c0 * c * 1.1 * e;
     col += u_c3 * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 1.6 * e;
@@ -76,7 +76,8 @@ void main() {
   float smoke = 1.0 - exp(-acc.r * u_gain);
   float ring = 1.0 - exp(-acc.g * u_gain);
   vec3 white = mix(vec3(1.0), u_c3, 0.25);
-  col = u_bg * 0.4 + white * smoke * 0.75 + mix(white, u_c0, 0.4) * ring * 0.9;
+  float e = 1.0 + 1.0 * u_pulse;   // hits flare the trails on the frame
+  col = u_bg * 0.4 + (white * smoke * 0.75 + mix(white, u_c0, 0.4) * ring * 0.9) * e;
   for (int i = 0; i < 4; i++) {
     if (i >= u_agent_count) break;
     vec2 q = (uv - u_agents[i].xy) * vec2(aspect, 1.0);
@@ -87,11 +88,12 @@ void main() {
     float tail = (0.8 + 3.5 * u_agent_dir[i].z);
     float stretch = along < 0.0 ? tail : 0.9;
     float r2 = (along * along) / (sz * sz * stretch * stretch) + (across * across) / (sz * sz * 0.5);
-    col += white * u_agents[i].z * (exp(-r2) * 3.2 + exp(-dot(q, q) / (sz * sz) * 0.06) * 0.2);
+    col += white * u_agents[i].z * (exp(-r2) * 3.2 + exp(-dot(q, q) / (sz * sz) * 0.06) * (0.2 + 0.5 * u_pulse)) * e;
   }
 #elif VARIANT == 3
   // Starry: the painted canvas, plus glowing stars with halo rings.
-  col = acc.rgb;
+  // The paint brightens on each hit (frame-accurate, the strokes lag).
+  col = acc.rgb * (1.0 + 0.45 * u_pulse);
   vec3 warm = hueRotate(u_c2, u_hue_shift * 0.25);
   vec3 hot = hueRotate(u_c3, u_hue_shift * 0.25);
   for (int i = 0; i < 8; i++) {
@@ -100,14 +102,14 @@ void main() {
     float r = length(q) / u_stars[i].z;
     float halo = (0.5 + 0.5 * sin(r * 18.0 - u_time * 1.5)) * smoothstep(3.2, 1.0, r) * smoothstep(0.6, 1.1, r);
     float core = exp(-r * r * 2.2);
-    float puls = 0.7 + 0.6 * u_stars[i].w;
+    float puls = 0.7 + 0.6 * u_stars[i].w + 0.8 * u_pulse;
     col = mix(col, warm, halo * 0.32 * puls);
     col += hot * core * 1.4 * puls;
   }
 #elif VARIANT == 4
   // Warp: streak light over a deep tunnel.
   vec2 d = (uv - 0.5) * vec2(aspect, 1.0);
-  col = u_bg * (0.5 + 0.5 * smoothstep(0.0, 0.9, length(d))) + acc.rgb;
+  col = u_bg * (0.5 + 0.5 * smoothstep(0.0, 0.9, length(d))) + acc.rgb * (1.0 + 0.55 * u_pulse);
 #endif
 
   frag = vec4(col, 1.0);

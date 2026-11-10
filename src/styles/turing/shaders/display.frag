@@ -18,6 +18,7 @@ uniform vec3 u_ink;
 uniform vec3 u_glow;
 uniform vec3 u_hot;
 uniform float u_pulse;
+uniform float u_hit;     // bass-hit envelope: shapes swell on the frame
 uniform float u_time;
 out vec4 frag;
 
@@ -32,7 +33,8 @@ void main() {
   vec2 uv = world / u_domain;
   float v = texture(u_state, uv).g;
   float w = max(fwidth(v), 1e-4) * 1.2;
-  float body = smoothstep(0.2 - w, 0.2 + w, v);
+  float th = 0.2 - 0.07 * u_hit;
+  float body = smoothstep(th - w, th + w, v);
   vec3 col;
   if (u_variant == 0) {
     // Coral: solid pigment on paper (or paper-coloured shapes on dark).
@@ -48,8 +50,9 @@ void main() {
     vec3 inner = u_glow * 0.18 + u_hot * 0.05 * smoothstep(0.3, 0.45, v);
     if (u_invert == 1) { bgc = u_glow * 0.22; inner = u_bg * 0.4; }
     col = mix(bgc, inner, body);
-    col += u_glow * (e * 0.9 + rim * 1.3) * (1.0 + 0.6 * u_pulse);
-    col += u_hot * rim * 0.6 * u_pulse;
+    float pk = max(u_pulse, u_hit);
+    col += u_glow * (e * 0.9 + rim * 1.3) * (1.0 + 0.8 * pk);
+    col += u_hot * rim * 0.6 * pk;
   }
   frag = vec4(col, 1.0);
 }
