@@ -36,6 +36,9 @@ const SEG_MAX = 5;
 /** Candidate directions tried per waypoint and samples per segment. */
 const TRIES = 28;
 const SAMPLES = 10;
+/** Line-of-sight scoring: cap (in clearances) and weight. */
+const VIEW_CAP = 25;
+const VIEW_WEIGHT = 0.35;
 
 export function deBox(x: number, y: number, z: number, p: BoxParams, iters = DE_ITERS): number {
   let px = x, py = y, pz = z, pw = 1;
@@ -87,6 +90,19 @@ export class FlightPath {
   /** Clearance (distance to the surface) at a point. */
   de(p: Vec3): number { return deBox(p[0], p[1], p[2], this.params()); }
 
+  /** Free distance along a ray (sphere tracing, capped), in clearances. */
+  private viewDepth(from: Vec3, dir: Vec3): number {
+    const sp = this.space();
+    const cap = sp.clearance * VIEW_CAP;
+    let t = 0;
+    for (let i = 0; i < 40 && t < cap; i++) {
+      const d = this.de(add(from, scl(dir, t)));
+      if (d < sp.clearance * 0.05) break;
+      t += d * 0.9;
+    }
+    return Math.min(t, cap) / sp.clearance;
+  }
+
   private randomDir(): Vec3 {
     const z = this.rng() * 2 - 1, a = this.rng() * Math.PI * 2, r = Math.sqrt(1 - z * z);
     return [r * Math.cos(a), r * Math.sin(a), z];
@@ -103,7 +119,13 @@ export class FlightPath {
       const score = -Math.abs(Math.log(Math.max(c, 1e-5) / sp.clearance));
       if (score > bestScore) { bestScore = score; best = p; }
     }
-    const dir = this.randomDir();
+    // Start looking down the longest open line of sight.
+    let dir = this.randomDir(), bestView = -1;
+    for (let i = 0; i < 48; i++) {
+      const d = this.randomDir();
+      const v = this.viewDepth(best, d);
+      if (v > bestView) { bestView = v; dir = d; }
+    }
     this.pts = [sub(best, scl(dir, sp.clearance)), best];
     while (this.pts.length < 5) this.extend();
     this.seg = 0;
@@ -127,7 +149,9 @@ export class FlightPath {
       let minD = Infinity;
       for (let s = 1; s <= SAMPLES; s++) minD = Math.min(minD, this.de(add(cur, scl(d, (L * s) / SAMPLES))));
       if (minD < CLEAR_MIN * sp.clearance) continue;
-      const score = -Math.abs(Math.log(minD / sp.clearance)) + 0.9 * dot(d, dir0);
+      // Prefer smooth turns, the preferred clearance, and a long view ahead.
+      const score = -Math.abs(Math.log(minD / sp.clearance)) + 0.9 * dot(d, dir0)
+        + VIEW_WEIGHT * Math.log(1 + this.viewDepth(q, d));
       if (score > bestScore) { bestScore = score; best = q; }
       if (t >= TRIES && best) break;
     }

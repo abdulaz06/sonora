@@ -62,7 +62,7 @@ interface VariantCfg {
 
 const CFG: Record<Variant, VariantCfg> = {
   silk: { count: 1, decay: 0.84, point: 1, gain: 0.03, display: 1.1, paint: false },
-  lumen: { count: 0.5, decay: 0.85, point: 1, gain: 0.016, display: 1.0, paint: false },
+  lumen: { count: 0.12, decay: 0.8, point: 1, gain: 0.005, display: 1.0, paint: false },
   wisp: { count: 0.06, decay: 0.975, point: 1, gain: 0.014, display: 1.5, paint: false },
   starry: { count: 0.25, decay: 0.9, point: 1, gain: 1, display: 1, paint: true },
   warp: { count: 0.06, decay: 0.5, point: 1, gain: 0.75, display: 1, paint: false },
@@ -367,6 +367,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_stars_w: starsWorld, u_star_w_count: variant === 'starry' ? starsWorld.length / 4 : 0,
         u_vp: [simplex2(time * 0.07, 4) * 0.25, simplex2(time * 0.06, 5) * 0.18], u_roll: cam.roll * 3,
         u_streak: 0.016 + 0.012 * ctx.intensitySmoothed,
+        u_fil_len: 0.14 + 0.16 * spread, u_fil_max: view * 0.25,
         u_c0: variant === 'starry' ? sb[0] : pal.primary,
         u_c1: variant === 'starry' ? sb[1] : pal.secondary,
         u_c2: variant === 'starry' ? sb[2] : mixRgb(pal.highlight, [1, 1, 1], 0.6),
@@ -374,7 +375,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_hue_shift: shift, u_warm_shift: shift * 0.25,
       }, ['u_side', 'u_vort_count', 'u_star_w_count']);
       gl.bindVertexArray(emptyVAO);
-      if (variant === 'starry' || variant === 'warp') gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
+      if (variant === 'starry' || variant === 'warp' || variant === 'lumen') gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
       else gl.drawArrays(gl.POINTS, 0, count);
       gl.bindVertexArray(null);
       gl.disable(gl.BLEND);

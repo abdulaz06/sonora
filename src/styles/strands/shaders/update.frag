@@ -109,8 +109,8 @@ void main() {
     else if (pick < u_balance.x + u_balance.y) base = (r.y < 0.5 ? 1.5708 : -1.5708);
     else base = 0.7854 + floor(r.y * 4.0) * 1.5708;
     // Discrete rays (lanes) read as individual hair-thin filaments.
-    float lane = (floor(r.z * 36.0) + 0.5) / 36.0 - 0.5;
-    float jitter = lane * mix(0.06, 0.9, spread * spread) + (r.w - 0.5) * 0.002;
+    float lane = (floor(r.z * 120.0) + 0.5) / 120.0 - 0.5;
+    float jitter = lane * mix(0.05, 0.38, spread * spread) + (r.w - 0.5) * 0.002;
     float ang = base + jitter + u_source.w;
     float sp = (0.15 + 1.1 * pow(fract(r.w * 7.31), 2.0)) * u_speed;
     A.xy = u_source.xy + (r.zw - 0.5) * 0.006;
@@ -161,7 +161,7 @@ void main() {
   }
 #elif VARIANT == 1
   // Fine wiggle only: the filaments stay straight-ish, like hair.
-  v += curl2(p * 16.0, u_field_t * 2.0) * 0.035 * dt * (0.3 + u_intensity) * length(v);
+  v += curl2(p * 22.0, u_field_t * 2.0) * 0.11 * dt * (0.4 + u_intensity) * length(v);
   v *= exp(-dt * 0.6);
 #elif VARIANT == 2
   v += curl2(p * 4.0, u_field_t) * 0.05 * dt;

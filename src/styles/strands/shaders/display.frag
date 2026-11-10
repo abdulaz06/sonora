@@ -66,11 +66,11 @@ void main() {
   }
   f += (sh * u_balance.x + sv * u_balance.y) * u_gain * 0.015 * u_streak;
   vec2 d = (uv - u_src) * vec2(aspect, 1.0);
-  float core = exp(-dot(d, d) * 900.0) * 3.0 + exp(-dot(d, d) * 90.0) * 0.6;
+  float core = exp(-dot(d, d) * 2500.0) * 2.2 + exp(-dot(d, d) * 160.0) * 0.35;
   float hx = exp(-abs(d.y) * 260.0) * exp(-abs(d.x) * 3.2) * u_balance.x;
   float vy = exp(-abs(d.x) * 260.0) * exp(-abs(d.y) * 3.2) * u_balance.y;
   vec3 tint = mix(vec3(1.0), u_c3, 0.35);
-  col = u_bg * 0.4 + f * mix(vec3(1.0), u_c3, 0.25) + tint * (core + (hx + vy) * 1.4 * u_streak) * u_fade * (0.6 + 0.6 * u_pulse);
+  col = u_bg * 0.4 + f * mix(vec3(1.0), mix(u_c0, u_c3, 0.5), 0.45) + tint * (core + (hx + vy) * 1.4 * u_streak) * u_fade * (0.6 + 0.6 * u_pulse);
 #elif VARIANT == 2
   // Wisp: faint smoke trails, bright darting agents.
   float smoke = 1.0 - exp(-acc.r * u_gain);

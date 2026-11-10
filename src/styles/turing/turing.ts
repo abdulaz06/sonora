@@ -35,6 +35,8 @@ const REGIMES: [number, number, number][] = [
   [0.45, 0.0545, 0.062],
   [1.0, 0.06, 0.0618],
 ];
+/** Regime ceiling during breakdowns (sparser pattern). */
+const BREAKDOWN_REGIME = 0.2;
 const SEED_COOLDOWN = 0.12;
 const INVERT_BEATS = 2;
 /** Reseed wave: ring speed (view heights / s) and duration (s). */
@@ -161,7 +163,10 @@ void main() { vec2 uv = gl_FragCoord.xy * u_texel; vec2 cell = floor(uv * 24.0);
       time += dt;
       seedCooldown -= dt;
       pulse = Math.max(pulse * Math.exp(-dt / 0.18), ctx.beatOnset ? ctx.beatConfidence : 0);
-      regime += (1 - Math.exp(-dt / 2.5)) * (clamp01(ctx.intensitySmoothed * 1.1 + ctx.eventState.buildProgress * 0.2) - regime);
+      // Breakdowns thin the maze into sparse worms and spots (restraint).
+      let regimeT = clamp01(ctx.intensitySmoothed * 1.1 + ctx.eventState.buildProgress * 0.2);
+      if (ctx.eventState.section === 'breakdown') regimeT = Math.min(regimeT, BREAKDOWN_REGIME);
+      regime += (1 - Math.exp(-dt / 2.5)) * (regimeT - regime);
       const cam = ctx.camera;
       if (ctx.fadeInOut > 0.1 && seedCooldown <= 0) {
         if (ctx.bassHits > 0.6) {

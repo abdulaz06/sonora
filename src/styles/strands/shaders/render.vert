@@ -1,8 +1,8 @@
 #version 300 es
 precision highp float;
 precision highp int;
-// Draws particles. VARIANT 0–2: points, 3: instanced brushstrokes,
-// 4: instanced velocity-stretched streaks.
+// Draws particles. VARIANT 0, 2: points; 1: instanced hair-thin filament
+// streaks; 3: instanced brushstrokes; 4: instanced velocity-stretched streaks.
 uniform sampler2D u_stateA;
 uniform sampler2D u_stateB;
 uniform int u_side;
@@ -28,6 +28,9 @@ uniform int u_star_w_count;
 uniform vec2 u_vp;             // vanishing point offset (clip units)
 uniform float u_roll;
 uniform float u_streak;        // streak length factor
+// Lumen
+uniform float u_fil_len;       // filament length (seconds of travel)
+uniform float u_fil_max;       // max filament length (world units)
 out vec4 v_col;
 out vec2 v_uv;
 flat out float v_seed;
@@ -41,7 +44,7 @@ vec2 toClip(vec2 w) {
 }
 
 void main() {
-#if VARIANT <= 2
+#if VARIANT == 0 || VARIANT == 2
   int pid = gl_VertexID;
 #else
   int pid = gl_InstanceID;
@@ -64,9 +67,20 @@ void main() {
     ? vec4(0.0, w * (0.15 + 0.85 * u_sparkle) * pow(fract(seed * 31.0), 3.0) * 1.5, 0.0, 0.0)
     : vec4(w * u_gain * (0.6 + 4.0 * speed), 0.0, 0.0, 0.0);
 #elif VARIANT == 1
-  // Lumen: hair-thin filaments, iridescent tint carried in rgb.
-  gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
-  gl_PointSize = u_point;
+  // Lumen: hair-thin filaments drawn as streaks back along the velocity,
+  // iridescent tint carried in rgb.
+  int corner = gl_VertexID;
+  vec2 q = corner == 0 ? vec2(0, -1) : corner == 1 ? vec2(1, -1) : corner == 2 ? vec2(0, 1)
+         : corner == 3 ? vec2(1, -1) : corner == 4 ? vec2(1, 1) : vec2(0, 1);
+  float spd = length(A.zw);
+  vec2 dirw = spd > 1e-6 ? A.zw / spd : vec2(1.0, 0.0);
+  float len = min(spd * u_fil_len, u_fil_max) * min(age * 3.0, 1.0);
+  vec2 ph = toClip(A.xy), pt = toClip(A.xy - dirw * len);
+  vec2 along = ph - pt;
+  vec2 dirc = length(along * u_res) > 1e-3 ? normalize(along * u_res) : vec2(1.0, 0.0);
+  vec2 side = vec2(-dirc.y, dirc.x) / u_res * 2.0;
+  gl_Position = vec4(mix(pt, ph, q.x) + side * q.y * 0.75 * u_point, 0.0, 1.0);
+  v_uv = q;
   float t = age / max(life, 1e-3);
   float hue = fract(kind + atan(A.w, A.z) / 6.2832 + u_time * 0.03);
   vec3 irid = 0.55 + 0.45 * cos(6.2832 * (hue + vec3(0.0, 0.33, 0.67)));

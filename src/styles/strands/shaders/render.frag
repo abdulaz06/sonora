@@ -13,8 +13,12 @@ uniform float u_gain;
 out vec4 frag;
 //#include noise
 void main() {
-#if VARIANT <= 2
+#if VARIANT == 0 || VARIANT == 2
   frag = v_col;
+#elif VARIANT == 1
+  // Filament: brightest at the head, thin soft edge.
+  float edge = 1.0 - smoothstep(0.3, 1.0, abs(v_uv.y));
+  frag = vec4(v_col.rgb * edge * mix(0.25, 1.0, v_uv.x), 1.0);
 #elif VARIANT == 3
   // Brushstroke: soft across the width, bristle streaks along the length.
   float across = 1.0 - smoothstep(0.55, 1.0, abs(v_uv.y));
