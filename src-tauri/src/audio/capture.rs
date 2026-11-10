@@ -2,6 +2,7 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use parking_lot::Mutex;
 use serde::Serialize;
 use sonora_dsp::AudioBuffer;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Public-facing description of an output device for the device picker UI.
@@ -56,9 +57,12 @@ pub fn list_output_devices() -> Vec<DeviceInfo> {
 /// Start WASAPI loopback capture on the supplied output device.
 /// The returned `Stream` is `!Send` on Windows — keep it on the thread that
 /// created it for its entire lifetime.
+/// `failed` is set when the stream reports an error (e.g. the endpoint was
+/// invalidated by a plug/unplug); the pipeline then reopens capture.
 pub fn start_capture_on(
     device: &cpal::Device,
     buffer: Arc<Mutex<AudioBuffer>>,
+    failed: Arc<AtomicBool>,
 ) -> Result<(cpal::Stream, u32), String> {
     let config = device
         .default_output_config()
@@ -79,8 +83,9 @@ pub fn start_capture_on(
                     buf.write_one(mono);
                 }
             },
-            |err| {
+            move |err| {
                 eprintln!("Audio stream error: {err}");
+                failed.store(true, Ordering::Relaxed);
             },
             None,
         )

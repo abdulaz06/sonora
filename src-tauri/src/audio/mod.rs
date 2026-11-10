@@ -6,6 +6,7 @@ use capture::{default_output_device, find_output_device_by_name, start_capture_o
 use devices::{DevicePreference, DeviceState};
 use parking_lot::Mutex;
 use sonora_dsp::{hop_size, Analyzer, AudioBuffer};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tauri::Emitter;
@@ -18,6 +19,15 @@ const DEVICE_POLL_INTERVAL_MS: u128 = 1000;
 /// Stable-for window before applying a hot device swap (ms). Avoids thrashing
 /// when the user plug/unplugs in quick succession.
 const DEVICE_DEBOUNCE_MS: u128 = 500;
+/// No samples for this long → reopen capture on the current target. Catches
+/// streams that died silently (endpoint invalidated without a name change,
+/// e.g. a 3.5 mm jack re-routing the same Realtek device). Reopening during
+/// genuine silence is harmless.
+const WATCHDOG_MS: u128 = 3000;
+/// WASAPI loopback delivers no packets while nothing plays. After this long
+/// without samples, feed silence so analysis keeps running and visuals decay
+/// instead of freezing on the last frame.
+const SILENCE_FILL_MS: u128 = 120;
 
 /// Start the audio capture and processing pipeline.
 pub fn start(app_handle: tauri::AppHandle, device_state: Arc<DeviceState>) {
@@ -33,6 +43,8 @@ pub fn start(app_handle: tauri::AppHandle, device_state: Arc<DeviceState>) {
 struct ActiveCapture {
     _stream: cpal::Stream,
     device_name: String,
+    failed: Arc<AtomicBool>,
+    started: Instant,
 }
 
 fn run_pipeline(
@@ -49,11 +61,29 @@ fn run_pipeline(
     let mut pending_change: Option<(String, Instant)> = None;
     // `None` forces a poll on the first tick.
     let mut last_poll: Option<Instant> = None;
+    let mut last_samples = Instant::now();
+    let mut last_fill = Instant::now();
+    let silence = vec![0.0_f32; 2048];
 
     loop {
         std::thread::sleep(Duration::from_millis(16));
 
         let now = Instant::now();
+
+        // Recover a dead or stalled stream on the same target device.
+        let restart = match &active {
+            Some(a) => {
+                a.failed.load(Ordering::Relaxed)
+                    || (now.duration_since(last_samples).as_millis() >= WATCHDOG_MS
+                        && now.duration_since(a.started).as_millis() >= WATCHDOG_MS)
+            }
+            None => false,
+        };
+        if restart {
+            reopen(&app_handle, &device_state, &buffer, &mut active, &mut analysis);
+            last_samples = now;
+        }
+
         let due = last_poll
             .map(|t| now.duration_since(t).as_millis() >= DEVICE_POLL_INTERVAL_MS)
             .unwrap_or(true);
@@ -76,7 +106,17 @@ fn run_pipeline(
         };
 
         let hop = hop_size(analysis.sample_rate());
-        let new_count = buffer.lock().new_sample_count();
+        let mut new_count = buffer.lock().new_sample_count();
+        if new_count > 0 {
+            last_samples = now;
+        } else if now.duration_since(last_samples).as_millis() >= SILENCE_FILL_MS
+            && now.duration_since(last_fill).as_millis() >= 16
+        {
+            // Nothing arriving: analyse silence at the normal hop rate.
+            buffer.lock().write_slice(&silence[..hop.min(silence.len())]);
+            last_fill = now;
+            new_count = hop;
+        }
         if new_count < hop {
             continue;
         }
@@ -164,6 +204,34 @@ fn try_apply_device(
     }
 }
 
+/// Reopen capture after a stream error or a stall. Same device → quiet reopen
+/// that keeps analysis state; a different target goes through the normal swap.
+fn reopen(
+    app_handle: &tauri::AppHandle,
+    device_state: &DeviceState,
+    buffer: &Arc<Mutex<AudioBuffer>>,
+    active: &mut Option<ActiveCapture>,
+    analysis: &mut Option<Analyzer>,
+) {
+    let Some(prev) = active.as_ref() else { return };
+    let failed = prev.failed.load(Ordering::Relaxed);
+    let prev_name = prev.device_name.clone();
+    let target = match device_state.preference() {
+        DevicePreference::Default => default_output_device(),
+        DevicePreference::Pinned(name) => find_output_device_by_name(&name),
+    };
+    let Some(target) = target else {
+        // Nothing to capture from; the poll loop reports it and retries.
+        *active = None;
+        return;
+    };
+    let same = target.1 == prev_name;
+    if failed {
+        println!("Audio stream on {prev_name} failed; reopening on {}", target.1);
+    }
+    apply_swap_inner(app_handle, device_state, buffer, active, analysis, target, same && !failed);
+}
+
 /// Drop the current stream, build a new one on `target`, reset analysis state,
 /// and notify the frontend. On failure, leaves `active`/`analysis` clear so the
 /// next tick will retry.
@@ -175,28 +243,51 @@ fn apply_swap(
     analysis: &mut Option<Analyzer>,
     target: (cpal::Device, String),
 ) {
+    apply_swap_inner(app_handle, device_state, buffer, active, analysis, target, false);
+}
+
+fn apply_swap_inner(
+    app_handle: &tauri::AppHandle,
+    device_state: &DeviceState,
+    buffer: &Arc<Mutex<AudioBuffer>>,
+    active: &mut Option<ActiveCapture>,
+    analysis: &mut Option<Analyzer>,
+    target: (cpal::Device, String),
+    quiet: bool,
+) {
     let (device, name) = target;
     let previous = active.take().map(|a| a.device_name);
-    *analysis = None;
     buffer.lock().clear();
+    let failed = Arc::new(AtomicBool::new(false));
 
-    match start_capture_on(&device, Arc::clone(buffer)) {
+    match start_capture_on(&device, Arc::clone(buffer), Arc::clone(&failed)) {
         Ok((stream, sample_rate)) => {
-            match &previous {
-                Some(prev) => println!(
-                    "Audio device changed: {prev} → {name} ({sample_rate} Hz)"
-                ),
-                None => println!("Audio capture started on {name} ({sample_rate} Hz)"),
+            if !quiet {
+                match &previous {
+                    Some(prev) => println!(
+                        "Audio device changed: {prev} → {name} ({sample_rate} Hz)"
+                    ),
+                    None => println!("Audio capture started on {name} ({sample_rate} Hz)"),
+                }
             }
-            *analysis = Some(Analyzer::new(sample_rate));
+            // Keep analysis state (tempo, envelopes, events) across a reopen
+            // at the same rate so recovery is seamless.
+            if analysis.as_ref().map(|a| a.sample_rate()) != Some(sample_rate) {
+                *analysis = Some(Analyzer::new(sample_rate));
+            }
             *active = Some(ActiveCapture {
                 _stream: stream,
                 device_name: name.clone(),
+                failed,
+                started: Instant::now(),
             });
             device_state.set_current(name.clone());
-            let _ = app_handle.emit("audio-device-changed", &name);
+            if !quiet {
+                let _ = app_handle.emit("audio-device-changed", &name);
+            }
         }
         Err(e) => {
+            *analysis = None;
             eprintln!("Failed to start capture on {name}: {e}");
             device_state.set_current(String::new());
             let _ = app_handle.emit("audio-device-changed", "");
