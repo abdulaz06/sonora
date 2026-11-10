@@ -14,7 +14,7 @@ import type { StyleId } from '../styles/visual-style';
 import { toggleDebugOverlay, updateDebugOverlay } from '../ui/debug-overlay';
 import { initHoverUI } from '../ui/hover-ui';
 import { initPalettePicker, syncPalettePicker } from '../ui/palette-picker';
-import { initSettingsPanel, syncSettings } from '../ui/settings-panel';
+import { initSettingsPanel, setAudioLevel, syncSettings } from '../ui/settings-panel';
 import type { AudioFeatureFrame } from '../types/audio-frame';
 
 export interface ControllerOptions {
@@ -26,6 +26,8 @@ export interface ControllerOptions {
     currentName: string;
     onChange: (id: string) => void;
   };
+  /** Web: open the audio source chooser from the settings panel. */
+  openAudioSource?: () => void;
 }
 
 export interface Controller {
@@ -160,6 +162,7 @@ export function initController(opts: ControllerOptions): Controller {
         persist();
       }
       : undefined,
+    onOpenAudioSource: opts.openAudioSource,
   }, {
     ...panelState(),
     ringCount: settings.ringCount,
@@ -238,6 +241,7 @@ export function initController(opts: ControllerOptions): Controller {
   return {
     onFrame(frame: AudioFeatureFrame): void {
       renderer.pushFrame(frame);
+      setAudioLevel(Math.sqrt(frame.energy.instant) * 2.2);
       updateDebugOverlay(frame, renderer.events.state, renderer.stats());
     },
     setStyle,

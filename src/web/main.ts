@@ -8,7 +8,9 @@
  */
 
 import { initController } from '../app/controller';
-import { decodeWavMono, WasmFrameSource } from '../audio/wasm-source';
+import { decodeWavMono } from '../audio/wav';
+import { WasmFrameSource } from '../audio/wasm-source';
+import { createSourceUi, type SourceUi } from './source-ui';
 import { CAMERA_PRESETS } from '../engine/camera';
 import { initRenderer } from '../engine/renderer';
 import { DEFAULT_SETTINGS, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
@@ -96,7 +98,8 @@ async function main(): Promise<void> {
     preserveDrawingBuffer: harness,
     seed: harness ? 1234 : undefined,
   });
-  const controller = initController({ renderer, settings, persist });
+  let openSource: () => void = () => undefined;
+  const controller = initController({ renderer, settings, persist, openAudioSource: () => window.setTimeout(() => openSource(), 0) });
   const source = await WasmFrameSource.create();
   source.subscribe((f) => controller.onFrame(f));
 
@@ -109,10 +112,10 @@ async function main(): Promise<void> {
     return;
   }
 
-  buildBar(source, tracks, renderer);
+  openSource = buildBar(source, tracks, renderer).open;
 }
 
-function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, renderer: ReturnType<typeof initRenderer>): void {
+function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, renderer: ReturnType<typeof initRenderer>): SourceUi {
   const style = document.createElement('style');
   style.textContent = BAR_CSS;
   document.head.appendChild(style);
@@ -120,13 +123,11 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
   const bar = document.createElement('div');
   bar.id = 'webbar';
   bar.className = 'sonora-fadeable';
-  const trackOpts = Object.keys(tracks).map((t) => `<option value="track:${t}">${t}</option>`).join('');
   bar.innerHTML = `
     <span class="brand">sonora</span>
-    <select id="src"><option value="" selected disabled>Source…</option>${trackOpts}
-      <option value="file">Audio file…</option><option value="mic">Microphone</option><option value="display">Tab / system audio</option></select>
-    <button id="play">Play</button>
-    <span id="clock" class="dim">--:--</span>
+    <span id="src-slot"></span>
+    <button id="play" style="display:none">Pause</button>
+    <span id="clock" class="dim" style="display:none"></span>
     <span id="fps" class="dim">-- fps</span>
   `;
   document.body.appendChild(bar);
@@ -135,48 +136,27 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
   hint.textContent = 'drop audio to play';
   document.body.appendChild(hint);
 
-  const fileInput = document.createElement('input');
-  fileInput.type = 'file';
-  fileInput.accept = 'audio/*';
-  const sel = bar.querySelector<HTMLSelectElement>('#src')!;
   const playBtn = bar.querySelector<HTMLButtonElement>('#play')!;
   const clock = bar.querySelector<HTMLSpanElement>('#clock')!;
   const fpsEl = bar.querySelector<HTMLSpanElement>('#fps')!;
 
-  const playBlob = async (data: Blob | ArrayBuffer): Promise<void> => {
+  const playData = async (data: Blob | ArrayBuffer, label: string): Promise<void> => {
     const buf = await source.loadFile(data);
-    await source.playBuffer(buf, 0, () => { playBtn.textContent = 'Play'; });
+    await source.playBuffer(buf, 0, () => { playBtn.textContent = 'Play'; }, label);
     playBtn.textContent = 'Pause';
   };
+  const ui = createSourceUi(source, Object.entries(tracks).map(([id, m]) => ({ id, file: m.file })), playData);
+  bar.querySelector('#src-slot')!.replaceWith(ui.chip);
 
-  sel.addEventListener('change', async () => {
-    const v = sel.value;
-    try {
-      if (v.startsWith('track:')) {
-        const meta = tracks[v.slice(6)];
-        const res = await fetch(`/test-audio/${meta.file}`);
-        await playBlob(await res.arrayBuffer());
-      } else if (v === 'file') {
-        fileInput.click();
-      } else if (v === 'mic') {
-        await source.useMicrophone();
-        playBtn.textContent = 'Live';
-      } else if (v === 'display') {
-        await source.useDisplayAudio();
-        playBtn.textContent = 'Live';
-      }
-    } catch (err) {
-      console.warn('Source failed:', err);
-      clock.textContent = err instanceof Error ? err.message.slice(0, 48) : 'source failed';
-    }
-  });
-  fileInput.addEventListener('change', () => {
-    const f = fileInput.files?.[0];
-    if (f) void playBlob(f);
+  // Play/pause and the clock only make sense for files.
+  source.onStatus((s) => {
+    const file = s.kind === 'file' && s.state !== 'idle';
+    playBtn.style.display = file ? '' : 'none';
+    clock.style.display = file ? '' : 'none';
   });
   playBtn.addEventListener('click', () => {
     if (source.isPlaying) { source.pause(); playBtn.textContent = 'Play'; }
-    else { void source.resume(); if (source.duration) playBtn.textContent = 'Pause'; }
+    else { void source.resume(); playBtn.textContent = 'Pause'; }
   });
 
   window.addEventListener('dragover', (e) => { e.preventDefault(); document.body.classList.add('dragging'); });
@@ -185,7 +165,7 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
     e.preventDefault();
     document.body.classList.remove('dragging');
     const f = e.dataTransfer?.files[0];
-    if (f) void playBlob(f);
+    if (f) void playData(f, f.name);
   });
 
   const fmt = (t: number): string => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -194,6 +174,7 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
     fpsEl.textContent = `${st.fps.toFixed(0)} fps · ${st.quality.level}`;
     if (source.duration) clock.textContent = `${fmt(source.currentTime)} / ${fmt(source.duration)}`;
   }, 250);
+  return ui;
 }
 
 function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFrameSource, tracks: Record<string, TrackMeta>): void {

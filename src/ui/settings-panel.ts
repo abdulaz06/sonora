@@ -67,8 +67,10 @@ export interface SettingsCallbacks {
   onDriftPeriodChange: (seconds: number) => void;
   onResponsivenessChange: (t: number) => void;
   onQualityChange: (preset: QualityPreset) => void;
-  /** Omit to hide the audio section (web build). */
+  /** Desktop: pick an output device to listen to. */
   onAudioDeviceChange?: (id: string) => void;
+  /** Web: open the audio source chooser. */
+  onOpenAudioSource?: () => void;
 }
 
 export interface SettingsState {
@@ -143,6 +145,9 @@ const CSS = `
 #settings-panel .check { display: flex; align-items: center; gap: 8px; cursor: pointer; color: rgba(236,231,223,0.62); }
 #settings-panel .check input { accent-color: #ECE7DF; }
 #settings-panel select { width: 100%; background: #08080A; color: #ECE7DF; border: 1px solid rgba(236,231,223,0.18); padding: 6px; }
+#settings-panel .meter { height: 4px; background: rgba(236,231,223,0.12); margin-top: 8px; }
+#settings-panel .meter i { display: block; height: 100%; width: 0; background: #ECE7DF; transition: width 80ms linear; }
+#settings-panel .go { width: 100%; background: transparent; color: #ECE7DF; border: 1px solid rgba(236,231,223,0.3); padding: 8px; cursor: pointer; }
 #settings-panel kbd { font-family: inherit; border: 1px solid rgba(236,231,223,0.2); padding: 0 4px; margin-right: 6px; }
 #settings-panel .keys { line-height: 1.9; color: rgba(236,231,223,0.55); }
 `;
@@ -209,12 +214,26 @@ function render(): void {
       ${hint('Drag on the picture to move around. Scroll to zoom in and out. Switch View to Depth for camera presets.')}
     </div>` : '';
 
+  const meter = `<div class="meter"><i id="audio-level"></i></div>`;
   const audio = cb.onAudioDeviceChange ? `
     <div class="sec">
       <div class="title">Audio</div>
-      <div class="field"><div class="label">Source</div>
+      <div class="field"><div class="label">Listen to</div>
         <select data-a="device">${deviceOptions()}</select>
-        ${hint(state.currentAudioDeviceName ? `Listening to: ${state.currentAudioDeviceName}. "Default" follows whatever Windows is playing through.` : 'No audio device found.')}
+        ${meter}
+        ${hint(state.currentAudioDeviceName
+          ? `Hearing: ${state.currentAudioDeviceName}. ${state.audioDevice === 'default'
+            ? 'Follows the speakers or headphones Windows is using and switches by itself when you plug something in.'
+            : 'Pinned to this device. Choose "Whatever Windows is playing on" to follow device changes automatically.'}`
+          : 'No playback device found. Plug in speakers or headphones; Sonora picks them up automatically.')}
+      </div>
+    </div>` : cb.onOpenAudioSource ? `
+    <div class="sec">
+      <div class="title">Audio</div>
+      <div class="field">
+        <button class="go" data-a="audio-source">Choose audio source</button>
+        ${meter}
+        ${hint('Share a browser tab (best), your whole computer, a microphone, or play a file.')}
       </div>
     </div>` : '';
 
@@ -289,7 +308,7 @@ function render(): void {
 }
 
 function deviceOptions(): string {
-  const opts = [`<option value="default">Default (follows Windows)</option>`];
+  const opts = [`<option value="default">Whatever Windows is playing on (recommended)</option>`];
   let seen = state.audioDevice === 'default';
   for (const d of state.audioDevices) {
     if (d.id === state.audioDevice) seen = true;
@@ -325,6 +344,7 @@ function onClick(e: MouseEvent): void {
     }
     case 'drift': state.autoDrift = v === '1'; cb.onAutoDriftChange(state.autoDrift); break;
     case 'quality': state.quality = v as QualityPreset; cb.onQualityChange(state.quality); break;
+    case 'audio-source': setOpen(false); cb.onOpenAudioSource?.(); return;
     default: return;
   }
   render();
@@ -409,4 +429,10 @@ export function syncSettings(patch: Partial<SettingsState>): void {
   const active = document.activeElement;
   if (active instanceof HTMLInputElement && active.type === 'range' && panel.contains(active)) return;
   render();
+}
+
+/** Live input level (0–1) for the Audio section meter. Cheap: no re-render. */
+export function setAudioLevel(level: number): void {
+  const el = panel?.classList.contains('open') ? panel.querySelector<HTMLElement>('#audio-level') : null;
+  if (el) el.style.width = `${Math.round(Math.min(1, level) * 100)}%`;
 }

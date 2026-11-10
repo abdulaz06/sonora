@@ -36,6 +36,12 @@ Abdul's side-by-side video (v0.1 vs 2.0, same song) showed 2.0 had lost beat syn
 - [x] Live input latency: AudioWorklet block 1024 → 256 samples.
 - [x] Bug: settings panel closed itself when a button re-rendered it.
 
+## Audio selection round — done
+- [x] Desktop: capture reopens on stream errors and after 3 s without samples; silence is analysed so visuals decay instead of freezing (D17).
+- [x] Web: source chooser (tab recommended / whole computer / mic + device list / file / test tracks), status chip with level meter, reconnect banner, raw-audio constraints, mic auto re-acquire, remembered last source (D18).
+- [x] Settings → Audio: level meter on both builds; desktop wording explains that the default follows Windows' current speakers/headphones; web button opens the chooser.
+- [x] Tested: getDisplayMedia path in Edge with auto-accept flags (live → simulated device change → silence → reconnect banner; continued sound → no banner). Physical jack plugging not testable here.
+
 ## Quality Bar — Flow Ink 2.0 (self-assessed from harness screenshots, all four tracks)
 1. Layered: inflow ← mid presence, jets/splats ← bass hits, sparkle ← high hits, turbulence + camera ← intensity, surface breathing ← beat. Pass.
 2. Never static: camera drift, evolving flow, Auto Drift, seeded variation. Pass.

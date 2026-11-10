@@ -54,3 +54,11 @@ The first seven palettes are v0.1's, in v0.1 order, so names and saved indices m
 
 ## D16 — Sync metric in the harness
 `--sync` renders 12 s around the drop and scores, per known kick (exported by the generator), the largest relative luminance change within 133 ms. It is the regression test for "music and visuals in sync".
+
+## D17 — Desktop capture recovers by itself
+**Context:** plugging speakers into the 3.5 mm jack could stop the visuals while music kept playing. cpal reported the stream error but nothing reopened capture, and when the endpoint name stays the same (Realtek jack re-routing) the default-device poll saw no change. WASAPI loopback also delivers no packets during silence, so the renderer froze on its last frame.
+**Decision:** a stream error flags the capture for reopen; a watchdog reopens after 3 s without samples (harmless during silence, quiet when it is the same device, keeps analysis state); after 120 ms without samples the pipeline analyses silence at the normal hop rate so visuals decay instead of freezing.
+
+## D18 — Web audio sources: tab first, health-checked
+**Context:** Chromium binds whole-computer (system) audio sharing to the output device active when sharing started; changing speakers/headphones silences it and a new capture needs a click. Tab audio follows the tab. The old source dropdown also could not re-select the same option, so re-sharing silently did nothing.
+**Decision:** a source chooser with plain-language options (Browser tab — recommended, Whole computer, Microphone/line-in with device list, Audio file, Test tracks), a status chip with a live level meter, and a banner with one-click Reconnect when sharing stops or when a device change is followed by silence while music had been playing. Captures request raw audio (no echo cancellation / noise suppression / auto-gain, which Chromium otherwise applies). Microphones re-acquire automatically. The last capture type is remembered for a one-click reconnect on the next visit.

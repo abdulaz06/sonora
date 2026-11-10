@@ -39,6 +39,14 @@ WASAPI loopback (desktop)        Web Audio + AudioWorklet (browser)
 
 The same analysis crate runs in the desktop app and in the browser; a parity check confirms both produce the same frames. Instrument and section labels are heuristics derived from band energy and onsets, not source separation or machine learning.
 
+## Choosing what Sonora hears
+
+- **Desktop app (recommended):** listens to your speakers directly. Leave Audio on "Whatever Windows is playing on" and it follows device changes by itself: plug in headphones or 3.5 mm speakers and the visuals carry on.
+- **Browser (`npm run dev:web`):** click the source chip top-left.
+  - **Browser tab** (best): share the tab playing music with "Also share tab audio" on. Keeps working when you change speakers or headphones.
+  - **Whole computer:** Entire screen with "Also share system audio" on; hears any app, including the Spotify desktop app. Browsers keep this tied to the speakers active when you started, so after a device change Sonora shows a one-click Reconnect.
+  - **Microphone / line-in**, **audio file** (or drop one on the page), **test tracks**.
+
 ## Controls
 
 | Key | Action |
