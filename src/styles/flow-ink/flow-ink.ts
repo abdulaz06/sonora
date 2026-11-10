@@ -40,29 +40,45 @@ import fullscreenVertSrc from '../../engine/shaders/fullscreen.vert?raw';
 const DOMAIN = 4.0;
 /** Depth view: ground grid size (world units) and how far ahead it is centred. */
 const GRID_SIZE = 8;
-const GRID_AHEAD = 2.6;
+/** Grid centre: where the camera looks at the surface, clamped (world units). */
+const GRID_AHEAD_MIN = 0.4;
+const GRID_AHEAD_MAX = 2.6;
 /** Surface height (world units) from ink, and from bass lift. */
 const HEIGHT_SCALE = 0.018;
 const LIFT_SCALE = 0.03;
 const BREATH_AMOUNT = 0.14;
 /** Flat view: world units visible vertically per camera view-height. */
-const FLAT_VIEW_SCALE = 1.6;
+const FLAT_VIEW_SCALE = 1.3;
 
 /** Inflow emitters attached to the view. */
 const EMITTERS = 4;
-const INFLOW_DYE = 3.4;         // dye per second at full mid presence
-const INFLOW_RADIUS = 0.003;    // uv
+const INFLOW_DYE = 2.6;         // dye per second at full mid presence
+const INFLOW_RADIUS = 0.0045;   // uv
 const INFLOW_SPEED = 0.16;      // uv/s jet
 
 /** Bass splats. */
-const BASS_THRESHOLD = 0.5;
-const BASS_COOLDOWN = 0.17;
-const BASS_RADIUS = [0.016, 0.036];  // uv range
-const BASS_DYE = 0.9;
+const BASS_THRESHOLD = 0.4;
+const BASS_COOLDOWN = 0.11;
+const BASS_RADIUS = [0.018, 0.04];   // uv range
+const BASS_DYE = 0.75;
+/** Energy (fast glow) injected by a bass splat. */
+const BASS_ENERGY = 1.0;
+/** Beat kick: outward ink push on the frame of the hit (uv/s; radius × splat radius). */
+const BASS_KICK_SPEED = 1.1;
+const BASS_KICK_RADIUS = 1.9;
+/** A second, wider kick inside the view so ink already on screen jumps too. */
+const VIEW_KICK_SPEED = 0.55;
+const VIEW_KICK_RADIUS = 0.07;
 /** Jets per bass splat and their speed (uv/s): jets become vortex pairs. */
-const BASS_JETS = 3;
-const BASS_JET_SPEED = 0.55;
-const BASS_SWIRL = 0.025;
+const BASS_JETS = 2;
+const BASS_JET_SPEED = 0.35;
+const BASS_SWIRL = 0.02;
+/** Frame-accurate brightening of all ink on bass hits, per variant (ink, sumi, marble). */
+const PULSE_GAIN = [0.7, 1.0, 0.5];
+/** Black ink on paper reads much heavier than glowing ink: scale Sumi's dye. */
+const SUMI_DYE = 0.5;
+/** Energy channel decay (1/s): ~150 ms glow. */
+const ENERGY_DECAY = 6.5;
 /** Sparkle on high hits. */
 const HIGH_THRESHOLD = 0.3;
 const HIGH_COOLDOWN = 0.045;
@@ -77,9 +93,9 @@ const STIR_MAX = 0.16;
 const CURL_MIN = 10;
 const CURL_MAX = 26;
 /** Subtractive decay of faint ink (dye units / s) — keeps negative space. */
-const INK_FLOOR_DECAY = 0.018;
+const INK_FLOOR_DECAY = 0.016;
 /** Dye decay (1/s) for ink while playing / while silent. */
-const INK_DECAY = 0.075;
+const INK_DECAY = 0.07;
 const INK_DECAY_SILENT = 0.3;
 const MARBLE_DECAY = 0.004;
 
@@ -251,7 +267,9 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
   const tps = (v: number): number => v * sim.simRes;
 
   function push(s: Omit<Splat, 'seed'> & { seed?: number }): void {
-    sim.splat({ seed: s.seed ?? rng() * 100, ...s });
+    const k = variant === 'sumi' ? SUMI_DYE : 1;
+    const dye: Splat['dye'] = k === 1 ? s.dye : [s.dye[0] * k, s.dye[1] * k, s.dye[2], s.dye[3]];
+    sim.splat({ seed: s.seed ?? rng() * 100, ...s, dye });
   }
 
   /** Directional velocity jet: in incompressible flow it rolls up into a vortex pair. */
@@ -267,9 +285,14 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
     const amt = BASS_DYE * (0.6 + 0.6 * strength) * (variant === 'marble' ? 0.3 : 1);
     push({
       x, y, radius,
-      dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, 0.9 * strength],
-      vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (rng() < 0.5 ? -1 : 1)), detail: 1,
+      dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, BASS_ENERGY * strength],
+      vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (rng() < 0.5 ? -1 : 1)), detail: 0.8,
     });
+    const snap = 0.6 + 0.8 * ctx.responsiveness;
+    sim.kick(x, y, radius * BASS_KICK_RADIUS, BASS_KICK_SPEED * strength * snap);
+    // Ink already in view jumps on the same frame.
+    const [vx, vy] = screenToUv(ctx, (rng() - 0.5) * 1.2, (rng() - 0.5) * 1.0);
+    sim.kick(vx, vy, VIEW_KICK_RADIUS, VIEW_KICK_SPEED * strength * snap);
     // 1–3 jets at irregular angles: symmetric jets read as propellers.
     const jets = 1 + Math.floor(rng() * BASS_JETS);
     let a = rng() * Math.PI * 2;
@@ -307,7 +330,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       const radius = 0.03 + rng() * 0.02;
       push({
         x, y, radius,
-        dye: [i % 2 === 0 ? amt : amt * 0.15, i % 2 === 1 ? amt : amt * 0.1, 0.25, 1.0],
+        dye: [i % 2 === 0 ? amt : amt * 0.15, i % 2 === 1 ? amt : amt * 0.1, 0.25, 1.1],
         vx: 0, vy: 0, radial: 0, swirl: 0, detail: 1,
       });
       jet(x, y, dx / len, dy / len, 1.3 * strength, radius * 0.7);
@@ -388,10 +411,11 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       const [sx, sy] = randomScreen();
       const [x, y] = screenToUv(ctx, sx, sy);
       push({
-        x, y, radius: 0.012 + rng() * 0.01,
-        dye: [0.05, 0.45 * ctx.midHits * fade * (variant === 'marble' ? 0.4 : 1), 0.1, 0.2],
-        vx: 0, vy: 0, radial: 0, swirl: 0, detail: 1,
+        x, y, radius: 0.016 + rng() * 0.012,
+        dye: [0.05, 0.6 * ctx.midHits * fade * (variant === 'marble' ? 0.4 : 1), 0.1, 0.7 * ctx.midHits],
+        vx: 0, vy: 0, radial: 0, swirl: 0, detail: 0.8,
       });
+      sim.kick(x, y, 0.03, 0.5 * ctx.midHits);
       const a = rng() * Math.PI * 2;
       jet(x, y, Math.cos(a), Math.sin(a), 0.3 * ctx.midHits, 0.008);
       midCooldown = MID_COOLDOWN;
@@ -432,7 +456,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       params.dyeDissipation[0] = inkDecay;
       params.dyeDissipation[1] = inkDecay;
       params.dyeDissipation[2] = 1.4;
-      params.dyeDissipation[3] = 2.2;
+      params.dyeDissipation[3] = ENERGY_DECAY;
 
       emit(ctx, dt);
       mapAudio(ctx);
@@ -454,6 +478,8 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
         : [pal.bg[0] + inkA[0] * 0.045, pal.bg[1] + inkA[1] * 0.045, pal.bg[2] + inkA[2] * 0.045];
 
       // Post for this frame
+      // Beat pulse straight from the bass-hit envelope (instant attack, ~80 ms decay).
+      const pulse = clamp01(Math.max(ctx.bassHits, 0.5 * ctx.midHits) * ctx.fadeInOut);
       const post = ctx.post;
       if (light) {
         post.tonemap = 'none';
@@ -461,7 +487,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
         post.vignette = 0.16;
         post.grain = 0.028;
       } else {
-        post.exposure = vIdx === 2 ? 1.1 : 1.35;
+        post.exposure = (vIdx === 2 ? 1.05 : 1.15) * (1 + 0.1 * pulse);
         post.bloom = vIdx === 2 ? 0.35 : 0.6;
         post.bloomThreshold = 1.0;
         post.flash = 0.03 * ctx.eventState.dropEnvelope;
@@ -486,6 +512,8 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
         gl.uniform1f(u.u_drop, ctx.eventState.dropEnvelope);
         gl.uniform1f(u.u_sharpen, quality.level === 'low' ? 0.4 : 0.6);
         gl.uniform1f(u.u_glow, 1.0);
+        gl.uniform1f(u.u_pulse, pulse);
+        gl.uniform1f(u.u_pulse_gain, (PULSE_GAIN[vIdx] ?? 0.8) * (0.5 + ctx.responsiveness));
       };
 
       if (!ctx.depth) {
@@ -514,7 +542,8 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       gl.uniform3fv(uSky.u_up, cam.up);
       gl.uniform1f(uSky.u_tan, Math.tan(cam.fov / 2));
       gl.uniform1f(uSky.u_aspect, cam.aspect);
-      gl.uniform3fv(uSky.u_horizon, fogColor);
+      const atmo = Math.max(0, cam.curvature) * (light ? 0 : 0.25);
+      gl.uniform3fv(uSky.u_horizon, [fogColor[0] + inkA[0] * atmo, fogColor[1] + inkA[1] * atmo, fogColor[2] + inkA[2] * atmo]);
       gl.uniform3fv(uSky.u_zenith, light ? pal.paper : [pal.bg[0] * 0.55, pal.bg[1] * 0.55, pal.bg[2] * 0.55]);
       gl.bindVertexArray(quadVAO);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -525,8 +554,9 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
 
       const spacing = GRID_SIZE / (grid.res - 1);
       const fx = Math.sin(cam.yaw), fz = -Math.cos(cam.yaw);
-      const ox = Math.floor((cam.position[0] + fx * GRID_AHEAD - GRID_SIZE / 2) / spacing) * spacing;
-      const oz = Math.floor((cam.position[2] + fz * GRID_AHEAD - GRID_SIZE / 2) / spacing) * spacing;
+      const ahead = Math.min(GRID_AHEAD_MAX, Math.max(GRID_AHEAD_MIN, cam.position[1] / Math.tan(Math.max(0.05, -cam.pitch))));
+      const ox = Math.floor((cam.position[0] + fx * ahead - GRID_SIZE / 2) / spacing) * spacing;
+      const oz = Math.floor((cam.position[2] + fz * ahead - GRID_SIZE / 2) / spacing) * spacing;
       const breath = (0.5 + 0.5 * Math.cos(ctx.beatPhase * Math.PI * 2)) * ctx.beatConfidence * ctx.fadeInOut;
       const heightScale = HEIGHT_SCALE * (1 + BREATH_AMOUNT * breath) * (marbleFlatten(variant));
 
@@ -540,6 +570,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       gl.uniform3fv(uGround.u_fog_color, fogColor);
       gl.uniform2f(uGround.u_fog, cam.fogNear, cam.fogFar);
       gl.uniform1f(uGround.u_spec, vIdx === 2 ? 0.12 : light ? 0.05 : 1.0);
+      gl.uniform1f(uGround.u_curve_k, cam.curvature);
 
       gl.bindVertexArray(grid.vao);
       gl.drawElements(gl.TRIANGLES, grid.count, gl.UNSIGNED_INT, 0);

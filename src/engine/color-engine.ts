@@ -67,37 +67,20 @@ function duo(name: string, preview: string, hue: number, sat: number, light = 0.
 }
 
 // ── Preset palettes ─────────────────────────────────────────────
+// The first seven keep the exact hues and order of v0.1 so saved choices and
+// names mean the same thing ("Ember" is the v0.1 Ember). Flow Ink maps them
+// as: ink A = primary, ink B = accent, sparkle = highlight.
+const legacy = (name: string, preview: string, bg: HSL, primary: HSL, secondary: HSL, accent: HSL, highlight: HSL): Palette =>
+  ({ name, preview, duotone: false, bg, primary, secondary, accent, highlight, paper: BONE });
+
 export const PALETTES: Palette[] = [
-  {
-    name: 'Nocturne', preview: '#2f6fd6', duotone: false,
-    bg: h(225, 0.35, 0.03), primary: h(215, 0.72, 0.5), secondary: h(255, 0.45, 0.36),
-    accent: h(186, 0.62, 0.52), highlight: h(200, 0.6, 0.86), paper: BONE,
-  },
-  {
-    name: 'Ember', preview: '#e8641e', duotone: false,
-    bg: h(15, 0.35, 0.025), primary: h(18, 0.86, 0.5), secondary: h(352, 0.62, 0.36),
-    accent: h(36, 0.9, 0.56), highlight: h(42, 0.85, 0.84), paper: BONE,
-  },
-  {
-    name: 'Abyss', preview: '#0ea5b7', duotone: false,
-    bg: h(200, 0.4, 0.025), primary: h(190, 0.75, 0.42), secondary: h(222, 0.55, 0.32),
-    accent: h(168, 0.6, 0.5), highlight: h(180, 0.5, 0.85), paper: BONE,
-  },
-  {
-    name: 'Orchid', preview: '#b04ad8', duotone: false,
-    bg: h(280, 0.3, 0.028), primary: h(290, 0.62, 0.5), secondary: h(330, 0.5, 0.38),
-    accent: h(255, 0.55, 0.6), highlight: h(310, 0.45, 0.86), paper: BONE,
-  },
-  {
-    name: 'Verdigris', preview: '#2fa38a', duotone: false,
-    bg: h(170, 0.3, 0.025), primary: h(165, 0.55, 0.42), secondary: h(28, 0.5, 0.36),
-    accent: h(140, 0.45, 0.55), highlight: h(60, 0.4, 0.84), paper: BONE,
-  },
-  {
-    name: 'Gold', preview: '#d9a028', duotone: false,
-    bg: h(32, 0.3, 0.025), primary: h(40, 0.8, 0.5), secondary: h(22, 0.62, 0.34),
-    accent: h(50, 0.85, 0.6), highlight: h(48, 0.6, 0.88), paper: BONE,
-  },
+  legacy('Ocean', '#3b82f6', h(240, 0.3, 0.04), h(220, 0.7, 0.55), h(260, 0.5, 0.45), h(180, 0.6, 0.5), h(200, 0.8, 0.7)),
+  legacy('Aurora', '#22c55e', h(270, 0.2, 0.04), h(150, 0.6, 0.5), h(280, 0.5, 0.5), h(60, 0.7, 0.55), h(180, 0.7, 0.65)),
+  legacy('Ember', '#f97316', h(10, 0.3, 0.04), h(15, 0.8, 0.5), h(35, 0.7, 0.45), h(350, 0.6, 0.45), h(45, 0.9, 0.6)),
+  legacy('Neon', '#d946ef', h(260, 0.25, 0.03), h(300, 0.8, 0.55), h(180, 0.9, 0.5), h(60, 0.95, 0.55), h(330, 0.85, 0.65)),
+  legacy('Crimson', '#e11d48', h(350, 0.3, 0.04), h(350, 0.8, 0.5), h(15, 0.65, 0.5), h(320, 0.7, 0.55), h(5, 0.85, 0.65)),
+  legacy('Gold', '#f59e0b', h(30, 0.3, 0.04), h(42, 0.85, 0.55), h(25, 0.75, 0.48), h(55, 0.9, 0.6), h(50, 0.95, 0.72)),
+  legacy('Violet', '#8b5cf6', h(270, 0.25, 0.04), h(270, 0.7, 0.55), h(300, 0.5, 0.45), h(240, 0.6, 0.55), h(280, 0.75, 0.7)),
   duo('Ember / Black', '#f07a1a', 24, 0.92, 0.55),
   duo('Ivory / Black', '#e6dccb', 38, 0.28, 0.82),
   duo('Cold / Black', '#4f8fe6', 214, 0.78, 0.56),
@@ -179,7 +162,7 @@ export class ColorEngine {
   private to: Palette;
   private progress = 1;
   private _paletteIndex = 0;
-  private autoDrift = true;
+  private autoDrift = false;
   private driftPeriod = DEFAULT_DRIFT_PERIOD_S;
   private driftPhase = 0; // degrees
   private resolved: ResolvedPalette;

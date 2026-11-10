@@ -11,6 +11,7 @@ uniform vec2 u_fog;            // near, far
 uniform float u_height_scale;
 uniform float u_lift_scale;
 uniform float u_spec;
+uniform float u_curve_k;
 out vec4 frag;
 //#include common
 //#include ink
@@ -44,6 +45,10 @@ void main() {
   // Fade micro relief out when minified (aliasing) and when strongly magnified (banding).
   float microFade = (1.0 - smoothstep(0.8, 3.0, footprint)) * smoothstep(0.08, 0.45, footprint);
   n = normalize(n + vec3(-(fr - fl), 0.0, -(fu - fd)) * 0.5 * microFade);
+
+  // Curvature tilts the surface normal away from (planet) or toward (bowl) the camera.
+  vec2 rel = v_world - u_cam_pos.xz;
+  n = normalize(n + vec3(2.0 * u_curve_k * rel.x, 0.0, 2.0 * u_curve_k * rel.y));
 
   vec3 L = normalize(u_light_dir);
   float diff = max(dot(n, L), 0.0);

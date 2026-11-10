@@ -95,6 +95,8 @@ export interface StyleSignals {
   beatPhase: number;
   beatConfidence: number;
   beatOnset: boolean;
+  /** Responsiveness slider, 0 = smooth, 1 = punchy. */
+  responsiveness: number;
 }
 
 export interface StyleContext extends StyleSignals {

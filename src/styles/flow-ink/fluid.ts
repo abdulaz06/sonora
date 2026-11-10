@@ -31,6 +31,9 @@ const MAX_SIM_DT = 1 / 30;
 /** Fraction of last frame's pressure kept as the solver's starting guess. */
 const PRESSURE_WARM_START = 0.8;
 const INSTANCE_FLOATS = 13;
+/** Concurrent beat kicks and how fast each fades (s). */
+const MAX_KICKS = 8;
+const KICK_TAU = 0.09;
 
 export interface Splat {
   /** Domain uv (wrapped automatically). */
@@ -111,6 +114,8 @@ export class FluidSim {
   private instanceBuf: WebGLBuffer;
   private instances = new Float32Array(MAX_INSTANCES * INSTANCE_FLOATS);
   private instanceCount = 0;
+  private kicks: { x: number; y: number; r: number; s: number }[] = [];
+  private kickData = new Float32Array(MAX_KICKS * 4);
 
   private vel!: Double;
   private pressure!: Double;
@@ -205,6 +210,15 @@ export class FluidSim {
     }
   }
 
+  /**
+   * Beat kick: pushes ink outward from (x, y) immediately, fading over ~0.1 s.
+   * `radius` in uv, `speed` in uv/s at the start.
+   */
+  kick(x: number, y: number, radius: number, speed: number): void {
+    if (this.kicks.length >= MAX_KICKS) this.kicks.shift();
+    this.kicks.push({ x: ((x % 1) + 1) % 1, y: ((y % 1) + 1) % 1, r: radius, s: speed });
+  }
+
   step(rawDt: number, p: FluidParams): void {
     const gl = this.gl;
     const dt = Math.min(rawDt, MAX_SIM_DT);
@@ -259,10 +273,19 @@ export class FluidSim {
       u_texel: [simTexel, simTexel], u_dt: dt, u_dissipation: p.velocityDissipation,
     });
     this.swap(this.vel);
+    // Fade beat kicks and pack them for the dye pass.
+    const fade = Math.exp(-dt / KICK_TAU);
+    this.kicks = this.kicks.filter((k) => (k.s *= fade) > 0.004);
+    this.kickData.fill(0);
+    this.kicks.forEach((k, i) => this.kickData.set([k.x, k.y, k.r, k.s], i * 4));
     const dyeU = {
       u_dye_texel: [dyeTexel, dyeTexel], u_sim_res: this.simRes, u_dt: dt,
       u_dissipation: p.dyeDissipation as number[], u_floor_decay: p.dyeFloorDecay as number[],
     };
+    const ap = this.progs.advectDye;
+    gl.useProgram(ap.prog);
+    gl.uniform4fv(ap.u.u_kicks, this.kickData);
+    gl.uniform1i(ap.u.u_kick_count, this.kicks.length);
     this.pass('advectDye', this.tmp, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.dye.read }, { ...dyeU, u_pass: 0 });
     this.pass('advectDye', this.dye.write, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.tmp }, { ...dyeU, u_pass: 1 });
     this.swap(this.dye);

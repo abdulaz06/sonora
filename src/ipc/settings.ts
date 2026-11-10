@@ -7,12 +7,18 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
+import { DEFAULT_CAMERA_VIEW, type CameraView } from '../engine/camera';
 import { DEFAULT_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
 import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
+/** Bump when a default changes in a way saved settings must not override. */
+export const SETTINGS_VERSION = 3;
+
 export interface PersistedSettings {
+  /** Schema version (see SETTINGS_VERSION). */
+  settingsVersion: number;
   /** Active visual style. */
   mode: StyleId;
   /** Last-selected variant per mode (so switching modes restores correctly). */
@@ -35,6 +41,8 @@ export interface PersistedSettings {
   lightModes: Partial<Record<StyleId, LightMode>>;
   /** Per-style depth (3D) view preference. */
   depth: Partial<Record<StyleId, boolean>>;
+  /** Depth-view camera: height, tilt, curvature. */
+  camera: CameraView;
   /** Concentric shape count (Aura mode). */
   ringCount: number;
   /** Capture source: `'default'` follows the system default and auto-switches
@@ -52,6 +60,7 @@ export interface PersistedSettings {
 }
 
 export const DEFAULT_SETTINGS: PersistedSettings = {
+  settingsVersion: SETTINGS_VERSION,
   mode: DEFAULT_STYLE,
   variants: {},
   paletteIndex: 0,
@@ -59,10 +68,11 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   responsiveness: 0.6,
   quality: 'medium',
   showClassic: false,
-  autoDrift: true,
+  autoDrift: false,
   driftPeriod: DEFAULT_DRIFT_PERIOD_S,
   lightModes: {},
   depth: {},
+  camera: { ...DEFAULT_CAMERA_VIEW },
   ringCount: 3,
   audioDevice: 'default',
   window: {
@@ -154,7 +164,10 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     out.variants = variants;
   }
   if (typeof r.showClassic === 'boolean') out.showClassic = r.showClassic;
-  if (typeof r.autoDrift === 'boolean') out.autoDrift = r.autoDrift;
+  // v3: Auto Drift defaults off (it made palettes look wrong); older saves reset it.
+  const version = typeof r.settingsVersion === 'number' ? r.settingsVersion : 1;
+  if (typeof r.autoDrift === 'boolean' && version >= 3) out.autoDrift = r.autoDrift;
+  out.settingsVersion = SETTINGS_VERSION;
   if (typeof r.driftPeriod === 'number' && Number.isFinite(r.driftPeriod)) {
     out.driftPeriod = clamp(r.driftPeriod, MIN_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S);
   }
@@ -172,6 +185,16 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     const depth: Partial<Record<StyleId, boolean>> = {};
     for (const k of ids) if (typeof d[k] === 'boolean') depth[k] = d[k] as boolean;
     out.depth = depth;
+  }
+  if (r.camera && typeof r.camera === 'object') {
+    const c = r.camera as Record<string, unknown>;
+    const num = (v: unknown, lo: number, hi: number, d: number): number =>
+      (typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : d);
+    out.camera = {
+      height: num(c.height, 0, 1, DEFAULT_CAMERA_VIEW.height),
+      tilt: num(c.tilt, 0, 1, DEFAULT_CAMERA_VIEW.tilt),
+      curve: num(c.curve, -1, 1, DEFAULT_CAMERA_VIEW.curve),
+    };
   }
   // Classic styles stay selectable only while the classic group is shown.
   const desc = STYLES.find((d) => d.id === out.mode);

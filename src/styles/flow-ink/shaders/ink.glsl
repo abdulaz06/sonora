@@ -20,6 +20,8 @@ uniform float u_time;
 uniform float u_drop;         // post-drop envelope
 uniform float u_sharpen;
 uniform float u_glow;
+uniform float u_pulse;        // bass-hit envelope × fade: frame-accurate beat response
+uniform float u_pulse_gain;   // how much ink brightens on a hit
 
 struct InkSample {
   vec4 d;      // sharpened dye
@@ -53,7 +55,7 @@ vec3 darkBackground(vec2 world) {
 }
 
 // Returns colour; `cover` receives ink coverage (0..1) for lighting.
-vec3 shadeInk(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
+vec3 shadeInkBase(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
   float a = s.d.r, b = s.d.g, sp = s.d.b;
   float g = grainAt(world);
   bool light = u_light == 1;
@@ -80,7 +82,7 @@ vec3 shadeInk(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
   if (u_variant == 1) {
     // ── Sumi: black ink in water / on bone paper (ref07) ──
     float dens = a + b * 0.85 + s.edge * 0.7;
-    float cov = 1.0 - exp(-pow(dens, 0.75) * 3.2);
+    float cov = 1.0 - exp(-pow(dens, 0.8) * 2.2);
     cover = cov;
     if (light) {
       vec3 ink = mix(vec3(0.025, 0.024, 0.028), u_ink_a * 0.18, 0.18);
@@ -118,5 +120,24 @@ vec3 shadeInk(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
   // Filament rims: fine detail catches light.
   col += mix(u_ink_a, u_spark, 0.6) * s.edge * 0.35;
   col += u_spark * min(sp, 1.5) * 1.6;
+  return col;
+}
+
+// Beat response on top of the variant shading:
+//  - u_pulse brightens all ink on the hit (dark) or deepens it (paper)
+//  - dye.a carries "energy" injected by hits; it glows past 1.0 so it blooms
+//    and fades in ~150 ms
+vec3 shadeInk(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
+  vec3 col = shadeInkBase(s, world, fragCoord, cover);
+  float e = min(s.d.a, 2.0);
+  vec3 inkCol = u_variant == 1 ? (u_light == 1 ? vec3(0.02) : u_paper)
+              : mix(u_ink_a, u_ink_b, s.d.g / (s.d.r + s.d.g + 1e-3));
+  if (u_light == 1) {
+    float deepen = clamp((0.45 * u_pulse * u_pulse_gain + 0.35 * e) * max(cover, 0.25 * e), 0.0, 0.7);
+    return col * (1.0 - deepen) + inkCol * deepen * 0.15;
+  }
+  vec3 base = darkBackground(world);
+  col = base + (col - base) * (1.0 + u_pulse_gain * u_pulse);
+  col += inkCol * e * (0.3 + 0.7 * cover);
   return col;
 }

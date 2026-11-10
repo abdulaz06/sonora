@@ -195,7 +195,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     frame, time: 0, dt: 0,
     fadeInOut: 0, intensity: 0, intensitySmoothed: 0,
     bassHits: 0, bassPresence: 0, midHits: 0, midPresence: 0, highHits: 0, highPresence: 0,
-    beatPhase: 0, beatConfidence: 0, beatOnset: false,
+    beatPhase: 0, beatConfidence: 0, beatOnset: false, responsiveness: 0.6,
     events: [], eventState: events.state, camera,
     palette: colorEngine.getResolved(), light: false, depth,
     quality: quality.params, post,
@@ -332,7 +332,9 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       cancelAnimationFrame(rafId);
     },
     setResponsiveness(t: number): void {
-      envIntensity.setParams(lerpParams(Math.max(0, Math.min(1, t))));
+      const r = Math.max(0, Math.min(1, t));
+      envIntensity.setParams(lerpParams(r));
+      ctx.responsiveness = r;
     },
     setQuality(p: QualityPreset): void {
       quality.setPreset(p);

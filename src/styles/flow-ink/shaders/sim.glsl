@@ -127,9 +127,33 @@ uniform float u_dt;
 uniform vec4 u_dissipation;  // per-channel decay, 1/s
 uniform vec4 u_floor_decay;  // per-channel subtractive decay, units/s (clears faint haze)
 uniform int u_pass;
+// Beat kicks: a divergent push applied to the ink only (not the velocity
+// field, where the pressure solve would cancel it), so ink bursts outward on
+// the frame of the hit. xy = centre (uv), z = radius (uv), w = speed (uv/s).
+const int MAX_KICKS = 8;
+uniform vec4 u_kicks[MAX_KICKS];
+uniform int u_kick_count;
+vec2 kickVelocity(vec2 uv) {
+  vec2 v = vec2(0.0);
+  for (int i = 0; i < MAX_KICKS; i++) {
+    if (i >= u_kick_count) break;
+    vec4 k = u_kicks[i];
+    vec2 d = uv - k.xy;
+    d -= floor(d + 0.5);
+    float r = length(d) / k.z;
+    if (r > 3.0) continue;
+    // Lopsided: random 2- and 3-lobe angular strength so bursts tear
+    // irregularly instead of stamping discs.
+    float ang = atan(d.y, d.x);
+    float ph = fract(k.x * 91.7 + k.y * 37.3) * 6.2832;
+    float lobes = 0.45 + 0.35 * sin(ang * 2.0 + ph) + 0.3 * sin(ang * 3.0 + ph * 1.7);
+    v += (d / max(length(d), 1e-5)) * k.w * max(lobes, 0.05) * min(r * 1.5, 1.0) * exp(-r * r);
+  }
+  return v;
+}
 void main() {
   vec2 uv = gl_FragCoord.xy * u_dye_texel;
-  vec2 v = texture(u_vel, uv).xy / u_sim_res;
+  vec2 v = texture(u_vel, uv).xy / u_sim_res + kickVelocity(uv);
   vec2 back = uv - u_dt * v;
   if (u_pass == 0) {
     frag = texture(u_dye, back);

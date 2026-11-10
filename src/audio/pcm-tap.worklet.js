@@ -2,7 +2,7 @@
 // thread, where the WASM analyser runs. Audio passes through unchanged so the
 // node can sit inline before the destination.
 
-const BLOCK = 1024; // samples per message (~23 ms at 44.1 kHz)
+const BLOCK = 256; // samples per message (~6 ms at 44.1 kHz) — small for low latency
 
 class PcmTap extends AudioWorkletProcessor {
   constructor() {

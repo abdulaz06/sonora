@@ -10,6 +10,7 @@ uniform sampler2D u_height;
 uniform float u_height_scale;
 uniform float u_lift_scale;
 uniform vec3 u_cam_pos;
+uniform float u_curve_k;            // >0 planet (∩), <0 bowl (U)
 out vec2 v_world;
 out vec3 v_pos;
 float inkHeightV(vec4 blur) { return 1.0 - exp(-(blur.r + blur.g) * 0.9); }
@@ -19,7 +20,10 @@ void main() {
   float h = inkHeightV(hb) * u_height_scale + hb.a * u_lift_scale;
   // Far vertices are sparse relative to the field: flatten them so distant
   // ridges don't alias into spikes (fog hides the rest).
-  h *= 1.0 - smoothstep(1.4, 3.2, length(world - u_cam_pos.xz));
+  float dist = length(world - u_cam_pos.xz);
+  h *= 1.0 - smoothstep(1.4 + u_cam_pos.y, 3.2 + u_cam_pos.y * 1.5, dist);
+  // Curvature around the camera: the surface falls away (planet) or rises (bowl).
+  h -= u_curve_k * dist * dist;
   vec3 pos = vec3(world.x, h, world.y);
   v_world = world;
   v_pos = pos;
