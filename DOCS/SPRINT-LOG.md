@@ -1,19 +1,28 @@
 # Prompt 2: the art styles
 
 ## Checklist
-- [ ] P2.1 Flash limiter (≤3 large luminance flashes/s), registry order Flow Ink, Strands, Turing, Mosh, Fractal
-- [ ] P2.2 Strands engine (GPU particles, density accumulation, quality-scaled counts)
-- [ ] P2.3 Strands: Silk (inversion cut on drop), Lumen, Wisp, Starry Night, Warp
-- [ ] P2.4 Turing (Gray-Scott, regimes, seeds, drop inversion) + Coral, Bioluminescent
-- [ ] P2.5 Turing text-seeding hook via trackChange + dev-page button
-- [ ] P2.6 Mosh (feedback, smear, glitch, freeze-release) + Concrete, Signal
-- [ ] P2.7 Fractal (raymarched, spline flight, adaptive, half-res + temporal) + Voyage, Kaleido
-- [ ] P2.8 Every variant verified on all four tracks; Quality Bar pass; perf at 1080p Medium
-- [ ] P2.9 Preview images src/assets/previews/<style>-<variant>.webp
-- [ ] P2.10 Docs: local notes, DOCS/16, decisions
+- [x] P2.1 Flash limiter (≤3 large luminance flashes/s), registry order Flow Ink, Strands, Turing, Mosh, Fractal
+- [x] P2.2 Strands engine (GPU particles, density accumulation, quality-scaled counts)
+- [x] P2.3 Strands: Silk (inversion cut on drop), Lumen, Wisp, Starry Night, Warp
+- [x] P2.4 Turing (Gray-Scott, regimes, seeds, drop inversion) + Coral, Bioluminescent
+- [x] P2.5 Turing text-seeding hook via trackChange + dev-page button
+- [x] P2.6 Mosh (feedback, smear, glitch, freeze-release) + Concrete, Signal
+- [x] P2.7 Fractal (raymarched, spline flight, adaptive, half-res + temporal) + Voyage, Kaleido
+- [x] P2.8 Every variant verified on all four tracks; Quality Bar pass; perf at 1080p Medium
+- [x] P2.9 Preview images src/assets/previews/<style>-<variant>.webp
+- [x] P2.10 Docs: local notes, DOCS/16, decisions
 - [ ] P2.11 `npm run tauri build`; every style in the desktop app with system audio
 
 ## Notes (Prompt 2)
+- Flash guard: request() tokens (≤3/s, 0.25 s gap) + async luminance probe with damping (D19). Overlay shows flashes/s.
+- Strands: GPU particle engine shared by five looks. Lumen redrawn as instanced filament streaks after the first all-track review showed only a flare.
+- Turing: Gray-Scott; title seeding with a cleared moat so words stay readable (D22); breakdowns thin the pattern.
+- Mosh: analytic Droste tunnel after the resampling-feedback version blurred to mush (D21).
+- Fractal: negative Mandelbox scales were nearly solid at flyable clearance (measured); Voyage 2.9, Kaleido 2.6. Planner keeps clearance and prefers long lines of sight (D24).
+- Beat sync: first pass had Silk 22%, Wisp/Warp 9%, Starry/Coral 0% of kicks; added frame-accurate hit brightening/swelling → 91–100% everywhere, kept per-hit luminance jumps under the flash threshold.
+- Perf (1080p Medium): 1.7–7.6 ms per frame for every look; Starry halved its strokes (12 → 7.6 ms). Table in DOCS/16 §7.
+- Added: Frame rate setting (30/60/90/120/144/max, default 60) on Abdul's request; Auto quality judges against the cap.
+- Verified: scripts/verify-art.sh all (11 looks × 4 tracks), contact sheets reviewed; previews via scripts/make-previews.py.
 
 ---
 

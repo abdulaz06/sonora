@@ -87,3 +87,41 @@ Classic: Aura and Halo move to a hidden "Classic" section (settings toggle, off 
 - Turing and Flow Ink share ping-pong FBO infrastructure; reuse it.
 - Strands needs GPU-side particle state (float textures + ping-pong, or transform feedback). Do not simulate particles on the CPU.
 - Mosh must not use any copyrighted photos; generate the concrete/asphalt texture procedurally.
+
+---
+
+## 7. What shipped in v1.0 (Prompt 2)
+
+Registry order: **Flow Ink, Strands, Turing, Mosh, Fractal**; Aura and Halo stay in the hidden Classic group. Every style consumes only mapping signals and events, honours the palette (presets, custom hue, two-tone, Colour drift) and asks the flash guard before any deliberate flash. Previews live in `src/assets/previews/<style>-<variant>.webp`.
+
+| Style | Engine | Looks | Body / intensity | Beat | Hits | Drop |
+|-------|--------|-------|------------------|------|------|------|
+| **Strands** | GPU particles (RGBA32F state, ping-pong), additive density accumulation with blend decay; counts scale with quality (448² / 1024² / 1448² state) | Silk, Lumen, Wisp, Starry Night, Warp | Presence → emission; intensity → field and camera speed | Field pulse, star pulse | Bass → shockwaves (Silk), smoke rings (Wisp), energy glow on every look; highs → sparkle, Lumen spread | Silk inversion cut; Lumen cross → X burst; Warp jump |
+| **Turing** | Gray-Scott, 9-point Laplacian, periodic grid (512² / 1024² / 1536², 8 / 14 / 20 steps per frame) | Coral (paper), Bioluminescent | Intensity → spots ↔ maze ↔ stripes; breakdowns thin to sparse worms | Growth pulses | Seeds at random positions; bass swells the shapes on the frame | Inversion + reseed wave |
+| **Mosh** | Analytic nested-frame (Droste) tunnel + feedback datamosh layer; procedural seeds | Concrete, Signal | Intensity → tunnel depth speed | One nested frame per beat | Bass → smear; highs → RGB glitch blocks and tears | Freeze 0.45 s, then release in a full mosh |
+| **Fractal** | Mandelbox raymarch, CPU-planned spline flight, half-res jittered march + temporal upscale, adaptive steps | Voyage, Kaleido | Presence → fold scale / radius; intensity → flight speed and glow | Camera roll | Bass → fold breath + emissive veins; highs → iridescent sheen | Voyage dives (surge + FOV kick); Kaleido changes its wedge count |
+
+Track titles from `trackChange` grow into Turing as readable words (dev page: **Seed text**).
+
+**Frame rate.** Settings › Quality › Frame rate caps rendering at 30, 60 (default), 90, 120, 144 fps or the display rate.
+
+**Performance** (RX 7700S, 1080p, synced frame cost per frame at the house-124 drop; budget 16.7 ms):
+
+| Look | Low | Medium |
+|------|-----|--------|
+| Flow Ink · Ink | 2.7 ms | 4.8 ms |
+| Strands · Silk | 2.5 ms | 5.2 ms |
+| Strands · Lumen | 2.4 ms | 4.4 ms |
+| Strands · Wisp | 2.0 ms | 2.7 ms |
+| Strands · Starry Night | 3.7 ms* | 7.6 ms |
+| Strands · Warp | 2.1 ms | 2.6 ms |
+| Turing · Coral | 2.3 ms | 3.9 ms |
+| Turing · Bioluminescent | 1.2 ms | 3.1 ms |
+| Mosh · Concrete | 1.9 ms | 4.3 ms |
+| Mosh · Signal | 1.2 ms | 1.7 ms |
+| Fractal · Voyage | 2.0 ms | 3.4 ms |
+| Fractal · Kaleido | 2.0 ms | 3.5 ms |
+
+\* measured before Starry's stroke count was halved; Lumen Low before its filament streaks.
+
+**Beat sync** (`--sync`, house-124): every art look sees 91–100% of kicks with the luminance peak 38–88 ms after the kick.
