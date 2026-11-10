@@ -22,10 +22,11 @@ import type { BeatPulse } from '../engine/beat-pulse';
 import type { WorldCamera } from '../engine/camera';
 import type { ColorEngine, ResolvedPalette } from '../engine/color-engine';
 import type { EventState, SonoraEvent } from '../engine/events';
+import type { FlashGuard } from '../engine/flash-guard';
 import type { GenerativeState } from '../engine/generative';
 import type { QualityParams } from '../engine/quality';
 
-export type StyleId = 'flow-ink' | 'aura' | 'halo';
+export type StyleId = 'flow-ink' | 'strands' | 'turing' | 'mosh' | 'fractal' | 'aura' | 'halo';
 export type StyleCategory = 'art' | 'classic';
 /** Background preference: follow the variant's default, or force one. */
 export type LightMode = 'auto' | 'dark' | 'light';
@@ -35,6 +36,8 @@ export interface VariantOption {
   label: string;
   /** True if this variant is ink-on-paper by default. */
   defaultLight?: boolean;
+  /** Overrides the style's `supportsLight` for this variant. */
+  lightCapable?: boolean;
 }
 
 /** Static variant definitions per style (UI reads these without an instance). */
@@ -43,6 +46,25 @@ export const STYLE_VARIANTS: Record<StyleId, VariantOption[]> = {
     { id: 'ink', label: 'Ink' },
     { id: 'sumi', label: 'Sumi', defaultLight: true },
     { id: 'marble', label: 'Marble' },
+  ],
+  strands: [
+    { id: 'silk', label: 'Silk' },
+    { id: 'lumen', label: 'Lumen', lightCapable: false },
+    { id: 'wisp', label: 'Wisp', lightCapable: false },
+    { id: 'starry', label: 'Starry Night', lightCapable: false },
+    { id: 'warp', label: 'Warp', lightCapable: false },
+  ],
+  turing: [
+    { id: 'coral', label: 'Coral', defaultLight: true },
+    { id: 'bio', label: 'Bioluminescent' },
+  ],
+  mosh: [
+    { id: 'concrete', label: 'Concrete' },
+    { id: 'signal', label: 'Signal' },
+  ],
+  fractal: [
+    { id: 'voyage', label: 'Voyage' },
+    { id: 'kaleido', label: 'Kaleido' },
   ],
   aura: [
     { id: 'circle', label: 'Circle' },
@@ -124,6 +146,8 @@ export interface StyleContext extends StyleSignals {
   depth: boolean;
   quality: QualityParams;
   post: PostControls;
+  /** Ask `flash.request()` before any deliberate flash (inversion, strobe). */
+  flash: FlashGuard;
 
   beatPulse: BeatPulse;
   colorEngine: ColorEngine;
@@ -168,8 +192,14 @@ export interface StyleDescriptor {
 
 /** Resolve the effective light flag for a style/variant/user preference. */
 export function resolveLight(desc: StyleDescriptor, variant: string, mode: LightMode): boolean {
-  if (!desc.supportsLight) return false;
+  const v = desc.variants.find((x) => x.id === variant);
+  if (!(v?.lightCapable ?? desc.supportsLight)) return false;
   if (mode === 'light') return true;
   if (mode === 'dark') return false;
-  return desc.variants.find((v) => v.id === variant)?.defaultLight ?? false;
+  return v?.defaultLight ?? false;
+}
+
+/** Whether the Background (light/dark) control applies to this variant. */
+export function variantSupportsLight(desc: StyleDescriptor, variant: string): boolean {
+  return desc.variants.find((x) => x.id === variant)?.lightCapable ?? desc.supportsLight;
 }

@@ -13,6 +13,7 @@ uniform float u_vignette;
 uniform int u_tonemap;       // 0 filmic, 1 none
 uniform float u_flash;
 uniform vec3 u_tint;
+uniform float u_lum_scale;  // flash guard: holds luminance steady when engaged
 out vec4 frag;
 
 float hash(vec3 p) {
@@ -39,7 +40,7 @@ void main() {
   col *= vig;
 
   if (u_tonemap == 0) col = aces(col);
-  col = clamp(col, 0.0, 1.0);
+  col = clamp(col * u_lum_scale, 0.0, 1.0);
 
   // Grain: strongest in mid-tones, per-pixel, animated.
   float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));

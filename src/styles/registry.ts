@@ -6,6 +6,7 @@
 import { createAuraStyle } from './classic/aura';
 import { createHaloStyle } from './classic/halo-spectrum';
 import { createFlowInkStyle } from './flow-ink/flow-ink';
+import { createStrandsStyle } from './strands/strands';
 import { STYLE_VARIANTS, type StyleCategory, type StyleDescriptor, type StyleId } from './visual-style';
 
 export const STYLES: StyleDescriptor[] = [
@@ -14,6 +15,12 @@ export const STYLES: StyleDescriptor[] = [
     variants: STYLE_VARIANTS['flow-ink'], defaultVariant: 'ink',
     supportsLight: true, supportsDepth: true, defaultDepth: true,
     create: createFlowInkStyle,
+  },
+  {
+    id: 'strands', label: 'Strands', category: 'art',
+    variants: STYLE_VARIANTS.strands, defaultVariant: 'silk',
+    supportsLight: true, supportsDepth: false, defaultDepth: false,
+    create: createStrandsStyle,
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',

@@ -1,3 +1,22 @@
+# Prompt 2: the art styles
+
+## Checklist
+- [ ] P2.1 Flash limiter (≤3 large luminance flashes/s), registry order Flow Ink, Strands, Turing, Mosh, Fractal
+- [ ] P2.2 Strands engine (GPU particles, density accumulation, quality-scaled counts)
+- [ ] P2.3 Strands: Silk (inversion cut on drop), Lumen, Wisp, Starry Night, Warp
+- [ ] P2.4 Turing (Gray-Scott, regimes, seeds, drop inversion) + Coral, Bioluminescent
+- [ ] P2.5 Turing text-seeding hook via trackChange + dev-page button
+- [ ] P2.6 Mosh (feedback, smear, glitch, freeze-release) + Concrete, Signal
+- [ ] P2.7 Fractal (raymarched, spline flight, adaptive, half-res + temporal) + Voyage, Kaleido
+- [ ] P2.8 Every variant verified on all four tracks; Quality Bar pass; perf at 1080p Medium
+- [ ] P2.9 Preview images src/assets/previews/<style>-<variant>.webp
+- [ ] P2.10 Docs: local notes, DOCS/16, decisions
+- [ ] P2.11 `npm run tauri build`; every style in the desktop app with system audio
+
+## Notes (Prompt 2)
+
+---
+
 # Sprint log — Prompt 1: engine reset + Flow Ink 2.0
 
 ## Summary (Prompt 1 complete)

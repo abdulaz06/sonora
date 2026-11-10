@@ -21,6 +21,9 @@ import compositeFrag from './shaders/post/composite.frag?raw';
 
 // ── Tuning ──────────────────────────────────────────────────────
 const BLOOM_KNEE = 0.35;
+/** Flash-guard probe size (texels): the composited frame is averaged here. */
+const PROBE_W = 32;
+const PROBE_H = 18;
 
 export interface Target {
   fb: WebGLFramebuffer;
@@ -74,6 +77,11 @@ export class ArtPost {
   private uDown: Uniforms;
   private uUp: Uniforms;
   private uComp: Uniforms;
+  private probe: { fb: WebGLFramebuffer; tex: WebGLTexture } | null = null;
+  private pbo: WebGLBuffer | null = null;
+  private fence: WebGLSync | null = null;
+  private probePixels = new Uint8Array(PROBE_W * PROBE_H * 4);
+  private latestLuma: number | null = null;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -86,7 +94,7 @@ export class ArtPost {
     this.uUp = uniforms(gl, this.up, ['u_src', 'u_texel', 'u_dst_texel']);
     this.uComp = uniforms(gl, this.composite, [
       'u_scene', 'u_bloom', 'u_resolution', 'u_time', 'u_exposure', 'u_bloom_strength',
-      'u_grain', 'u_vignette', 'u_tonemap', 'u_flash', 'u_tint',
+      'u_grain', 'u_vignette', 'u_tonemap', 'u_flash', 'u_tint', 'u_lum_scale',
     ]);
   }
 
@@ -127,7 +135,14 @@ export class ArtPost {
     gl.viewport(0, 0, s.w, s.h);
   }
 
-  apply(quadVAO: WebGLVertexArrayObject, post: PostControls, time: number, tint: number): void {
+  /** Latest measured mean relative luminance of the output (0–1), if a readback finished. */
+  takeLuma(): number | null {
+    const l = this.latestLuma;
+    this.latestLuma = null;
+    return l;
+  }
+
+  apply(quadVAO: WebGLVertexArrayObject, post: PostControls, time: number, tint: number, lumScale = 1): void {
     const gl = this.gl;
     const scene = this.scene!;
     gl.disable(gl.BLEND);
@@ -197,8 +212,61 @@ export class ArtPost {
     gl.uniform1i(this.uComp.u_tonemap, post.tonemap === 'filmic' ? 0 : 1);
     gl.uniform1f(this.uComp.u_flash, post.flash);
     gl.uniform3f(this.uComp.u_tint, tint, tint, tint);
+    gl.uniform1f(this.uComp.u_lum_scale, lumScale);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    this.probeLuma();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindVertexArray(null);
+  }
+
+  /**
+   * Run the composite into a tiny target and read it back asynchronously
+   * (PBO + fence, no pipeline stall). Result lands in `latestLuma` a frame or
+   * two later. Uses the program/uniforms just set for the full-size pass.
+   */
+  private probeLuma(): void {
+    const gl = this.gl;
+    // Collect a finished readback first.
+    if (this.fence) {
+      const st = gl.clientWaitSync(this.fence, 0, 0);
+      if (st === gl.TIMEOUT_EXPIRED) return;
+      gl.deleteSync(this.fence);
+      this.fence = null;
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+      gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.probePixels);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+      const px = this.probePixels;
+      let sum = 0;
+      for (let i = 0; i < px.length; i += 4) {
+        // Approximate sRGB decode, then relative luminance.
+        const r = (px[i] / 255) ** 2.2, g = (px[i + 1] / 255) ** 2.2, b = (px[i + 2] / 255) ** 2.2;
+        sum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      }
+      this.latestLuma = sum / (PROBE_W * PROBE_H);
+    }
+    if (!this.probe) {
+      const tex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PROBE_W, PROBE_H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      const fb = gl.createFramebuffer()!;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      this.probe = { fb, tex };
+      this.pbo = gl.createBuffer();
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+      gl.bufferData(gl.PIXEL_PACK_BUFFER, this.probePixels.byteLength, gl.STREAM_READ);
+      gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.probe.fb);
+    gl.viewport(0, 0, PROBE_W, PROBE_H);
+    gl.uniform2f(this.uComp.u_resolution, PROBE_W, PROBE_H);
+    gl.uniform1f(this.uComp.u_grain, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);
+    gl.readPixels(0, 0, PROBE_W, PROBE_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
+    gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
+    this.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, this.outW, this.outH);
   }
 }

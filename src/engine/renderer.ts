@@ -30,6 +30,7 @@ import { WorldCamera } from './camera';
 import { ColorEngine } from './color-engine';
 import { EnvelopeFollower, lerpParams, MEDIUM } from './envelope';
 import { EventDetector, type SonoraEvent } from './events';
+import { FlashGuard } from './flash-guard';
 import { GenerativeState } from './generative';
 import { buildProgram } from './gl-utils';
 import { PostProcessPipeline } from './post-process';
@@ -55,6 +56,8 @@ export interface RendererStats {
   fps: number;
   frameMs: number;
   quality: QualityParams;
+  /** Large luminance flashes measured in the last second (flash guard). */
+  flashes: number;
   sceneWidth: number;
   sceneHeight: number;
 }
@@ -155,6 +158,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   const quality = new QualityManager();
   const envIntensity = new EnvelopeFollower(MEDIUM);
   const post: PostControls = { ...POST_DEFAULTS };
+  const flash = new FlashGuard();
 
   let descriptor = getStyle(options.initialStyle ?? 'flow-ink');
   let variant = descriptor.defaultVariant;
@@ -198,7 +202,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     beatPhase: 0, beatConfidence: 0, beatOnset: false, responsiveness: 0.6,
     events: [], eventState: events.state, camera,
     palette: colorEngine.getResolved(), light: false, depth,
-    quality: quality.params, post,
+    quality: quality.params, post, flash,
     beatPulse, colorEngine, generative,
   };
 
@@ -224,6 +228,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
 
     generative.update(dt);
     colorEngine.update(dt);
+    flash.tick(dt);
 
     const f = frame;
     const drained = events.drain();
@@ -292,7 +297,10 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       gl.clearColor(0, 0, 0, 1);
       gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
       style.render(ctx);
-      artPost.apply(quadVAO, post, time, fadeAlpha);
+      const measured = artPost.takeLuma();
+      if (measured !== null) flash.observe(measured);
+      const hold = flash.current > 0.002 ? Math.min(1.6, Math.max(0.4, flash.target / flash.current)) : 1;
+      artPost.apply(quadVAO, post, time, fadeAlpha, 1 + (hold - 1) * flash.damping);
     }
   }
 
@@ -379,7 +387,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
         if (i >= 0) eventListeners.splice(i, 1);
       };
     },
-    stats: () => ({ fps, frameMs, quality: quality.params, sceneWidth: sceneW, sceneHeight: sceneH }),
+    stats: () => ({ fps, frameMs, quality: quality.params, flashes: flash.recentFlashes, sceneWidth: sceneW, sceneHeight: sceneH }),
   };
 
   if (options.autoStart ?? true) api.start();

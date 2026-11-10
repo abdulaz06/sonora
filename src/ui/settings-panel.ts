@@ -17,7 +17,7 @@ import { CAMERA_PRESETS, type CameraView } from '../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
 import { getStyle, visibleStyles } from '../styles/registry';
-import type { LightMode, StyleId } from '../styles/visual-style';
+import { variantSupportsLight, type LightMode, type StyleId } from '../styles/visual-style';
 import type { DeviceInfo } from '../ipc/audio-device';
 
 export type { StyleId, QualityPreset };
@@ -251,7 +251,7 @@ function render(): void {
       ${desc.supportsDepth ? `<div class="field"><div class="label">View</div>
         <div class="seg">${segBtn('depth', '1', 'Depth', state.depth)}${segBtn('depth', '0', 'Flat', !state.depth)}</div>
         ${hint(state.depth ? 'Fly over the ink as a 3D surface.' : 'Look straight down at the ink, like a canvas.')}</div>` : ''}
-      ${desc.supportsLight ? `<div class="field"><div class="label">Background</div>
+      ${variantSupportsLight(desc, state.variant) ? `<div class="field"><div class="label">Background</div>
         <div class="seg">${(['auto', 'dark', 'light'] as LightMode[]).map((m) => segBtn('light', m, m, state.lightMode === m)).join('')}</div>
         ${hint(LIGHT_HINTS[state.lightMode])}</div>` : ''}
       ${desc.id === 'aura' ? `<div class="field"><div class="label">Rings <span class="val" id="ring-val">${state.ringCount}</span></div>
