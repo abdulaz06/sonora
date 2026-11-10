@@ -53,6 +53,7 @@ function parseArgs(argv) {
     else if (a === '--no-bench') o.bench = false;
     else if (a === '--sync') o.sync = true;
     else if (a === '--camera') o.camera = next();
+    else if (a === '--text') o.text = next();
   }
   return o;
 }
@@ -134,15 +135,22 @@ try {
       palette: o.palette, drift: false, camera: o.camera,
     }), opts);
     await page.evaluate((n) => window.__sonora.loadTrack(n), name);
+    // Optional: grow a title out of the pattern right after the fade-in.
+    if (opts.text) {
+      await page.evaluate((s) => window.__sonora.analyseOnly(s), meta.markers.fadeIn + 1);
+      await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [0.2, 1 / opts.fps]);
+      await page.evaluate((t) => window.__sonora.seedText(t), opts.text);
+    }
 
     const m = meta.markers;
     const shots = [
       ['1-silence', m.silence], ['2-fadein', m.fadeIn], ['3-build', m.build],
       ['4-drop', m.drop + 1.2], ['6-breakdown', m.breakdown],
+      ...(opts.text ? [['2b-text', m.fadeIn + 5]] : []),
     ].filter(([, t]) => t !== undefined).sort((a, b) => a[1] - b[1]);
     const stripStart = m.drop - 0.25;
     const dt = 1 / opts.fps;
-    let t = 0;
+    let t = opts.text ? meta.markers.fadeIn + 1.2 : 0;
     const t0 = Date.now();
 
     const goTo = async (target) => {

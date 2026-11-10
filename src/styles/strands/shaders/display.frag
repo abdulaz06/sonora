@@ -21,6 +21,7 @@ uniform float u_streak;      // anamorphic streak strength
 uniform vec2 u_balance;      // horizontal / vertical emphasis
 // Wisp
 uniform vec4 u_agents[4];    // uv.xy, brightness, size
+uniform vec4 u_agent_dir[4]; // direction.xy (screen), speed
 uniform int u_agent_count;
 // Starry
 uniform vec4 u_stars[8];     // uv.xy, radius (uv), pulse
@@ -61,7 +62,7 @@ void main() {
     float ov = float(i * i) * 1.6 / u_res.y;
     sv += (texture(u_accum, uv + vec2(0.0, ov)).rgb + texture(u_accum, uv - vec2(0.0, ov)).rgb) * wgt;
   }
-  f += (sh * u_balance.x + sv * u_balance.y) * u_gain * 0.12 * u_streak;
+  f += (sh * u_balance.x + sv * u_balance.y) * u_gain * 0.015 * u_streak;
   vec2 d = (uv - u_src) * vec2(aspect, 1.0);
   float core = exp(-dot(d, d) * 900.0) * 3.0 + exp(-dot(d, d) * 90.0) * 0.6;
   float hx = exp(-abs(d.y) * 260.0) * exp(-abs(d.x) * 3.2) * u_balance.x;
@@ -77,14 +78,20 @@ void main() {
   for (int i = 0; i < 4; i++) {
     if (i >= u_agent_count) break;
     vec2 q = (uv - u_agents[i].xy) * vec2(aspect, 1.0);
-    float r2 = dot(q, q) / (u_agents[i].w * u_agents[i].w);
-    col += white * u_agents[i].z * (exp(-r2) * 3.0 + exp(-r2 * 0.08) * 0.25);
+    // Flame: a hot core stretched backwards along the direction of travel.
+    vec2 dir = u_agent_dir[i].xy;
+    float along = dot(q, dir), across = dot(q, vec2(-dir.y, dir.x));
+    float sz = u_agents[i].w;
+    float tail = (0.8 + 3.5 * u_agent_dir[i].z);
+    float stretch = along < 0.0 ? tail : 0.9;
+    float r2 = (along * along) / (sz * sz * stretch * stretch) + (across * across) / (sz * sz * 0.5);
+    col += white * u_agents[i].z * (exp(-r2) * 3.2 + exp(-dot(q, q) / (sz * sz) * 0.06) * 0.2);
   }
 #elif VARIANT == 3
   // Starry: the painted canvas, plus glowing stars with halo rings.
   col = acc.rgb;
-  vec3 warm = hueRotate(u_c2, u_hue_shift);
-  vec3 hot = hueRotate(u_c3, u_hue_shift);
+  vec3 warm = hueRotate(u_c2, u_hue_shift * 0.25);
+  vec3 hot = hueRotate(u_c3, u_hue_shift * 0.25);
   for (int i = 0; i < 8; i++) {
     if (i >= u_star_count) break;
     vec2 q = (uv - u_stars[i].xy) * vec2(aspect, 1.0);

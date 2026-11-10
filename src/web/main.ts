@@ -38,6 +38,8 @@ export interface HarnessApi {
   analyseOnly(seconds: number): number;
   snapshot(): string;
   configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string }): void;
+  /** Fire a trackChange with a title (Turing grows it out of the pattern). */
+  seedText(title: string): void;
   time(): number;
   events: SonoraEvent[];
   stats(): ReturnType<ReturnType<typeof initRenderer>['stats']>;
@@ -250,6 +252,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       for (let i = 0; i < frames; i++) { source.stepOffline(dt); renderer.step(dt); sync(); }
       return (performance.now() - t0) / frames;
     },
+    seedText(title: string): void { renderer.events.notifyTrackChange({ title }); },
     time: () => source.offlineTime,
     events,
     stats: () => renderer.stats(),

@@ -22,6 +22,8 @@ uniform float u_stroke_w;
 uniform vec4 u_vort[8];
 uniform int u_vort_count;
 uniform float u_field_t;
+uniform vec4 u_stars_w[8];    // star world pos.xy, radius
+uniform int u_star_w_count;
 // Warp
 uniform vec2 u_vp;             // vanishing point offset (clip units)
 uniform float u_roll;
@@ -68,8 +70,10 @@ void main() {
   float t = age / max(life, 1e-3);
   float hue = fract(kind + atan(A.w, A.z) / 6.2832 + u_time * 0.03);
   vec3 irid = 0.55 + 0.45 * cos(6.2832 * (hue + vec3(0.0, 0.33, 0.67)));
-  irid = mix(vec3(1.0), irid, 0.55);
-  v_col = vec4(irid * w * u_gain * (1.0 - t * 0.7), 1.0);
+  irid = 0.5 + 0.5 * cos(6.2832 * (hue + vec3(0.0, 0.33, 0.67)));
+  // White near the source, iridescent toward the tips.
+  irid = mix(vec3(1.0), irid * 1.7, smoothstep(0.0, 0.35, t) * 0.9);
+  v_col = vec4(irid * w * u_gain * (1.0 - t * 0.6), 1.0);
 #elif VARIANT == 2
   // Wisp: r = smoke, g = ring smoke.
   gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
@@ -88,7 +92,14 @@ void main() {
   gl_Position = vec4(toClip(wp), 0.0, 1.0);
   v_uv = q;
   float spd = length(A.zw);
-  v_col = vec4(spd, kind, w, 0.0);
+  // Strokes near a star turn warm.
+  float nearStar = 0.0;
+  for (int i = 0; i < 8; i++) {
+    if (i >= u_star_w_count) break;
+    float dd = length(A.xy - u_stars_w[i].xy) / max(u_stars_w[i].z, 1e-4);
+    nearStar = max(nearStar, smoothstep(2.6, 0.9, dd));
+  }
+  v_col = vec4(spd, kind, w * (0.35 + 0.65 * u_active), nearStar);
 #elif VARIANT == 4
   // Warp: head at the particle, tail further down the tunnel.
   int corner = gl_VertexID;
@@ -105,7 +116,7 @@ void main() {
   vec2 along = ph - pt;
   vec2 dirc = length(along) > 1e-6 ? normalize(along * u_res) : vec2(1.0, 0.0);
   vec2 side = vec2(-dirc.y, dirc.x) / u_res * 2.0;
-  float px = clamp(2.2 / -head.z, 0.6, 3.5);
+  float px = clamp(4.0 / -head.z, 0.9, 5.0);
   vec2 pos = mix(pt, ph, q.x) + side * q.y * px;
   gl_Position = vec4(pos, 0.0, 1.0);
   v_uv = q;

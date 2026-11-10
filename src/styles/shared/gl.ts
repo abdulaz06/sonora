@@ -89,6 +89,8 @@ export type Uniforms = Record<string, WebGLUniformLocation | null>;
 export interface Program {
   prog: WebGLProgram;
   u: Uniforms;
+  /** GL type of each uniform (FLOAT, INT, BOOL, SAMPLER_2D, …). */
+  types: Record<string, number>;
 }
 
 /** Replace `//#include name` lines with chunks. */
@@ -105,26 +107,31 @@ export function makeProgram(gl: WebGL2RenderingContext, vert: string, frag: stri
   const inject = (s: string): string => (defines ? s.replace(/^(#version[^\n]*\n)/, `$1${defines}\n`) : s);
   const prog = buildProgram(gl, inject(vert), inject(frag));
   const u: Uniforms = {};
+  const types: Record<string, number> = {};
   const n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS) as number;
   for (let i = 0; i < n; i++) {
     const info = gl.getActiveUniform(prog, i);
-    if (info) u[info.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(prog, info.name);
+    if (!info) continue;
+    const name = info.name.replace(/\[0\]$/, '');
+    u[name] = gl.getUniformLocation(prog, info.name);
+    types[name] = info.type;
   }
-  return { prog, u };
+  return { prog, u, types };
 }
 
 export type UniformValue = number | boolean | number[] | Float32Array | WebGLTexture;
 
 /**
- * Set uniforms by name. Numbers → float (names listed in `ints` → int),
- * arrays of 2/3/4 → vecN (longer arrays → vec4 arrays), textures bind to
- * consecutive units starting at `unit0`.
+ * Set uniforms by name, using each uniform's declared GL type: scalars and
+ * booleans go to float or int uniforms as declared, arrays of 2/3/4 → vecN
+ * (longer arrays → vec4 arrays), textures bind to consecutive units.
+ * `ints` is kept for call-site readability; the declared type wins.
  */
 export function setUniforms(
   gl: WebGL2RenderingContext,
   p: Program,
   values: Record<string, UniformValue>,
-  ints: string[] = [],
+  _ints: string[] = [],
   unit0 = 0,
 ): void {
   let unit = unit0;
@@ -136,11 +143,11 @@ export function setUniforms(
       gl.bindTexture(gl.TEXTURE_2D, v);
       gl.uniform1i(loc, unit);
       unit++;
-    } else if (typeof v === 'boolean') {
-      gl.uniform1i(loc, v ? 1 : 0);
-    } else if (typeof v === 'number') {
-      if (ints.includes(k)) gl.uniform1i(loc, v);
-      else gl.uniform1f(loc, v);
+    } else if (typeof v === 'boolean' || typeof v === 'number') {
+      const x = typeof v === 'boolean' ? (v ? 1 : 0) : v;
+      const t = p.types[k];
+      if (t === gl.INT || t === gl.BOOL || t === gl.UNSIGNED_INT) gl.uniform1i(loc, Math.round(x));
+      else gl.uniform1f(loc, x);
     } else if (v.length === 2) gl.uniform2fv(loc, v);
     else if (v.length === 3) gl.uniform3fv(loc, v);
     else if (v.length % 4 === 0) gl.uniform4fv(loc, v);
