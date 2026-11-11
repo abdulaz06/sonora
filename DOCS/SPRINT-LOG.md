@@ -1,5 +1,34 @@
 # Prompt 2: the art styles
 
+## Summary (Prompt 2 complete)
+
+**What shipped**
+- Four new art styles after Flow Ink, in registry order: **Strands** (Silk, Lumen, Wisp, Starry Night, Warp), **Turing** (Coral, Bioluminescent), **Mosh** (Concrete, Signal), **Fractal** (Voyage, Kaleido). Aura and Halo stay hidden under Classic. Every look has a plain-language hint in Settings and a preview in `src/assets/previews/`.
+- **Flash guard** (WCAG 2.3.1): deliberate flashes need `ctx.flash.request()` (at most 3 per second), and a GPU luminance probe damps any source that swings more than 3 times a second (D19).
+- **Turing text seeding**: track titles grow into the pattern as readable words. Sources are the media session, files played on the dev page, and the new **Seed text** button (D22).
+- **Fractal**: a raymarched Mandelbox flight on a spline planned by a CPU copy of the distance estimator. It marches at half resolution with a temporal upscale and an adaptive step budget (D24).
+- **Frame rate** setting (added on request): 30 / 60 (default) / 90 / 120 / 144 / max. Auto quality judges frame time against the cap.
+- Shared GL toolkit for styles (`src/styles/shared/`), plus scripts: `verify-art.sh`, `perf-art.sh`, `make-previews.py`.
+- The desktop settings loader accepts files saved with a BOM (Notepad).
+
+**Verification**
+- All 11 new looks were rendered on all four test tracks (`scripts/verify-art.sh all`) and the contact sheets reviewed. Fixes from that review: Lumen redrawn as filament streaks, Turing thins out in breakdowns, Fractal's camera prefers open lines of sight, Starry Night is cheaper.
+- Beat sync (`--sync`, house-124): every art look sees 91–100% of kicks, peaking 38–88 ms after each kick. Per-hit luminance jumps stay under the flash threshold.
+- Performance, RX 7700S at 1080p Medium: 1.7–7.6 ms per frame for every look (budget 16.7 ms). Low is 1.2–3.7 ms. Full table in DOCS/16 §7.
+- `npm run tauri build` produces the MSI and NSIS installers. In the built app with real system audio, Flow Ink, Silk, Starry Night, Coral, Concrete, Voyage and Kaleido all ran and reacted.
+
+**What to look at**
+- `npm run dev:web`: pick a test track, open Settings and try each Style and Look. Use **Seed text** with Turing. Settings › Quality › Frame rate sets the cap.
+- `npm run verify -- --style fractal --variant voyage --track house-124`, then open `verify/fractal-voyage-depth/house-124/`.
+
+**Known issues / follow-ups**
+- Lumen's filaments are softer than the reference's hair-thin strands. Its colour comes from the palette, not true iridescence.
+- Mosh's composition is centred on its vanishing point (it wanders slightly); variety between sections comes from smear and glitch more than from framing.
+- Turing breakdowns thin the maze slowly (about 2.5 s ease), so the breakdown screenshot still shows mostly maze.
+- At a drop on bright palettes, Kaleido can get very bright (drop flash now softened).
+- The harness output folder still says `-depth` for styles without a depth view (cosmetic).
+
+
 ## Checklist
 - [x] P2.1 Flash limiter (≤3 large luminance flashes/s), registry order Flow Ink, Strands, Turing, Mosh, Fractal
 - [x] P2.2 Strands engine (GPU particles, density accumulation, quality-scaled counts)
@@ -11,7 +40,7 @@
 - [x] P2.8 Every variant verified on all four tracks; Quality Bar pass; perf at 1080p Medium
 - [x] P2.9 Preview images src/assets/previews/<style>-<variant>.webp
 - [x] P2.10 Docs: local notes, DOCS/16, decisions
-- [ ] P2.11 `npm run tauri build`; every style in the desktop app with system audio
+- [x] P2.11 `npm run tauri build`; every style in the desktop app with system audio
 
 ## Notes (Prompt 2)
 - Flash guard: request() tokens (≤3/s, 0.25 s gap) + async luminance probe with damping (D19). Overlay shows flashes/s.
