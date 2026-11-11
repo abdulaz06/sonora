@@ -36,7 +36,8 @@ pub fn load_settings(app: AppHandle) -> Result<Value, String> {
     }
     let raw = fs::read_to_string(&path)
         .map_err(|e| format!("could not read {path:?}: {e}"))?;
-    match serde_json::from_str::<Value>(&raw) {
+    // Editors such as Notepad may save with a UTF-8 byte-order mark.
+    match serde_json::from_str::<Value>(raw.trim_start_matches('\u{feff}')) {
         Ok(v) => Ok(v),
         Err(e) => {
             eprintln!("settings.json parse error ({e}); treating as no settings");

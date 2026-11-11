@@ -29,6 +29,6 @@ void main() {
   suv = 1.0 - abs(1.0 - mod(suv, 2.0));
   vec3 c = texture(u_src, suv).rgb;
   // A soft light at the heart of the mandala.
-  c += texture(u_src, vec2(0.5)).rgb * 0.35 * exp(-r * r * 40.0);
+  c += texture(u_src, vec2(0.5)).rgb * 0.2 * exp(-r * r * 40.0);
   frag = vec4(c, 1.0);
 }

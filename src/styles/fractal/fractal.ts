@@ -275,7 +275,7 @@ export function createFractalStyle(deps: StyleDeps): VisualStyle {
 
       const post = ctx.post;
       post.tonemap = 'filmic';
-      post.exposure = 1 + 0.6 * flashEnv;
+      post.exposure = 1 + 0.4 * flashEnv;
       post.bloom = 0.35;
       post.bloomThreshold = 0.95;
       post.grain = 0.03;
