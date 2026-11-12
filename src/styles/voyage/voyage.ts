@@ -60,6 +60,24 @@ const TWIST_BEAT = 0.016;
 /** Landscape cylinder: radius, and how far below the fractal's centre its floor lies. */
 const LAND_R = 70;
 const LAND_FLOOR = 9;
+/** Wide shots: after this long without one (s), a calm moment also pulls out. */
+const VISTA_IDLE_S = 60;
+/** Exit: give up flying out after this long and cut (s); "outside" = |p|∞ beyond. */
+const EXIT_MAX_S = 12;
+const OUTSIDE = 4.5;
+/** Exit flight speed multiplier (a purposeful fly-out, even in a breakdown). */
+const EXIT_SPEED = 3.5;
+/** Vista: ease-in time, orbit radius and height, look-down-the-axis target. */
+const VISTA_EASE = 3.5;
+const VISTA_R = 13;
+const VISTA_Y = -1.5;
+const VISTA_LOOK: Vec3 = [0, -3, 55];
+/** Vista ends: idle-triggered after this long, any after the max (s). */
+const VISTA_IDLE_HOLD = 15;
+const VISTA_MAX = 45;
+/** Dive back in (s) and the wide-shot field of view (deg). */
+const DIVE_IN_S = 1.0;
+const FOV_VISTA = 72;
 /** Camera safety: push away from walls closer than this x clearance. */
 const SAFE_K = 0.35;
 /** Presence modulation of scale / minR2 (slow: seconds). */
@@ -83,6 +101,8 @@ const BARREL_S = 1.5;
 /** Adaptive step budget: target frame interval (ms). */
 const TARGET_MS = 1000 / 60;
 const FAR = 14;
+/** Far limit outside the fractal, so the whole structure stays in the shot. */
+const FAR_VISTA = 40;
 const HALTON: [number, number][] = [];
 for (let i = 1; i <= 8; i++) {
   const h = (b: number): number => { let f = 1, r = 0, n = i; while (n > 0) { f /= b; r += f * (n % b); n = Math.floor(n / b); } return r; };
@@ -122,6 +142,41 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
   let stepScale = 1;
   let lastReal = -1, realMs = TARGET_MS;
   let prev: { pos: Vec3; right: Vec3; up: Vec3; fwd: Vec3; tan: number } | null = null;
+  // Wide shots
+  type Mode = 'inside' | 'exit' | 'vista' | 'dive';
+  let mode: Mode = 'inside';
+  let modeT = 0;
+  let lastVista = 0;
+  let vistaIdle = false;
+  let vistaFrom: { pos: Vec3; fwd: Vec3 } = { pos: [0, 0, 0], fwd: [0, 0, 1] };
+  let vistaAngle = 0;
+  let diveFrom: Vec3 = [0, 0, 0];
+  let diveTo: Vec3 = [0, 0, 0];
+
+  function setMode(m: Mode): void { mode = m; modeT = 0; }
+
+  function startVista(cut: boolean): void {
+    path.setGoal(null);
+    vistaFrom = { pos: [...pos], fwd: [...fwd] };
+    vistaAngle = Math.atan2(pos[2], pos[0]) || 0;
+    if (cut) resetHist = true;
+    setMode('vista');
+  }
+
+  function startDive(): void {
+    path.reset();
+    diveFrom = [...pos];
+    diveTo = path.sample(0);
+    setMode('dive');
+  }
+
+  /** Vista orbit position / look target at time t into the vista. */
+  function vistaPose(t: number): { p: Vec3; look: Vec3 } {
+    const a = vistaAngle + t * 0.035;
+    const p: Vec3 = [Math.cos(a) * VISTA_R, VISTA_Y + 1.2 * Math.sin(t * 0.11), Math.sin(a) * VISTA_R * 0.7 - 4];
+    const look: Vec3 = [VISTA_LOOK[0] * 0.3 + p[0] * 0.2, VISTA_LOOK[1], VISTA_LOOK[2]];
+    return { p, look };
+  }
 
   function ensure(w: number, h: number): void {
     const b = BUDGET[quality.level];
@@ -147,11 +202,66 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     prev = null;
   }
 
+  /** Camera on the vista orbit or diving back in (no planner). */
+  function flyScripted(ctx: StyleContext, dt: number): void {
+    const es = ctx.eventState;
+    const fade = ctx.fadeInOut;
+    let target: Vec3, look: Vec3;
+    if (mode === 'vista') {
+      const e = Math.min(1, modeT / VISTA_EASE);
+      const k = e * e * (3 - 2 * e);
+      const vp = vistaPose(modeT);
+      target = [vistaFrom.pos[0] + (vp.p[0] - vistaFrom.pos[0]) * k, vistaFrom.pos[1] + (vp.p[1] - vistaFrom.pos[1]) * k, vistaFrom.pos[2] + (vp.p[2] - vistaFrom.pos[2]) * k];
+      const ahead: Vec3 = [vistaFrom.pos[0] + vistaFrom.fwd[0] * 4, vistaFrom.pos[1] + vistaFrom.fwd[1] * 4, vistaFrom.pos[2] + vistaFrom.fwd[2] * 4];
+      look = [ahead[0] + (vp.look[0] - ahead[0]) * k, ahead[1] + (vp.look[1] - ahead[1]) * k, ahead[2] + (vp.look[2] - ahead[2]) * k];
+      pos = target;
+    } else {
+      // Dive: accelerate from the vista into the fractal; hand over to the
+      // planner at the end (masked by speed, the FOV punch and the roll).
+      const e = Math.min(1, modeT / DIVE_IN_S);
+      const k = e * e * e;
+      pos = [diveFrom[0] + (diveTo[0] - diveFrom[0]) * k, diveFrom[1] + (diveTo[1] - diveFrom[1]) * k, diveFrom[2] + (diveTo[2] - diveFrom[2]) * k];
+      look = path.sample(SPACE.clearance * 4);
+      if (e >= 1) {
+        resetHist = true;
+        lastVista = time;
+        setMode('inside');
+        const ahead = path.sample(SPACE.clearance);
+        fwd = norm([ahead[0] - pos[0], ahead[1] - pos[1], ahead[2] - pos[2]]);
+        return;
+      }
+    }
+    const fwdT = norm([look[0] - pos[0], look[1] - pos[1], look[2] - pos[2]]);
+    const k = expApproach(dt, mode === 'dive' ? 0.12 : 0.6);
+    fwd = norm([fwd[0] + (fwdT[0] - fwd[0]) * k, fwd[1] + (fwdT[1] - fwd[1]) * k, fwd[2] + (fwdT[2] - fwd[2]) * k]);
+    const lean = expApproach(dt, 1.5);
+    up = [up[0], up[1] + lean, up[2]];
+    const d = up[0] * fwd[0] + up[1] * fwd[1] + up[2] * fwd[2];
+    up = norm([up[0] - fwd[0] * d, up[1] - fwd[1] * d, up[2] - fwd[2] * d]);
+    // Beat camera still works out here: roll sway and FOV breath.
+    const onBeat = ctx.beatConfidence > 0.3 ? ctx.beatOnset : ctx.bassHits > 0.75 && veins === ctx.bassHits;
+    if (onBeat && fade > 0.05) {
+      rollVel += ROLL_KICK * 0.6 * rollSign * (0.4 + 0.6 * fade);
+      rollSign = -rollSign;
+      fovVel += FOV_BEAT * 6 * (0.5 + 0.5 * fade);
+    }
+    [roll, rollVel] = spring(roll, rollVel, 0.15 * simplex2(time * 0.05, 11), 2.2, dt);
+    const fovT = mode === 'vista' ? FOV_VISTA : FOV + FOV_DROP * 0.5;
+    [fov, fovVel] = spring(fov, fovVel, fovT, 3, dt);
+    dive *= Math.exp(-dt / DIVE_TAU);
+    barrelT += dt;
+    flashEnv *= Math.exp(-dt / 0.22);
+    const fogT = mode === 'vista' ? 0.05 : es.section === 'breakdown' ? 0.3 : 0.14;
+    fogS += (fogT - fogS) * expApproach(dt, 1.2);
+  }
+
   return {
     id: 'voyage',
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
       if (e.type === 'drop') {
+        // Out on a wide shot: the drop dives back into the fractal.
+        if (mode === 'vista' || mode === 'exit') startDive();
         // The drop belongs to the camera: surge, wide-angle punch, barrel roll.
         if (ctx.flash.request()) flashEnv = 1;
         dive = 1;
@@ -162,6 +272,8 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         rollVel += ROLL_KICK * 1.4 * rollSign;
         rollSign = -rollSign;
       } else if (e.type === 'trackChange') {
+        path.setGoal(null);
+        setMode('inside');
         restart();
       }
     },
@@ -191,12 +303,36 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
       params.warpTime = time;
       params.lip = 1 / (1 + params.warpAmp * WARP_FREQ * 2.5 + (TWIST_BASE + TWIST_BEAT) * 6);
 
+      // Wide shots: pull out in breakdowns, or at a calm moment after a minute.
+      modeT += dt;
+      if (mode === 'inside' && modeT > 4 && es.section !== 'silence') {
+        const calm = es.section !== 'build' && es.section !== 'drop' && es.dropEnvelope < 0.1 && ctx.intensityGlow < 0.55;
+        const breakdown = es.section === 'breakdown';
+        if (breakdown || (time - lastVista > VISTA_IDLE_S && calm)) {
+          vistaIdle = !breakdown;
+          // Head outward through the structure toward a point beyond the box.
+          const out = norm([pos[0] || 0.1, pos[1] * 0.3, pos[2] || 0.1]);
+          path.setGoal([out[0] * 14, out[1] * 14, out[2] * 14]);
+          setMode('exit');
+        }
+      }
+      if (mode === 'exit') {
+        const outside = Math.max(Math.abs(pos[0]), Math.abs(pos[1]), Math.abs(pos[2])) > OUTSIDE;
+        if (outside) startVista(false);
+        else if (modeT > EXIT_MAX_S) startVista(true);
+      }
+      if (mode === 'vista' && ((vistaIdle && modeT > VISTA_IDLE_HOLD) || modeT > VISTA_MAX)) startDive();
+      if (mode === 'vista' || mode === 'dive') {
+        flyScripted(ctx, dt);
+        return;
+      }
+
       // Flight.
       dive *= Math.exp(-dt / DIVE_TAU);
       const sp = SPACE;
       const clear = clamp(path.de(pos), sp.clearance * 0.2, sp.clearance * 3);
       const speed = clear * (SPEED_MIN + (SPEED_MAX - SPEED_MIN) * ctx.intensitySmoothed + 0.8 * es.buildProgress)
-        * (0.3 + 0.7 * fade) * (es.section === 'breakdown' ? 0.6 : 1) * (1 + DIVE_SPEED * dive);
+        * (0.3 + 0.7 * fade) * (mode === 'exit' ? EXIT_SPEED : es.section === 'breakdown' ? 0.6 : 1) * (1 + DIVE_SPEED * dive);
       path.advance(speed * dt);
       const onPath = path.sample(0);
       // Safety: if the warping walls come too close, ease away.
@@ -278,7 +414,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_twist: (TWIST_BASE + TWIST_BEAT * twistEnv * (0.6 + 0.8 * ctx.responsiveness)) * twistSign,
         u_land_r: LAND_R, u_land_cy: LAND_R - LAND_FLOOR,
         u_scale: params.scale, u_min_r2: params.minR2, u_fold: params.fold, u_iters: b.iters,
-        u_steps: Math.round(b.steps * stepScale), u_detail: b.detail, u_far: FAR, u_ao_on: b.ao,
+        u_steps: Math.round(b.steps * stepScale), u_detail: b.detail, u_far: mode === 'inside' ? FAR : FAR_VISTA, u_ao_on: b.ao,
         u_sun: sun, u_bg: pal.bg, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
         u_time: time, u_pulse: clamp01(veins) * (0.4 + 0.6 * fade),
         u_glow: clamp01(0.5 * ctx.intensityGlow + 0.5 * ctx.eventState.buildProgress + 0.6 * ctx.eventState.dropEnvelope) * fade,

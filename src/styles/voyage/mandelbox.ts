@@ -97,6 +97,11 @@ export class FlightPath {
   private u = 0;
   private segLen = 1;
 
+  /** Optional destination: waypoints are pulled toward it and may leave the
+   * flight bound (used to fly out of the fractal for wide shots). */
+  private goal: Vec3 | null = null;
+  private goalWeight = 0;
+
   constructor(private params: () => BoxParams, private space: () => FlightSpace, private rng: () => number) {
     this.reset();
   }
@@ -120,6 +125,14 @@ export class FlightPath {
   private randomDir(): Vec3 {
     const z = this.rng() * 2 - 1, a = this.rng() * Math.PI * 2, r = Math.sqrt(1 - z * z);
     return [r * Math.cos(a), r * Math.sin(a), z];
+  }
+
+  /** Steer future waypoints toward `p` (null clears). Drops planned points
+   * beyond the next two so the turn starts soon. */
+  setGoal(p: Vec3 | null, weight = 2.5): void {
+    this.goal = p;
+    this.goalWeight = weight;
+    if (p && this.pts.length > this.seg + 6) this.pts.length = this.seg + 6;
   }
 
   /** Find a fresh start inside the structure. */
@@ -159,13 +172,14 @@ export class FlightPath {
       const wide = t < TRIES ? 0.35 + (t / TRIES) * 0.8 : 2;
       const d = norm(add(dir0, scl(this.randomDir(), wide)));
       const q = add(cur, scl(d, L));
-      if (len(q) > sp.bound) continue;
+      if (!this.goal && len(q) > sp.bound) continue;
       let minD = Infinity;
       for (let s = 1; s <= SAMPLES; s++) minD = Math.min(minD, this.de(add(cur, scl(d, (L * s) / SAMPLES))));
       if (minD < CLEAR_MIN * sp.clearance) continue;
       // Prefer smooth turns, the preferred clearance, and a long view ahead.
-      const score = -Math.abs(Math.log(minD / sp.clearance)) + 0.9 * dot(d, dir0)
+      let score = -Math.abs(Math.log(minD / sp.clearance)) + 0.9 * dot(d, dir0)
         + VIEW_WEIGHT * Math.log(1 + this.viewDepth(q, d));
+      if (this.goal) score += this.goalWeight * dot(d, norm(sub(this.goal, cur)));
       if (score > bestScore) { bestScore = score; best = q; }
       if (t >= TRIES && best) break;
     }

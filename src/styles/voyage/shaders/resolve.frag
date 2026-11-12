@@ -56,6 +56,7 @@ void main() {
   vec2 puv = pn * 0.5 + 0.5;
   bool valid = z > 1e-4 && all(greaterThanEqual(puv, vec2(0.0))) && all(lessThanEqual(puv, vec2(1.0)));
   vec3 h = texture(u_hist, puv).rgb;
+  if (any(isnan(h)) || any(isinf(h))) { h = cur.rgb; valid = false; }
   vec3 pad = (mx - mn) * 0.1 + 0.002;
   h = clamp(h, mn - pad, mx + pad);
   float a = valid ? mix(u_blend, 0.6, close) : 1.0;

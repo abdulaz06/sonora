@@ -274,5 +274,8 @@ void main() {
   }
   // Edge halo.
   col += mix(u_c2, u_c3, 0.5) * min(glow * 0.006, 0.6) * (0.08 + 0.6 * u_glow + 1.0 * u_pulse) * u_light;
+  // Guard: a NaN here would live on in the temporal history.
+  if (any(isnan(col)) || any(isinf(col))) col = vec3(0.0);
+  if (isnan(tOut) || isinf(tOut)) tOut = 1000.0;
   frag = vec4(max(col, vec3(0.0)), tOut);
 }
