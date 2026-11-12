@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 precision highp int;
-// Turns the accumulation buffer into the final Strands image per variant.
+// Turns the accumulation buffer into the final image per style (silk, wisp, warp).
 uniform sampler2D u_accum;
 uniform vec2 u_res;
 uniform float u_time;
@@ -15,18 +15,10 @@ uniform int u_light;
 uniform float u_gain;
 uniform float u_fade;
 uniform float u_pulse;
-// Lumen
-uniform vec2 u_src;          // source in uv
-uniform float u_streak;      // anamorphic streak strength
-uniform vec2 u_balance;      // horizontal / vertical emphasis
 // Wisp
 uniform vec4 u_agents[4];    // uv.xy, brightness, size
 uniform vec4 u_agent_dir[4]; // direction.xy (screen), speed
 uniform int u_agent_count;
-// Starry
-uniform vec4 u_stars[8];     // uv.xy, radius (uv), pulse
-uniform int u_star_count;
-uniform float u_hue_shift;
 out vec4 frag;
 //#include noise
 
@@ -52,25 +44,6 @@ void main() {
     col += u_c3 * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 0.9 * e;
     col += mix(u_c0, u_c3, 0.6) * dust * 0.9 * e;
   }
-#elif VARIANT == 1
-  // Lumen: filaments + a hot core with anamorphic streaks.
-  vec3 f = acc.rgb * u_gain;
-  // Streak blur of the filament light along both axes.
-  vec3 sh = vec3(0.0), sv = vec3(0.0);
-  for (int i = 1; i <= 10; i++) {
-    float o = float(i * i) * 1.6 / u_res.x;
-    float wgt = exp(-float(i) * 0.35);
-    sh += (texture(u_accum, uv + vec2(o, 0.0)).rgb + texture(u_accum, uv - vec2(o, 0.0)).rgb) * wgt;
-    float ov = float(i * i) * 1.6 / u_res.y;
-    sv += (texture(u_accum, uv + vec2(0.0, ov)).rgb + texture(u_accum, uv - vec2(0.0, ov)).rgb) * wgt;
-  }
-  f += (sh * u_balance.x + sv * u_balance.y) * u_gain * 0.015 * u_streak;
-  vec2 d = (uv - u_src) * vec2(aspect, 1.0);
-  float core = exp(-dot(d, d) * 2500.0) * 2.2 + exp(-dot(d, d) * 160.0) * 0.35;
-  float hx = exp(-abs(d.y) * 260.0) * exp(-abs(d.x) * 3.2) * u_balance.x;
-  float vy = exp(-abs(d.x) * 260.0) * exp(-abs(d.y) * 3.2) * u_balance.y;
-  vec3 tint = mix(vec3(1.0), u_c3, 0.35);
-  col = u_bg * 0.4 + f * mix(vec3(1.0), mix(u_c0, u_c3, 0.5), 0.45) + tint * (core + (hx + vy) * 1.4 * u_streak) * u_fade * (0.6 + 0.6 * u_pulse);
 #elif VARIANT == 2
   // Wisp: faint smoke trails, bright darting agents.
   float smoke = 1.0 - exp(-acc.r * u_gain);
@@ -89,22 +62,6 @@ void main() {
     float stretch = along < 0.0 ? tail : 0.9;
     float r2 = (along * along) / (sz * sz * stretch * stretch) + (across * across) / (sz * sz * 0.5);
     col += white * u_agents[i].z * (exp(-r2) * 3.2 + exp(-dot(q, q) / (sz * sz) * 0.06) * (0.2 + 0.5 * u_pulse)) * e;
-  }
-#elif VARIANT == 3
-  // Starry: the painted canvas, plus glowing stars with halo rings.
-  // The paint brightens on each hit (frame-accurate, the strokes lag).
-  col = acc.rgb * (1.0 + 0.45 * u_pulse);
-  vec3 warm = hueRotate(u_c2, u_hue_shift * 0.25);
-  vec3 hot = hueRotate(u_c3, u_hue_shift * 0.25);
-  for (int i = 0; i < 8; i++) {
-    if (i >= u_star_count) break;
-    vec2 q = (uv - u_stars[i].xy) * vec2(aspect, 1.0);
-    float r = length(q) / u_stars[i].z;
-    float halo = (0.5 + 0.5 * sin(r * 18.0 - u_time * 1.5)) * smoothstep(3.2, 1.0, r) * smoothstep(0.6, 1.1, r);
-    float core = exp(-r * r * 2.2);
-    float puls = 0.7 + 0.6 * u_stars[i].w + 0.8 * u_pulse;
-    col = mix(col, warm, halo * 0.32 * puls);
-    col += hot * core * 1.4 * puls;
   }
 #elif VARIANT == 4
   // Warp: streak light over a deep tunnel.

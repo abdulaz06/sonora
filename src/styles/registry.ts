@@ -5,43 +5,48 @@
 
 import { createAuraStyle } from './classic/aura';
 import { createHaloStyle } from './classic/halo-spectrum';
-import { createFlowInkStyle } from './flow-ink/flow-ink';
-import { createStrandsStyle } from './strands/strands';
-import { createTuringStyle } from './turing/turing';
+import { createInkStyle } from './ink/ink';
+import { createSilkStyle, createWarpStyle, createWispStyle } from './strands/strands';
 import { createMoshStyle } from './mosh/mosh';
-import { createFractalStyle } from './fractal/fractal';
+import { createVoyageStyle } from './voyage/voyage';
 import { STYLE_VARIANTS, type StyleCategory, type StyleDescriptor, type StyleId } from './visual-style';
 
 export const STYLES: StyleDescriptor[] = [
   {
-    id: 'flow-ink', label: 'Flow Ink', category: 'art',
-    variants: STYLE_VARIANTS['flow-ink'], defaultVariant: 'ink',
+    id: 'ink', label: 'Ink', category: 'art',
+    variants: STYLE_VARIANTS.ink, defaultVariant: 'glow',
     supportsLight: true, supportsDepth: true, defaultDepth: true,
-    create: createFlowInkStyle,
+    create: createInkStyle,
   },
   {
-    id: 'strands', label: 'Strands', category: 'art',
-    variants: STYLE_VARIANTS.strands, defaultVariant: 'silk',
+    id: 'silk', label: 'Silk', category: 'art',
+    variants: STYLE_VARIANTS.silk, defaultVariant: 'silk',
     supportsLight: true, supportsDepth: false, defaultDepth: false,
-    create: createStrandsStyle,
+    create: createSilkStyle,
   },
   {
-    id: 'turing', label: 'Turing', category: 'art',
-    variants: STYLE_VARIANTS.turing, defaultVariant: 'coral',
-    supportsLight: true, supportsDepth: false, defaultDepth: false,
-    create: createTuringStyle,
+    id: 'wisp', label: 'Wisp', category: 'art',
+    variants: STYLE_VARIANTS.wisp, defaultVariant: 'wisp',
+    supportsLight: false, supportsDepth: false, defaultDepth: false,
+    create: createWispStyle,
+  },
+  {
+    id: 'warp', label: 'Warp', category: 'art',
+    variants: STYLE_VARIANTS.warp, defaultVariant: 'warp',
+    supportsLight: false, supportsDepth: false, defaultDepth: false,
+    create: createWarpStyle,
+  },
+  {
+    id: 'voyage', label: 'Voyage', category: 'art',
+    variants: STYLE_VARIANTS.voyage, defaultVariant: 'voyage',
+    supportsLight: false, supportsDepth: false, defaultDepth: false,
+    create: createVoyageStyle,
   },
   {
     id: 'mosh', label: 'Mosh', category: 'art',
-    variants: STYLE_VARIANTS.mosh, defaultVariant: 'concrete',
+    variants: STYLE_VARIANTS.mosh, defaultVariant: 'signal',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: createMoshStyle,
-  },
-  {
-    id: 'fractal', label: 'Fractal', category: 'art',
-    variants: STYLE_VARIANTS.fractal, defaultVariant: 'voyage',
-    supportsLight: false, supportsDepth: false, defaultDepth: false,
-    create: createFractalStyle,
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',
@@ -57,7 +62,7 @@ export const STYLES: StyleDescriptor[] = [
   },
 ];
 
-export const DEFAULT_STYLE: StyleId = 'flow-ink';
+export const DEFAULT_STYLE: StyleId = 'ink';
 
 export function getStyle(id: StyleId): StyleDescriptor {
   return STYLES.find((s) => s.id === id) ?? STYLES[0];

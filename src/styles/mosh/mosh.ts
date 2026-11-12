@@ -52,7 +52,7 @@ export function createMoshStyle(deps: StyleDeps): VisualStyle {
   const { gl, quadVAO } = deps;
   const rng = createRng(deps.seed ^ 0x3051);
   let quality = deps.quality;
-  let variant = 'concrete';
+  let variant = 'signal';
   const prog = makeProgram(gl, fullscreenVert, withIncludes(moshFrag, { noise: noiseSrc }));
   const copy = makeProgram(gl, fullscreenVert, `#version 300 es
 precision highp float; uniform sampler2D u_src; uniform vec2 u_res; out vec4 frag;
@@ -194,7 +194,7 @@ void main() { frag = texture(u_src, gl_FragCoord.xy / u_res); }`);
     },
 
     setVariant(id: string): void {
-      if ((id === 'concrete' || id === 'signal') && id !== variant) { variant = id; fill = true; }
+      if (id === 'signal' && id !== variant) { variant = id; fill = true; }
     },
     getVariant: () => variant,
     setQuality(q: QualityParams): void { quality = q; },

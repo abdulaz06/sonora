@@ -1,4 +1,4 @@
-// ── Shared helpers for Flow Ink shaders (injected at //#include common) ──
+// ── Shared helpers for Ink shaders (injected at //#include common) ──
 uvec3 pcg3d(uvec3 v) {
   v = v * 1664525u + 1013904223u;
   v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;

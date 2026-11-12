@@ -26,7 +26,7 @@ import type { FlashGuard } from '../engine/flash-guard';
 import type { GenerativeState } from '../engine/generative';
 import type { QualityParams } from '../engine/quality';
 
-export type StyleId = 'flow-ink' | 'strands' | 'turing' | 'mosh' | 'fractal' | 'aura' | 'halo';
+export type StyleId = 'ink' | 'silk' | 'wisp' | 'warp' | 'voyage' | 'mosh' | 'aura' | 'halo';
 export type StyleCategory = 'art' | 'classic';
 /** Background preference: follow the variant's default, or force one. */
 export type LightMode = 'auto' | 'dark' | 'light';
@@ -42,30 +42,16 @@ export interface VariantOption {
 
 /** Static variant definitions per style (UI reads these without an instance). */
 export const STYLE_VARIANTS: Record<StyleId, VariantOption[]> = {
-  'flow-ink': [
-    { id: 'ink', label: 'Ink' },
-    { id: 'sumi', label: 'Sumi', defaultLight: true },
+  ink: [
+    { id: 'glow', label: 'Glow' },
     { id: 'marble', label: 'Marble' },
+    { id: 'sumi', label: 'Sumi', defaultLight: true },
   ],
-  strands: [
-    { id: 'silk', label: 'Silk' },
-    { id: 'lumen', label: 'Lumen', lightCapable: false },
-    { id: 'wisp', label: 'Wisp', lightCapable: false },
-    { id: 'starry', label: 'Starry Night', lightCapable: false },
-    { id: 'warp', label: 'Warp', lightCapable: false },
-  ],
-  turing: [
-    { id: 'coral', label: 'Coral', defaultLight: true },
-    { id: 'bio', label: 'Bioluminescent' },
-  ],
-  mosh: [
-    { id: 'concrete', label: 'Concrete' },
-    { id: 'signal', label: 'Signal' },
-  ],
-  fractal: [
-    { id: 'voyage', label: 'Voyage' },
-    { id: 'kaleido', label: 'Kaleido' },
-  ],
+  silk: [{ id: 'silk', label: 'Silk' }],
+  wisp: [{ id: 'wisp', label: 'Wisp', lightCapable: false }],
+  warp: [{ id: 'warp', label: 'Warp', lightCapable: false }],
+  voyage: [{ id: 'voyage', label: 'Voyage' }],
+  mosh: [{ id: 'signal', label: 'Signal' }],
   aura: [
     { id: 'circle', label: 'Circle' },
     { id: 'triangle', label: 'Triangle' },

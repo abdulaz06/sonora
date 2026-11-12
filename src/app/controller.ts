@@ -133,7 +133,7 @@ export function initController(opts: ControllerOptions): Controller {
     },
     onShowClassicChange: (on) => {
       settings.showClassic = on;
-      if (!on && getStyle(settings.mode).category === 'classic') setStyle('flow-ink');
+      if (!on && getStyle(settings.mode).category === 'classic') setStyle('ink');
       persist();
     },
     onRingCountChange: (n) => { renderer.setRingCount(n); settings.ringCount = n; persist(); },

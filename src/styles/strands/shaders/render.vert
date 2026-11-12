@@ -1,8 +1,8 @@
 #version 300 es
 precision highp float;
 precision highp int;
-// Draws particles. VARIANT 0, 2: points; 1: instanced hair-thin filament
-// streaks; 3: instanced brushstrokes; 4: instanced velocity-stretched streaks.
+// Draws particles. VARIANT 0 (silk), 2 (wisp): points; 4 (warp): instanced
+// velocity-stretched streaks.
 uniform sampler2D u_stateA;
 uniform sampler2D u_stateB;
 uniform int u_side;
@@ -16,21 +16,10 @@ uniform float u_active;
 uniform float u_time;
 uniform float u_sparkle;       // high-hit sparkle boost
 uniform vec2 u_res;            // target size in pixels
-// Starry
-uniform float u_stroke_len;
-uniform float u_stroke_w;
-uniform vec4 u_vort[8];
-uniform int u_vort_count;
-uniform float u_field_t;
-uniform vec4 u_stars_w[8];    // star world pos.xy, radius
-uniform int u_star_w_count;
 // Warp
 uniform vec2 u_vp;             // vanishing point offset (clip units)
 uniform float u_roll;
 uniform float u_streak;        // streak length factor
-// Lumen
-uniform float u_fil_len;       // filament length (seconds of travel)
-uniform float u_fil_max;       // max filament length (world units)
 out vec4 v_col;
 out vec2 v_uv;
 flat out float v_seed;
@@ -66,54 +55,11 @@ void main() {
   v_col = kind > 0.5
     ? vec4(0.0, w * (0.15 + 0.85 * u_sparkle) * pow(fract(seed * 31.0), 3.0) * 1.5, 0.0, 0.0)
     : vec4(w * u_gain * (0.6 + 4.0 * speed), 0.0, 0.0, 0.0);
-#elif VARIANT == 1
-  // Lumen: hair-thin filaments drawn as streaks back along the velocity,
-  // iridescent tint carried in rgb.
-  int corner = gl_VertexID;
-  vec2 q = corner == 0 ? vec2(0, -1) : corner == 1 ? vec2(1, -1) : corner == 2 ? vec2(0, 1)
-         : corner == 3 ? vec2(1, -1) : corner == 4 ? vec2(1, 1) : vec2(0, 1);
-  float spd = length(A.zw);
-  vec2 dirw = spd > 1e-6 ? A.zw / spd : vec2(1.0, 0.0);
-  float len = min(spd * u_fil_len, u_fil_max) * min(age * 3.0, 1.0);
-  vec2 ph = toClip(A.xy), pt = toClip(A.xy - dirw * len);
-  vec2 along = ph - pt;
-  vec2 dirc = length(along * u_res) > 1e-3 ? normalize(along * u_res) : vec2(1.0, 0.0);
-  vec2 side = vec2(-dirc.y, dirc.x) / u_res * 2.0;
-  gl_Position = vec4(mix(pt, ph, q.x) + side * q.y * 0.75 * u_point, 0.0, 1.0);
-  v_uv = q;
-  float t = age / max(life, 1e-3);
-  float hue = fract(kind + atan(A.w, A.z) / 6.2832 + u_time * 0.03);
-  vec3 irid = 0.55 + 0.45 * cos(6.2832 * (hue + vec3(0.0, 0.33, 0.67)));
-  irid = 0.5 + 0.5 * cos(6.2832 * (hue + vec3(0.0, 0.33, 0.67)));
-  // White near the source, iridescent toward the tips.
-  irid = mix(vec3(1.0), irid * 1.7, smoothstep(0.0, 0.35, t) * 0.9);
-  v_col = vec4(irid * w * u_gain * (1.0 - t * 0.6), 1.0);
 #elif VARIANT == 2
   // Wisp: r = smoke, g = ring smoke.
   gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
   gl_PointSize = u_point;
   v_col = kind > 0.5 ? vec4(0.0, w * u_gain * 1.4, 0.0, 0.0) : vec4(w * u_gain, 0.0, 0.0, 0.0);
-#elif VARIANT == 3
-  // Starry: a short thick stroke oriented along the swirl.
-  int corner = gl_VertexID;
-  vec2 q = corner == 0 ? vec2(-1, -1) : corner == 1 ? vec2(1, -1) : corner == 2 ? vec2(-1, 1)
-         : corner == 3 ? vec2(1, -1) : corner == 4 ? vec2(1, 1) : vec2(-1, 1);
-  vec2 dir = length(A.zw) > 1e-5 ? normalize(A.zw) : vec2(1.0, 0.0);
-  vec2 nrm = vec2(-dir.y, dir.x);
-  float len = u_stroke_len * (0.7 + 0.6 * fract(seed * 17.0));
-  float wid = u_stroke_w * (0.7 + 0.6 * fract(seed * 29.0));
-  vec2 wp = A.xy + dir * q.x * len + nrm * q.y * wid;
-  gl_Position = vec4(toClip(wp), 0.0, 1.0);
-  v_uv = q;
-  float spd = length(A.zw);
-  // Strokes near a star turn warm.
-  float nearStar = 0.0;
-  for (int i = 0; i < 8; i++) {
-    if (i >= u_star_w_count) break;
-    float dd = length(A.xy - u_stars_w[i].xy) / max(u_stars_w[i].z, 1e-4);
-    nearStar = max(nearStar, smoothstep(2.6, 0.9, dd));
-  }
-  v_col = vec4(spd, kind, w * (0.35 + 0.65 * u_active), nearStar);
 #elif VARIANT == 4
   // Warp: head at the particle, tail further down the tunnel.
   int corner = gl_VertexID;

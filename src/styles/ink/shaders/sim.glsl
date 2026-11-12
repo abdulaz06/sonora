@@ -1,4 +1,4 @@
-// Flow Ink simulation passes. One file, split into programs by
+// Ink simulation passes. One file, split into programs by
 // `//#program <name>` markers (see fluid.ts). Every program shares the header.
 #version 300 es
 precision highp float;

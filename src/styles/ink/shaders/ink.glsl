@@ -1,4 +1,4 @@
-// ── Flow Ink shading (injected at //#include ink) ────────────────────
+// ── Ink shading (injected at //#include ink) ────────────────────
 // Turns dye (palette-slot densities) into colour for each variant, in dark
 // (emissive ink on night) or light (absorbing ink on paper).
 

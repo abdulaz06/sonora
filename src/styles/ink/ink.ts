@@ -1,5 +1,5 @@
 /**
- * Flow Ink 2.0 — the flagship style.
+ * Ink (formerly Flow Ink) — the flagship style. Looks: Glow, Marble, Sumi.
  *
  * A stable-fluids ink simulation on a periodic domain several screens wide.
  * The world camera drifts across it (Flat) or glides low over it as a
@@ -101,7 +101,8 @@ const INK_DECAY = 0.07;
 const INK_DECAY_SILENT = 0.3;
 const MARBLE_DECAY = 0.004;
 
-const VARIANT_INDEX: Record<string, number> = { ink: 0, sumi: 1, marble: 2 };
+/** Shader variant index per look (Glow was called "ink" before v1.0). */
+const VARIANT_INDEX: Record<string, number> = { glow: 0, sumi: 1, marble: 2 };
 
 interface Emitter {
   phase: number;
@@ -199,7 +200,7 @@ function uniformMap(gl: WebGL2RenderingContext, prog: WebGLProgram): Record<stri
   return u;
 }
 
-export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
+export function createInkStyle(deps: StyleDeps): VisualStyle {
   const { gl, quadVAO } = deps;
   const rng = createRng(deps.seed ^ 0x51f0);
   let quality: QualityParams = deps.quality;
@@ -214,7 +215,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
   const grainTex = createGrainTexture(gl, deps.seed);
   let grid = createGrid(gl, quality.meshResolution);
 
-  let variant = 'ink';
+  let variant = 'glow';
   let noiseZ = rng() * 100;
   let bassCooldown = 0, highCooldown = 0, midCooldown = 0;
   let inkToggle = 0;
@@ -425,7 +426,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
   }
 
   return {
-    id: 'flow-ink',
+    id: 'ink',
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
       if (e.type === 'drop') dropBurst(ctx, e.strength);

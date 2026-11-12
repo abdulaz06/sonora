@@ -14,7 +14,7 @@ import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
 /** Bump when a default changes in a way saved settings must not override. */
-export const SETTINGS_VERSION = 3;
+export const SETTINGS_VERSION = 4;
 
 export interface PersistedSettings {
   /** Schema version (see SETTINGS_VERSION). */
@@ -152,16 +152,38 @@ export function createSettingsSaver(delayMs = 500): {
   return { scheduleSave, flush };
 }
 
+/** v4 lineup: map retired style ids to their nearest successor. */
+function migrateStyleId(mode: unknown, strandsVariant: unknown): unknown {
+  switch (mode) {
+    case 'flow-ink': case 'turing': return 'ink';
+    case 'strands': return strandsVariant === 'wisp' || strandsVariant === 'warp' ? strandsVariant : 'silk';
+    case 'fractal': return 'voyage';
+    default: return mode;
+  }
+}
+
+/** Per-style maps saved under old ids (lightModes, depth). */
+function renameKeys(m: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...m };
+  if (out.ink === undefined && m['flow-ink'] !== undefined) out.ink = m['flow-ink'];
+  if (out.silk === undefined && m.strands !== undefined) out.silk = m.strands;
+  return out;
+}
+
 /** Validate / fill in missing fields when loading. Tolerant of partial JSON. */
 export function mergeWithDefaults(raw: unknown): PersistedSettings {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
   const r = raw as Record<string, unknown>;
   const out: PersistedSettings = { ...DEFAULT_SETTINGS };
 
-  if (isStyleId(r.mode)) out.mode = r.mode;
   const ids = STYLES.map((d) => d.id);
+  const rawVariants = (r.variants && typeof r.variants === 'object' ? r.variants : {}) as Record<string, unknown>;
+  const mode = migrateStyleId(r.mode, rawVariants.strands);
+  if (isStyleId(mode)) out.mode = mode;
   if (r.variants && typeof r.variants === 'object') {
-    const v = r.variants as Record<string, unknown>;
+    const v: Record<string, unknown> = { ...rawVariants };
+    // v4: Flow Ink became Ink and its "Ink" look became Glow.
+    if (v.ink === undefined && typeof v['flow-ink'] === 'string') v.ink = v['flow-ink'] === 'ink' ? 'glow' : v['flow-ink'];
     const variants: Partial<Record<StyleId, string>> = {};
     for (const k of ids) {
       const val = v[k];
@@ -179,7 +201,7 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     out.driftPeriod = clamp(r.driftPeriod, MIN_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S);
   }
   if (r.lightModes && typeof r.lightModes === 'object') {
-    const lm = r.lightModes as Record<string, unknown>;
+    const lm = renameKeys(r.lightModes as Record<string, unknown>);
     const modes: Partial<Record<StyleId, LightMode>> = {};
     for (const k of ids) {
       const val = lm[k];
@@ -188,7 +210,7 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     out.lightModes = modes;
   }
   if (r.depth && typeof r.depth === 'object') {
-    const d = r.depth as Record<string, unknown>;
+    const d = renameKeys(r.depth as Record<string, unknown>);
     const depth: Partial<Record<StyleId, boolean>> = {};
     for (const k of ids) if (typeof d[k] === 'boolean') depth[k] = d[k] as boolean;
     out.depth = depth;

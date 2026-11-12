@@ -1,5 +1,5 @@
 /**
- * Fractal — a long camera flight through a raymarched Mandelbox (ref 12).
+ * Voyage — a long camera flight through a raymarched Mandelbox (ref 12).
  *
  * The camera follows a spline laid through open space by a CPU mirror of the
  * distance estimator (mandelbox.ts), so it never clips the walls; its speed
@@ -80,7 +80,7 @@ for (let i = 1; i <= 8; i++) {
 
 type Variant = 'voyage' | 'kaleido';
 
-export function createFractalStyle(deps: StyleDeps): VisualStyle {
+export function createVoyageStyle(deps: StyleDeps): VisualStyle {
   const { gl, quadVAO } = deps;
   const rng = createRng(deps.seed ^ 0xf4ac);
   let quality = deps.quality;
@@ -138,7 +138,7 @@ export function createFractalStyle(deps: StyleDeps): VisualStyle {
   }
 
   return {
-    id: 'fractal',
+    id: 'voyage',
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
       if (e.type === 'drop') {
@@ -284,7 +284,7 @@ export function createFractalStyle(deps: StyleDeps): VisualStyle {
     },
 
     setVariant(id: string): void {
-      if ((id === 'voyage' || id === 'kaleido') && id !== variant) {
+      if (id === 'voyage' && id !== variant) {
         variant = id;
         Object.assign(params, BASE[variant]);
         restart();

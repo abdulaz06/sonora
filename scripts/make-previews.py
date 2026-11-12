@@ -13,20 +13,14 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # (style, variant, verify folder, frame)
 PICKS = [
-    ("flow-ink", "ink", "flow-ink-ink-depth", "4-drop"),
-    ("flow-ink", "sumi", "flow-ink-sumi-depth", "3-build"),
-    ("flow-ink", "marble", "flow-ink-marble-depth", "4-drop"),
-    ("strands", "silk", "strands-silk-depth", "3-build"),
-    ("strands", "lumen", "strands-lumen-depth", "4-drop"),
-    ("strands", "wisp", "strands-wisp-depth", "3-build"),
-    ("strands", "starry", "strands-starry-depth", "3-build"),
-    ("strands", "warp", "strands-warp-depth", "3-build"),
-    ("turing", "coral", "turing-coral-depth", "3-build"),
-    ("turing", "bio", "turing-bio-depth", "3-build"),
-    ("mosh", "concrete", "mosh-concrete-depth", "3-build"),
-    ("mosh", "signal", "mosh-signal-depth", "3-build"),
-    ("fractal", "voyage", "fractal-voyage-depth", "3-build"),
-    ("fractal", "kaleido", "fractal-kaleido-depth", "4-drop"),
+    ("ink", "glow", "ink-glow", "4-drop"),
+    ("ink", "marble", "ink-marble", "4-drop"),
+    ("ink", "sumi", "ink-sumi", "3-build"),
+    ("silk", "silk", "silk", "3-build"),
+    ("wisp", "wisp", "wisp", "3-build"),
+    ("warp", "warp", "warp", "3-build"),
+    ("voyage", "voyage", "voyage", "3-build"),
+    ("mosh", "signal", "mosh-signal", "3-build"),
 ]
 
 

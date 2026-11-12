@@ -4,11 +4,11 @@
 // screenshots at the track's markers plus an 8-frame strip over 1 s around
 // the drop. Also measures real-time FPS at the drop.
 //
-//   npm run verify -- --style flow-ink --variant ink --track house-124
+//   npm run verify -- --style ink --variant ink --track house-124
 //   npm run verify -- --variant sumi --flat --light light --track all
 //
 // Options
-//   --style <id>        style id (default flow-ink)
+//   --style <id>        style id (default ink)
 //   --variant <id>      variant id (default: style default)
 //   --track <name|all>  test track (default house-124)
 //   --flat              Flat view instead of Depth
@@ -18,7 +18,7 @@
 //   --size <WxH>        viewport (default 1920x1080)
 //   --fps <n>           render steps per audio second (default 60)
 //   --warmup <s>        seconds rendered before each marker (default 14)
-//   --out <dir>         output dir (default verify/<style>-<variant>-<view>[-light]/<track>)
+//   --out <dir>         output dir (default verify/<style>[-<look>][-flat][-camera][-light]/<track>)
 //   --headed            show the browser
 //   --no-bench          skip the FPS measurement
 
@@ -33,7 +33,7 @@ const PORT = 5199;
 const BENCH_SECONDS = 6;
 
 function parseArgs(argv) {
-  const o = { style: 'flow-ink', variant: '', track: 'house-124', flat: false, light: 'auto', quality: 'medium',
+  const o = { style: 'ink', variant: '', track: 'house-124', flat: false, light: 'auto', quality: 'medium',
     palette: 0, size: '1920x1080', fps: 60, warmup: 14, out: '', headed: false, bench: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -128,7 +128,7 @@ try {
     const variant = opts.variant || '';
     const outDir = opts.out
       ? join(ROOT, opts.out, name)
-      : join(ROOT, 'verify', `${opts.style}-${variant || 'default'}-${view}${opts.camera ? '-' + opts.camera : ''}${opts.light !== 'auto' ? '-' + opts.light : ''}`, name);
+      : join(ROOT, 'verify', `${opts.style}${variant && variant !== opts.style ? '-' + variant : ''}${opts.flat ? '-flat' : ''}${opts.camera ? '-' + opts.camera : ''}${opts.light !== 'auto' ? '-' + opts.light : ''}`, name);
     mkdirSync(outDir, { recursive: true });
 
     // Fresh page state per track

@@ -2,7 +2,7 @@
 precision highp float;
 precision highp int;
 // Strands particle update (one texel = one particle). VARIANT is defined by
-// the host: 0 silk, 1 lumen, 2 wisp, 3 starry, 4 warp.
+// the host: 0 silk, 2 wisp, 4 warp (1 and 3 were retired looks).
 //   stateA = position.xy, velocity.xy        (warp: position.xyz, speed)
 //   stateB = age, life, seed, kind
 uniform sampler2D u_stateA;
@@ -25,31 +25,13 @@ uniform int u_emit_count;
 // Shockwaves: centre.xy, radius, strength
 uniform vec4 u_shock[4];
 uniform int u_shock_count;
-// Lumen source: xy, spread (0 star .. 1 X), angle
-uniform vec4 u_source;
-uniform vec2 u_balance;        // lumen: horizontal / vertical emphasis
 // Wisp agents: pos.xy, vel.xy
 uniform vec4 u_agents[4];
 uniform int u_agent_count;
 uniform vec4 u_ring;           // wisp ring burst: centre.xy, age, strength
-// Starry vortices: pos.xy, strength, radius
-uniform vec4 u_vort[8];
-uniform int u_vort_count;
 layout(location = 0) out vec4 outA;
 layout(location = 1) out vec4 outB;
 //#include noise
-
-vec2 starryField(vec2 p) {
-  vec2 v = curl2(p * 1.3, u_field_t) * 0.25;
-  for (int i = 0; i < 8; i++) {
-    if (i >= u_vort_count) break;
-    vec2 d = p - u_vort[i].xy;
-    float r2 = dot(d, d);
-    float rr = u_vort[i].w * u_vort[i].w;
-    v += vec2(-d.y, d.x) * u_vort[i].z * exp(-r2 / rr) / (sqrt(r2) + 0.05);
-  }
-  return v;
-}
 
 void main() {
   ivec2 id = ivec2(gl_FragCoord.xy);
@@ -100,23 +82,6 @@ void main() {
       A.zw = vec2(0.0);
       life = 2.5 + r.y * 4.5;
     }
-#elif VARIANT == 1
-    // Lumen: burst from the source along a cross (quiet) or an X (loud).
-    float pick = r.x;
-    float base;
-    float spread = u_source.z;
-    if (pick < u_balance.x) base = (r.y < 0.5 ? 0.0 : 3.14159);
-    else if (pick < u_balance.x + u_balance.y) base = (r.y < 0.5 ? 1.5708 : -1.5708);
-    else base = 0.7854 + floor(r.y * 4.0) * 1.5708;
-    // Discrete rays (lanes) read as individual hair-thin filaments.
-    float lane = (floor(r.z * 120.0) + 0.5) / 120.0 - 0.5;
-    float jitter = lane * mix(0.05, 0.38, spread * spread) + (r.w - 0.5) * 0.002;
-    float ang = base + jitter + u_source.w;
-    float sp = (0.15 + 1.1 * pow(fract(r.w * 7.31), 2.0)) * u_speed;
-    A.xy = u_source.xy + (r.zw - 0.5) * 0.006;
-    A.zw = vec2(cos(ang), sin(ang)) * sp;
-    kind = fract(seed * 13.7);
-    life = 0.5 + 1.6 * fract(r.z * 3.7);
 #elif VARIANT == 2
     // Wisp: smoke shed by an agent, or a ring around it after a bass hit.
     int a = int(floor(r.z * float(max(u_agent_count, 1))));
@@ -133,12 +98,6 @@ void main() {
       kind = 0.0;
     }
     life = 1.8 + r.y * 4.0;
-#elif VARIANT == 3
-    // Starry: brushstrokes anywhere in (and around) the view.
-    A.xy = u_center + (r.xy * 2.0 - 1.0) * half_ * 1.25;
-    A.zw = vec2(0.0);
-    kind = r.z;
-    life = 2.0 + r.w * 4.0;
 #endif
   }
 
@@ -159,24 +118,15 @@ void main() {
     float ring = exp(-pow((rr - u_shock[i].z) / 0.06, 2.0));
     v += d / max(rr, 1e-4) * u_shock[i].w * ring * dt * 9.0;
   }
-#elif VARIANT == 1
-  // Fine wiggle only: the filaments stay straight-ish, like hair.
-  v += curl2(p * 22.0, u_field_t * 2.0) * 0.11 * dt * (0.4 + u_intensity) * length(v);
-  v *= exp(-dt * 0.6);
 #elif VARIANT == 2
   v += curl2(p * 4.0, u_field_t) * 0.05 * dt;
   v *= exp(-dt * (kind > 0.5 ? 1.6 : 0.7));
-#elif VARIANT == 3
-  vec2 f = starryField(p);
-  v = mix(v, f * 0.12 * u_speed, 1.0 - exp(-dt * 6.0));
 #endif
   p += v * dt;
 
   // Leaving the area: recycle early.
   vec2 rel = (p - u_center) / half_;
-#if VARIANT == 1
-  if (length(p - u_source.xy) > u_view * 1.4) age = life + 1.0;
-#elif VARIANT == 2
+#if VARIANT == 2
   if (max(abs(rel.x), abs(rel.y)) > 2.5) age = life + 1.0;
 #else
   if (max(abs(rel.x), abs(rel.y)) > 1.9) age = life + 1.0;

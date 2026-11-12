@@ -181,7 +181,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   const flash = new FlashGuard();
   quality.setFrameBudget(1000 / 60);
 
-  let descriptor = getStyle(options.initialStyle ?? 'flow-ink');
+  let descriptor = getStyle(options.initialStyle ?? 'ink');
   let variant = descriptor.defaultVariant;
   let lightMode: LightMode = 'auto';
   let depth = descriptor.defaultDepth;
