@@ -15,6 +15,12 @@ export interface BoxParams {
   minR2: number;
   /** Box fold limit. */
   fold: number;
+  /** Melting warp (mirrors bend() in march.frag): amplitude, frequency, time. */
+  warpAmp?: number;
+  warpFreq?: number;
+  warpTime?: number;
+  /** Distance-bound correction for the warp (≤ 1). */
+  lip?: number;
 }
 
 /** Where the planner may fly: radius from the origin and preferred clearance. */
@@ -40,7 +46,15 @@ const SAMPLES = 10;
 const VIEW_CAP = 25;
 const VIEW_WEIGHT = 0.35;
 
-export function deBox(x: number, y: number, z: number, p: BoxParams, iters = DE_ITERS): number {
+export function deBox(x0: number, y0: number, z0: number, p: BoxParams, iters = DE_ITERS): number {
+  let x = x0, y = y0, z = z0;
+  const wa = p.warpAmp ?? 0;
+  if (wa > 0) {
+    const f = p.warpFreq ?? 1, t = p.warpTime ?? 0;
+    x = x0 + wa * Math.sin(y0 * f + t * 0.35);
+    y = y0 + wa * Math.sin(z0 * f + t * 0.29);
+    z = z0 + wa * Math.sin(x0 * f + t * 0.41);
+  }
   let px = x, py = y, pz = z, pw = 1;
   const s = p.scale, as = Math.abs(s), f = p.fold, maxK = 1 / p.minR2;
   for (let i = 0; i < iters; i++) {
@@ -55,7 +69,7 @@ export function deBox(x: number, y: number, z: number, p: BoxParams, iters = DE_
     pz = pz * k * s + z;
     pw = pw * k * as + 1;
   }
-  return Math.sqrt(px * px + py * py + pz * pz) / Math.abs(pw);
+  return (Math.sqrt(px * px + py * py + pz * pz) / Math.abs(pw)) * (p.lip ?? 1);
 }
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
