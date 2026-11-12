@@ -91,16 +91,16 @@ void main() {
     // Wisp: smoke shed by an agent, or a ring around it after a bass hit.
     int a = int(floor(r.z * float(max(u_agent_count, 1))));
     vec4 ag = u_agents[min(a, 3)];
-    if (u_ring.w > 0.01 && u_ring.z < 0.35 && r.w < 0.55) {
+    if (u_ring.w > 0.01 && u_ring.z < 0.35 && r.w < 0.75) {
       float ang = r.x * 6.2832;
       vec2 dir = vec2(cos(ang), sin(ang));
       A.xy = u_ring.xy + dir * (0.02 + r.y * 0.01);
-      A.zw = dir * (0.12 + 0.1 * r.y) * u_ring.w + vec2(-dir.y, dir.x) * 0.03;
-      kind = 1.0;
+      A.zw = dir * (0.17 + 0.14 * r.y) * u_ring.w + vec2(-dir.y, dir.x) * 0.04;
+      kind = 3.0;   // ring smoke
     } else {
       A.xy = ag.xy + (r.xy - 0.5) * 0.01;
       A.zw = -ag.zw * 0.15 + (r.yx - 0.5) * 0.05;
-      kind = 0.0;
+      kind = float(min(a, 2));   // smoke tinted by its agent
     }
     life = 1.8 + r.y * 4.0;
 #endif
@@ -133,7 +133,7 @@ void main() {
   }
 #elif VARIANT == 2
   v += curl2(p * 4.0, u_field_t) * 0.05 * dt;
-  v *= exp(-dt * (kind > 0.5 ? 1.6 : 0.7));
+  v *= exp(-dt * (kind > 2.5 ? 1.6 : 0.7));
 #endif
   p += v * dt;
 

@@ -24,6 +24,8 @@ uniform float u_streak;        // streak length factor
 // and radial snap amplitude (world units).
 uniform vec4 u_pluck;
 uniform float u_snap;
+// Wisp colours: agents 0–2 and the ring smoke.
+uniform vec4 u_wisp_col[4];
 out vec4 v_col;
 out vec2 v_uv;
 flat out float v_seed;
@@ -76,10 +78,11 @@ void main() {
     ? vec4(0.0, w * (0.15 + 0.85 * u_sparkle) * pow(fract(seed * 31.0), 3.0) * 1.5, 0.0, 0.0)
     : vec4(w * u_gain * (0.6 + 4.0 * speed), 0.0, 0.0, 0.0);
 #elif VARIANT == 2
-  // Wisp: r = smoke, g = ring smoke.
+  // Wisp: smoke in its agent's colour; ring smoke brighter.
   gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
   gl_PointSize = u_point;
-  v_col = kind > 0.5 ? vec4(0.0, w * u_gain * 1.4, 0.0, 0.0) : vec4(w * u_gain, 0.0, 0.0, 0.0);
+  int ci = int(clamp(kind, 0.0, 3.0));
+  v_col = vec4(u_wisp_col[ci].rgb * w * u_gain * (ci == 3 ? 1.5 : 1.0), 1.0);
 #elif VARIANT == 4
   // Warp: head at the particle, tail further down the tunnel.
   int corner = gl_VertexID;

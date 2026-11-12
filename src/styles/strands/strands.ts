@@ -54,7 +54,7 @@ interface KindCfg {
 
 const CFG: Record<StrandsKind, KindCfg> = {
   silk: { count: 1, decay: 0.84, point: 1, gain: 0.03, display: 1.1 },
-  wisp: { count: 0.06, decay: 0.975, point: 1, gain: 0.014, display: 1.5 },
+  wisp: { count: 0.1, decay: 0.975, point: 1, gain: 0.02, display: 1.6 },
   warp: { count: 0.06, decay: 0.5, point: 1, gain: 0.75, display: 1 },
 };
 
@@ -331,6 +331,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_streak: 0.016 + 0.012 * ctx.intensitySmoothed,
         u_pluck: [pluckAmp, pluckT, pluckOrigin[0], pluckOrigin[1]], u_snap: 0,
         u_c0: pal.primary, u_c1: pal.secondary, u_c2: mixRgb(pal.highlight, [1, 1, 1], 0.6), u_c3: pal.accent,
+        u_wisp_col: [...pal.primary, 1, ...pal.accent, 1, ...pal.highlight, 1, ...mixRgb(pal.highlight, [1, 1, 1], 0.5), 1],
       });
       gl.bindVertexArray(emptyVAO);
       if (kind === 'warp') gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
@@ -347,7 +348,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       for (let i = 0; i < 4; i++) {
         const a = agents[i];
         const uv = a ? worldToUv(cam, a.x, a.y, view, aspect) : [0, 0];
-        agentUv.push(uv[0], uv[1], a ? (0.4 + 0.6 * ctx.fadeInOut) * a.glow * (0.8 + a.speed) : 0, 0.006 + 0.004 * (a?.glow ?? 1));
+        agentUv.push(uv[0], uv[1], a ? (0.45 + 0.55 * ctx.fadeInOut) * a.glow * (0.8 + a.speed) : 0, 0.011 + 0.006 * (a?.glow ?? 1));
         agentDir.push(a ? Math.cos(a.heading - cam.rotation) : 1, a ? Math.sin(a.heading - cam.rotation) : 0, a ? a.speed : 0, 0);
       }
       setUniforms(gl, p.display, {

@@ -64,12 +64,11 @@ void main() {
     col += mix(u_c0, u_c3, 0.6) * dust * 0.9 * e;
   }
 #elif VARIANT == 2
-  // Wisp: faint smoke trails, bright darting agents.
-  float smoke = 1.0 - exp(-acc.r * u_gain);
-  float ring = 1.0 - exp(-acc.g * u_gain);
+  // Wisp: coloured smoke trails, bright darting flames.
+  vec3 smoke = 1.0 - exp(-acc.rgb * u_gain);
   vec3 white = mix(vec3(1.0), u_c3, 0.25);
-  float e = 1.0 + 1.0 * u_pulse;   // hits flare the trails on the frame
-  col = u_bg * 0.4 + (white * smoke * 0.75 + mix(white, u_c0, 0.4) * ring * 0.9) * e;
+  float e = 1.0 + 0.35 * u_pulse;   // hits flare the trails on the frame
+  col = u_bg * 0.5 + smoke * 1.15 * e;
   for (int i = 0; i < 4; i++) {
     if (i >= u_agent_count) break;
     vec2 q = (uv - u_agents[i].xy) * vec2(aspect, 1.0);
@@ -80,7 +79,10 @@ void main() {
     float tail = (0.8 + 3.5 * u_agent_dir[i].z);
     float stretch = along < 0.0 ? tail : 0.9;
     float r2 = (along * along) / (sz * sz * stretch * stretch) + (across * across) / (sz * sz * 0.5);
-    col += white * u_agents[i].z * (exp(-r2) * 3.2 + exp(-dot(q, q) / (sz * sz) * 0.06) * (0.2 + 0.5 * u_pulse)) * e;
+    vec3 tint = i == 0 ? u_c0 : i == 1 ? u_c2 : u_c3;
+    float core = exp(-r2);
+    float halo = exp(-dot(q, q) / (sz * sz) * 0.05);
+    col += (mix(tint, white, 0.65) * core * 3.0 + tint * halo * (0.35 + 0.3 * u_pulse)) * u_agents[i].z * e;
   }
 #elif VARIANT == 4
   // Warp: streak light over a deep tunnel.
