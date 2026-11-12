@@ -19,13 +19,32 @@ uniform float u_pulse;
 uniform vec4 u_agents[4];    // uv.xy, brightness, size
 uniform vec4 u_agent_dir[4]; // direction.xy (screen), speed
 uniform int u_agent_count;
+// Silk beat warp, applied to the whole image (trails included) on the frame:
+// x = zoom punch (fraction), y = snap amplitude (uv), z = time since the hit,
+// w = ripple amplitude (uv); u_warp_origin = hit position (uv).
+uniform vec4 u_warp;
+uniform vec2 u_warp_origin;
 out vec4 frag;
 //#include noise
 
 void main() {
   vec2 uv = gl_FragCoord.xy / u_res;
-  vec4 acc = texture(u_accum, uv);
   float aspect = u_res.x / u_res.y;
+#if VARIANT == 0
+  {
+    // Zoom punch toward the screen centre, then a snap + ripple ring that
+    // travels out from the hit: the sheet visibly jumps on every kick.
+    uv = 0.5 + (uv - 0.5) * (1.0 - u_warp.x);
+    vec2 d = (uv - u_warp_origin) * vec2(aspect, 1.0);
+    float r = length(d);
+    vec2 dir = d / max(r, 1e-4);
+    float t = u_warp.z;
+    float snap = u_warp.y * exp(-t / 0.18) * cos(t * 16.0) * exp(-r * 1.6);
+    float ring = u_warp.w * exp(-t / 0.45) * sin(r * 26.0 - t * 30.0) * exp(-pow((r - t * 1.3) / 0.22, 2.0));
+    uv -= dir * (snap + ring) / vec2(aspect, 1.0);
+  }
+#endif
+  vec4 acc = texture(u_accum, uv);
   vec3 col;
 
 #if VARIANT == 0

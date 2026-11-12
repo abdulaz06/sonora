@@ -287,7 +287,7 @@ async function runSync(page, meta, name) {
   await page.evaluate((n) => window.__sonora.loadTrack(n), name);
   await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
   await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);
-  const luma = await page.evaluate(([s, d]) => window.__sonora.lumaTrace(s, d), [len, dt]);
+  const { luma, motion } = await page.evaluate(([s, d]) => window.__sonora.exposureTrace(s, d), [len, dt]);
   const rises = [];
   const lags = [];
   for (const k of kicks) {
@@ -305,11 +305,25 @@ async function runSync(page, meta, name) {
     lags.push(at * dt * 1000);
   }
   const seen = rises.filter((r) => r >= SYNC_SEEN).length;
+  // Motion sync: peak frame-to-frame change within 133 ms after each kick vs
+  // the median change over the window (how much more the picture moves on hits).
+  const sortedM = [...motion].sort((a, b) => a - b);
+  const medM = Math.max(sortedM[Math.floor(sortedM.length / 2)], 1e-5);
+  const mRises = [];
+  for (const k of kicks) {
+    if (k < start + 0.1 || k > start + len - 0.2) continue;
+    const i = Math.round((k - start) / dt);
+    let pk = 0;
+    for (let j = 0; j <= Math.round(0.133 / dt); j++) pk = Math.max(pk, motion[i + j] ?? 0);
+    mRises.push(pk / medM);
+  }
+  mRises.sort((a, b) => a - b);
+  const motionX = mRises[Math.floor(mRises.length / 2)] ?? 0;
   const sorted = [...rises].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
   const meanLuma = luma.reduce((a, b) => a + b, 0) / luma.length;
   const meanLag = lags.reduce((a, b) => a + b, 0) / Math.max(1, lags.length);
-  console.log(`${name} [${opts.variant || 'default'} ${opts.flat ? 'flat' : 'depth'}]: kicks ${rises.length}, seen ${seen} (${(100 * seen / Math.max(1, rises.length)).toFixed(0)}%), median rise ${(100 * median).toFixed(1)}%, peak lag ${meanLag.toFixed(0)} ms, mean luma ${meanLuma.toFixed(3)}`);
+  console.log(`${name} [${opts.variant || 'default'} ${opts.flat ? 'flat' : 'depth'}]: kicks ${rises.length}, seen ${seen} (${(100 * seen / Math.max(1, rises.length)).toFixed(0)}%), median rise ${(100 * median).toFixed(1)}%, peak lag ${meanLag.toFixed(0)} ms, mean luma ${meanLuma.toFixed(3)}, motion on kicks ×${motionX.toFixed(2)}`);
   const outDir = join(ROOT, 'verify', 'sync');
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, `${name}-${opts.variant || 'default'}-${opts.flat ? 'flat' : 'depth'}.json`), JSON.stringify({ start, dt, kicks, luma, rises }, null, 1));

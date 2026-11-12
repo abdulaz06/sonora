@@ -20,6 +20,10 @@ uniform vec2 u_res;            // target size in pixels
 uniform vec2 u_vp;             // vanishing point offset (clip units)
 uniform float u_roll;
 uniform float u_streak;        // streak length factor
+// Silk beat response, drawn on the frame: pluck (amp, time since, origin.xy)
+// and radial snap amplitude (world units).
+uniform vec4 u_pluck;
+uniform float u_snap;
 out vec4 v_col;
 out vec2 v_uv;
 flat out float v_seed;
@@ -49,7 +53,23 @@ void main() {
 
 #if VARIANT == 0
   // Silk: r = ribbon density, g = dust.
-  gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
+  // Pluck: each thread ripples sideways like a plucked string and the whole
+  // sheet snaps outward from the hit, springing back with a little overshoot.
+  vec2 pos = A.xy;
+  {
+    float sp0 = length(A.zw);
+    vec2 tng = sp0 > 1e-5 ? A.zw / sp0 : vec2(1.0, 0.0);
+    vec2 nrm = vec2(-tng.y, tng.x);
+    float t = u_pluck.y;
+    vec2 d = pos - u_pluck.zw;
+    float fall = exp(-dot(d, d) / (u_view * u_view * 0.4));
+    float env = u_pluck.x * exp(-t / 0.3);
+    float wave = sin(age * 7.0 + seed * 3.0 - t * 26.0);
+    float k = kind > 0.5 ? 0.3 : 1.0;
+    pos += nrm * env * wave * (0.35 + 0.65 * fall) * k;
+    pos += normalize(d + 1e-6) * u_snap * exp(-t / 0.2) * cos(t * 17.0) * fall;
+  }
+  gl_Position = vec4(toClip(pos), 0.0, 1.0);
   gl_PointSize = kind > 0.5 ? 1.0 + step(0.985, fract(seed * 97.0)) : u_point;
   float speed = length(A.zw);
   v_col = kind > 0.5

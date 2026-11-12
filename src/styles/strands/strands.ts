@@ -61,6 +61,16 @@ const CFG: Record<StrandsKind, KindCfg> = {
 /** Silk: shockwave speed (world units/s) and lifetime (s). */
 const SHOCK_SPEED = 0.9;
 const SHOCK_LIFE = 1.1;
+/** Silk pluck on kicks: ripple and radial snap amplitude (view heights). */
+const PLUCK_AMP = 0.02;
+const SNAP_AMP = 0.09;
+/** Silk beat zoom punch (fraction of the view) and spring stiffness. */
+const ZOOM_PUNCH = 0.08;
+const ZOOM_OMEGA = 16;
+/** Silk drop: burst decay (s), formation hold and fade (s). */
+const BURST_TAU = 0.45;
+const FORM_HOLD = 5;
+const FORM_FADE = 2.5;
 /** Silk: inversion cut length in beats (drop) and chance on a big hit. */
 const CUT_BEATS_DROP = 2;
 const CUT_BEATS_HIT = 1;
@@ -104,6 +114,11 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
   let bassCooldown = 0;
   let cutUntil = -1;
   let sparkle = 0;
+  // Silk beat / drop state
+  let pluckT = 9, pluckAmp = 0, snapAmp = 0;
+  let pluckOrigin: [number, number] = [0, 0];
+  let zoom = 0, zoomVel = 0;
+  let burst = 0, formT = 99, formRot = 0;
   // Wisp
   const agents: Agent[] = [0, 1, 2].map((i) => ({
     x: (rng() - 0.5) * 0.6, y: (rng() - 0.5) * 0.4, heading: rng() * 6.28, speed: 0.2, turn: (i % 2 ? 1 : -1) * 1.2, glow: 1,
@@ -139,7 +154,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
       if (kind === 'silk') {
-        if (e.type === 'drop') cut(ctx, CUT_BEATS_DROP);
+        if (e.type === 'drop') { cut(ctx, CUT_BEATS_DROP); burst = 1; formT = 0; formRot = rng() * Math.PI; }
         else if (e.type === 'bigHit' && rng() < CUT_HIT_CHANCE) cut(ctx, CUT_BEATS_HIT);
       } else if (kind === 'warp' && e.type === 'drop') {
         warpJump = 1;
@@ -161,13 +176,29 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       sparkle = Math.max(sparkle * Math.exp(-dt / 0.15), ctx.highHits);
       bassCooldown -= dt;
 
-      // Silk shockwaves on bass hits.
+      // Silk shockwaves and plucks on bass hits.
       if (kind === 'silk' && ctx.bassHits > 0.55 && bassCooldown <= 0 && fade > 0.1) {
         const c = ctx.camera;
         const q = c.screenToWorld2D((rng() - 0.5) * 1.4, (rng() - 0.5) * 1.2);
         shocks.push({ x: q[0], y: q[1], r: 0.02, s: 0.6 * ctx.bassHits, age: 0 });
         if (shocks.length > 4) shocks.shift();
         bassCooldown = 0.18;
+        const motion = (0.55 + 0.9 * ctx.responsiveness) * ctx.bassHits * (0.4 + 0.6 * fade);
+        pluckT = 0;
+        pluckAmp = PLUCK_AMP * c.viewHeight * motion;
+        snapAmp = SNAP_AMP * c.viewHeight * motion;
+        pluckOrigin = c.screenToWorld2D((rng() - 0.5) * 0.6, (rng() - 0.5) * 0.5);
+      }
+      pluckT += dt;
+      if (kind === 'silk') {
+        // Beat-locked camera push: zoom in on the beat, spring back.
+        const onBeat = ctx.beatConfidence > 0.3 ? ctx.beatOnset : ctx.bassHits > 0.6 && pluckT === dt;
+        if (onBeat && fade > 0.1) zoomVel += ZOOM_OMEGA * (0.6 + 0.8 * ctx.responsiveness) * (0.5 + 0.5 * fade);
+        zoomVel += (-ZOOM_OMEGA * ZOOM_OMEGA * zoom - 2 * 0.55 * ZOOM_OMEGA * zoomVel) * dt;
+        zoom += zoomVel * dt;
+        burst *= Math.exp(-dt / BURST_TAU);
+        formT += dt;
+        formRot += dt * 0.15;
       }
       for (const s of shocks) { s.age += dt; s.r += SHOCK_SPEED * dt; s.s *= Math.exp(-dt / 0.5); }
       while (shocks.length && shocks[0].age > SHOCK_LIFE) shocks.shift();
@@ -222,15 +253,28 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       const active = kind === 'warp' ? 1
         : clamp01(0.12 + 0.88 * presence * (0.3 + 0.7 * ctx.fadeInOut) + 0.3 * ctx.intensityGlow);
 
-      // Silk emitters: three segments wandering around the view.
+      // Silk emitters: three segments wandering around the view, or, after a
+      // drop, four diameters through the core (an eight-spoke starburst).
+      const form = formT < FORM_HOLD ? 1 : Math.max(0, 1 - (formT - FORM_HOLD) / FORM_FADE);
+      const core = cam.center;
       const emit: number[] = [];
-      for (let i = 0; i < 3; i++) {
-        const t = time * (0.05 + i * 0.013) + i * 2.1;
-        const a = cam.screenToWorld2D(Math.sin(t * 1.3) * 0.9, Math.cos(t * 0.9 + i) * 0.8);
-        const b = cam.screenToWorld2D(Math.sin(t * 0.7 + 2 + i) * 0.9, Math.cos(t * 1.1 + 1) * 0.8);
-        emit.push(a[0], a[1], b[0], b[1]);
+      let emitCount = 3;
+      if (kind === 'silk' && form > 0.3) {
+        emitCount = 4;
+        for (let i = 0; i < 4; i++) {
+          const a = formRot + (i * Math.PI) / 4;
+          const L = view * 0.12;
+          emit.push(core[0] - Math.cos(a) * L, core[1] - Math.sin(a) * L, core[0] + Math.cos(a) * L, core[1] + Math.sin(a) * L);
+        }
+      } else {
+        for (let i = 0; i < 3; i++) {
+          const t = time * (0.05 + i * 0.013) + i * 2.1;
+          const a = cam.screenToWorld2D(Math.sin(t * 1.3) * 0.9, Math.cos(t * 0.9 + i) * 0.8);
+          const b = cam.screenToWorld2D(Math.sin(t * 0.7 + 2 + i) * 0.9, Math.cos(t * 1.1 + 1) * 0.8);
+          emit.push(a[0], a[1], b[0], b[1]);
+        }
+        emit.push(0, 0, 0, 0);
       }
-      emit.push(0, 0, 0, 0);
       const shockData: number[] = [];
       for (let i = 0; i < 4; i++) {
         const s = shocks[i];
@@ -257,7 +301,9 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_stateA: state.read.tex[0], u_stateB: state.read.tex[1],
         u_dt: Math.min(ctx.dt, 1 / 30), u_init: needsInit ? 1 : 0, u_intensity: ctx.intensitySmoothed,
         u_fade: ctx.fadeInOut, u_speed: kind === 'warp' ? warpSpeed : 0.5 + speedEnv * 1.3,
-        u_field_scale: 1.6, u_emit: emit, u_emit_count: 3, u_shock: shockData, u_shock_count: shocks.length,
+        u_field_scale: 1.6, u_emit: emit, u_emit_count: emitCount, u_shock: shockData, u_shock_count: shocks.length,
+        u_core: [core[0], core[1]], u_gather: kind === 'silk' ? Math.pow(Math.max(0, (ctx.eventState.buildProgress - 0.3) / 0.7), 2) * ctx.fadeInOut : 0,
+        u_burst: burst, u_form: kind === 'silk' ? form : 0,
         u_agents: agentData, u_agent_count: agents.length, u_ring: [ring.x, ring.y, ring.age, ring.s],
       });
       drawQuad(gl, quadVAO);
@@ -283,6 +329,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_sparkle: sparkle, u_res: [ctx.width, ctx.height],
         u_vp: [simplex2(time * 0.07, 4) * 0.25, simplex2(time * 0.06, 5) * 0.18], u_roll: cam.roll * 3,
         u_streak: 0.016 + 0.012 * ctx.intensitySmoothed,
+        u_pluck: [pluckAmp, pluckT, pluckOrigin[0], pluckOrigin[1]], u_snap: 0,
         u_c0: pal.primary, u_c1: pal.secondary, u_c2: mixRgb(pal.highlight, [1, 1, 1], 0.6), u_c3: pal.accent,
       });
       gl.bindVertexArray(emptyVAO);
@@ -308,6 +355,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
         u_light: kind === 'silk' ? silkLight : false, u_gain: cfg.display, u_fade: ctx.fadeInOut,
         u_pulse: ctx.bassHits,
+        u_warp: kind === 'silk' ? [ZOOM_PUNCH * zoom, snapAmp / view * 0.5, pluckT, snapAmp / view * 0.35] : [0, 0, 0, 0],
+        u_warp_origin: worldToUv(cam, pluckOrigin[0], pluckOrigin[1], view, aspect),
         u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: kind === 'wisp' ? agents.length : 0,
       });
       drawQuad(gl, quadVAO);

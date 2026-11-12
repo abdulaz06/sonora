@@ -49,7 +49,7 @@ export interface HarnessApi {
   /** Advance in steps of `dt` and return the mean screen luminance after each step. */
   lumaTrace(seconds: number, dt: number): number[];
   /** Like lumaTrace, plus the fraction of blown-out pixels (any channel ≥ 250) per step. */
-  exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[] };
+  exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[]; motion: number[] };
 }
 
 declare global {
@@ -235,26 +235,36 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
     lumaTrace(seconds: number, dt: number): number[] {
       return this.exposureTrace(seconds, dt).luma;
     },
-    exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[] } {
-      if (!gl) return { luma: [], clip: [] };
+    exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[]; motion: number[] } {
+      if (!gl) return { luma: [], clip: [], motion: [] };
       const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
       const buf = new Uint8Array(w * h * 4);
       const luma: number[] = [];
       const clip: number[] = [];
+      // Motion: mean absolute per-pixel luminance change from the last frame.
+      const motion: number[] = [];
+      let prev: Float32Array | null = null;
+      const cur = new Float32Array(Math.ceil(buf.length / (4 * 7)));
       for (let t = 0; t < seconds - 1e-9; t += dt) {
         source.stepOffline(dt);
         renderer.step(dt);
         gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-        let sum = 0, n = 0, hot = 0;
+        let sum = 0, n = 0, hot = 0, diff = 0;
         for (let i = 0; i < buf.length; i += 4 * 7) {
-          sum += 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2];
+          const l = 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2];
+          if (prev) diff += Math.abs(l - prev[n]);
+          cur[n] = l;
+          sum += l;
           if (buf[i] >= 250 || buf[i + 1] >= 250 || buf[i + 2] >= 250) hot++;
           n++;
         }
         luma.push(sum / n / 255);
         clip.push(hot / n);
+        motion.push(prev ? diff / n / 255 : 0);
+        prev = prev ?? new Float32Array(cur.length);
+        prev.set(cur);
       }
-      return { luma, clip };
+      return { luma, clip, motion };
     },
     frameCost(frames: number, dt: number): number {
       if (!gl) return 0;

@@ -29,6 +29,11 @@ uniform int u_shock_count;
 uniform vec4 u_agents[4];
 uniform int u_agent_count;
 uniform vec4 u_ring;           // wisp ring burst: centre.xy, age, strength
+// Silk drop arc: core (world), gather (build), burst (drop), formation weight
+uniform vec2 u_core;
+uniform float u_gather;
+uniform float u_burst;
+uniform float u_form;
 layout(location = 0) out vec4 outA;
 layout(location = 1) out vec4 outB;
 //#include noise
@@ -106,6 +111,14 @@ void main() {
   vec2 v = A.zw;
 #if VARIANT == 0
   vec2 field = curl2(p * u_field_scale, u_field_t) * 0.11 * u_speed;
+  // Drop arc: the build pulls threads into a swirling knot, the drop bursts
+  // them outward, then they stream along radial spokes for a few seconds.
+  vec2 toC = u_core - p;
+  float dc = length(toC) + 1e-4;
+  vec2 inw = toC / dc;
+  field = mix(field, -inw * 0.16 * u_speed, u_form * 0.85);
+  v += (inw * 0.18 + vec2(-inw.y, inw.x) * 0.24) * u_gather * u_speed * dt * 3.0;
+  v -= inw * u_burst * 9.0 * dt * exp(-dc / (u_view * 0.9));
   if (kind > 0.5) {
     v = field * 0.1;
   } else {
