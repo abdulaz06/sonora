@@ -52,15 +52,15 @@ const FLAT_VIEW_SCALE = 1.3;
 
 /** Inflow emitters attached to the view. */
 const EMITTERS = 4;
-const INFLOW_DYE = 2.6;         // dye per second at full mid presence
+const INFLOW_DYE = 1.7;         // dye per second at full mid presence (a drizzle, not a flood)
 const INFLOW_RADIUS = 0.0045;   // uv
 const INFLOW_SPEED = 0.16;      // uv/s jet
 
 /** Bass splats. */
 const BASS_THRESHOLD = 0.4;
 const BASS_COOLDOWN = 0.11;
-const BASS_RADIUS = [0.018, 0.04];   // uv range
-const BASS_DYE = 0.75;
+const BASS_RADIUS = [0.024, 0.045];   // uv range: big enough to read as one splash
+const BASS_DYE = 1.0;
 /** Energy (fast glow) injected by a bass splat. */
 const BASS_ENERGY = 1.0;
 /** Beat kick: outward ink push on the frame of the hit (uv/s; radius × splat radius). */
@@ -76,7 +76,7 @@ const BASS_SWIRL = 0.02;
 /** Frame-accurate brightening of all ink on bass hits, per variant (ink, sumi, marble). */
 /** How much ink brightens (or deepens, on paper) on a hit, per variant. Not
  * scaled by Responsiveness: that drives motion, never brightness. */
-const PULSE_GAIN = [0.35, 0.8, 0.28];
+const PULSE_GAIN = [0.35, 1.3, 0.28];
 /** Black ink on paper reads much heavier than glowing ink: scale Sumi's dye. */
 const SUMI_DYE = 0.5;
 /** Energy channel decay (1/s): ~150 ms glow. */
@@ -91,14 +91,20 @@ const MID_COOLDOWN = 0.22;
 
 /** Turbulence: stirring (uv/s²) and vorticity (texel units at 256²). */
 const STIR_MIN = 0.02;
-const STIR_MAX = 0.16;
+const STIR_MAX = 0.09;
 const CURL_MIN = 10;
-const CURL_MAX = 26;
+const CURL_MAX = 18;
 /** Subtractive decay of faint ink (dye units / s) — keeps negative space. */
-const INK_FLOOR_DECAY = 0.016;
-/** Dye decay (1/s) for ink while playing / while silent. */
-const INK_DECAY = 0.07;
-const INK_DECAY_SILENT = 0.3;
+const INK_FLOOR_DECAY = 0.04;
+/** Dye decay (1/s) for Glow/Sumi while playing (quiet → loud) and silent.
+ * Each kick's splash should read on its own and fade in ~1–2 s, as v0.1
+ * did, instead of piling up into a field that swallows new hits. */
+const INK_DECAY_QUIET = 0.55;
+const INK_DECAY_LOUD = 0.48;
+const INK_DECAY_SILENT = 1.2;
+/** Breakdowns: ink lingers and drifts (calm, not empty), with more inflow. */
+const INK_DECAY_BREAKDOWN = 0.18;
+const INFLOW_BREAKDOWN = 1.8;
 const MARBLE_DECAY = 0.004;
 
 /** Shader variant index per look (Glow was called "ink" before v1.0). */
@@ -216,6 +222,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   let grid = createGrid(gl, quality.meshResolution);
 
   let variant = 'glow';
+  let breakdownEnv = 0;
   let noiseZ = rng() * 100;
   let bassCooldown = 0, highCooldown = 0, midCooldown = 0;
   let inkToggle = 0;
@@ -232,7 +239,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   const params: FluidParams = {
     curlStrength: CURL_MIN, damping: 0.3, velocityDissipation: 0.15,
     noiseAmp: STIR_MIN, noisePeriod: 5, noiseZ, noiseDetail: 1,
-    dyeDissipation: [INK_DECAY, INK_DECAY, 1.6, 2.5], dyeFloorDecay: [INK_FLOOR_DECAY, INK_FLOOR_DECAY, 0.05, 0],
+    dyeDissipation: [INK_DECAY_QUIET, INK_DECAY_QUIET, 1.6, 2.5], dyeFloorDecay: [INK_FLOOR_DECAY, INK_FLOOR_DECAY, 0.05, 0],
   };
 
   // ── Placement helpers ─────────────────────────────────────────
@@ -256,7 +263,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   /** Random placement: mostly in view, some at the edges, some off-screen. */
   function randomScreen(): [number, number] {
     const r = rng();
-    if (r < 0.55) {
+    if (r < 0.8) {
       // In view, biased away from the centre so compositions stay off-axis.
       const x = (rng() < 0.5 ? -1 : 1) * (0.2 + 0.75 * Math.sqrt(rng()));
       return [x, rng() * 1.6 - 0.85];
@@ -365,7 +372,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     const presence = ctx.midPresence;
     const build = ctx.eventState.buildProgress;
     const calm = ctx.eventState.section === 'breakdown' ? 0.55 : 1;
-    const rate = presence * fade * (variant === 'marble' ? 0.8 : 1);
+    const rate = presence * fade * (variant === 'marble' ? 0.8 : 1) * (1 + (INFLOW_BREAKDOWN - 1) * breakdownEnv);
     if (rate < 0.01) {
       for (const e of emitters) e.lastX = NaN;
       return;
@@ -455,7 +462,10 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       const floor = marble ? 0 : INK_FLOOR_DECAY * (1 + 2 * smoothstep(0.3, 1, silence));
       params.dyeFloorDecay[0] = floor;
       params.dyeFloorDecay[1] = floor;
-      const inkDecay = marble ? MARBLE_DECAY : INK_DECAY + (INK_DECAY_SILENT - INK_DECAY) * smoothstep(0.2, 1, silence);
+      breakdownEnv += ((ctx.eventState.section === 'breakdown' ? 1 : 0) - breakdownEnv) * (1 - Math.exp(-dt / 1.5));
+      let playing = INK_DECAY_QUIET + (INK_DECAY_LOUD - INK_DECAY_QUIET) * clamp01(ctx.intensityGlow * 1.2);
+      playing += (INK_DECAY_BREAKDOWN - playing) * breakdownEnv;
+      const inkDecay = marble ? MARBLE_DECAY : playing + (INK_DECAY_SILENT - playing) * smoothstep(0.2, 1, silence);
       params.dyeDissipation[0] = inkDecay;
       params.dyeDissipation[1] = inkDecay;
       params.dyeDissipation[2] = 1.4;
