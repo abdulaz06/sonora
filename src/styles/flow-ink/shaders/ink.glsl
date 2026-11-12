@@ -138,6 +138,6 @@ vec3 shadeInk(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
   }
   vec3 base = darkBackground(world);
   col = base + (col - base) * (1.0 + u_pulse_gain * u_pulse);
-  col += inkCol * e * (0.3 + 0.7 * cover);
+  col += inkCol * min(e, 1.2) * 0.55 * (0.3 + 0.7 * cover);
   return col;
 }

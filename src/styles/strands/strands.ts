@@ -254,7 +254,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       const rows = Math.ceil(count / side);
       const presence = Math.max(ctx.midPresence, ctx.bassPresence * 0.8);
       const active = variant === 'warp' ? 1 : variant === 'starry' ? 0.3 + 0.7 * ctx.fadeInOut
-        : clamp01(0.12 + 0.88 * presence * (0.3 + 0.7 * ctx.fadeInOut) + 0.3 * ctx.intensitySmoothed);
+        : clamp01(0.12 + 0.88 * presence * (0.3 + 0.7 * ctx.fadeInOut) + 0.3 * ctx.intensityGlow);
 
       // Silk emitters: three segments wandering around the view.
       const emit: number[] = [];

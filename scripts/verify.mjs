@@ -54,6 +54,8 @@ function parseArgs(argv) {
     else if (a === '--sync') o.sync = true;
     else if (a === '--camera') o.camera = next();
     else if (a === '--text') o.text = next();
+    else if (a === '--resp') o.resp = Number(next());
+    else if (a === '--flicker') o.flicker = true;
   }
   return o;
 }
@@ -113,8 +115,8 @@ try {
   const summary = [];
   console.log(`GPU: ${gpu}`);
 
-  if (opts.sync) {
-    for (const name of names) await runSync(page, tracks[name], name);
+  if (opts.sync || opts.flicker) {
+    for (const name of names) await (opts.flicker ? runFlicker : runSync)(page, tracks[name], name);
     await browser.close();
     cleanup();
     process.exit(0);
@@ -134,7 +136,7 @@ try {
     await page.waitForFunction(() => window.__sonora?.ready === true);
     await page.evaluate((o) => window.__sonora.configure({
       style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality,
-      palette: o.palette, drift: false, camera: o.camera,
+      palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp,
     }), opts);
     await page.evaluate((n) => window.__sonora.loadTrack(n), name);
     // Optional: grow a title out of the pattern right after the fade-in.
@@ -194,7 +196,7 @@ try {
     if (opts.bench) {
       await page.reload();
       await page.waitForFunction(() => window.__sonora?.ready === true);
-      await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false }), opts);
+      await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, responsiveness: o.resp }), opts);
       await page.evaluate((n) => window.__sonora.loadTrack(n), name);
       await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, m.drop - 1));
       fps = await page.evaluate((secs) => new Promise((resolve) => {
@@ -235,6 +237,38 @@ try {
   process.exit(1);
 }
 
+// ── Flicker / exposure measurement ──────────────────────────────────
+// Renders 12 s from just before the drop and reports:
+//   swings/s  how often mean luminance jumps ≥ FLICKER_SWING above its
+//             0.4 s running mean (beat pulses count; strobing scores high)
+//   jitter    mean |frame-to-frame luminance change| / mean luminance
+//   clip      mean / max fraction of blown-out pixels (any channel ≥ 250)
+async function runFlicker(page, meta, name) {
+  const FLICKER_SWING = 0.25;
+  const start = name === 'silence-fadein' ? 26 : meta.markers.drop - 1;
+  const len = 12;
+  const dt = 1 / opts.fps;
+  await page.reload();
+  await page.waitForFunction(() => window.__sonora?.ready === true);
+  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp }), opts);
+  await page.evaluate((n) => window.__sonora.loadTrack(n), name);
+  await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
+  await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);
+  const { luma, clip } = await page.evaluate(([s, d]) => window.__sonora.exposureTrace(s, d), [len, dt]);
+  let ema = luma[0], above = false, swings = 0, jit = 0;
+  const k = 1 - Math.exp(-dt / 0.4);
+  for (let i = 1; i < luma.length; i++) {
+    const d = (luma[i] - ema) / Math.max(ema, 0.03);
+    if (!above && d >= FLICKER_SWING) { swings++; above = true; } else if (d < FLICKER_SWING * 0.5) above = false;
+    jit += Math.abs(luma[i] - luma[i - 1]);
+    ema += (luma[i] - ema) * k;
+  }
+  const meanL = luma.reduce((a, b) => a + b, 0) / luma.length;
+  const meanC = clip.reduce((a, b) => a + b, 0) / clip.length;
+  const maxC = Math.max(...clip);
+  console.log(`${name} [${opts.style}/${opts.variant || 'default'} p${opts.palette} r${opts.resp ?? 'def'}]: swings ${(swings / len).toFixed(2)}/s, jitter ${(100 * jit / Math.max(1, luma.length - 1) / Math.max(meanL, 0.01)).toFixed(1)}%, clip mean ${(100 * meanC).toFixed(1)}% max ${(100 * maxC).toFixed(1)}%, mean luma ${meanL.toFixed(3)}`);
+}
+
 // ── Beat-sync measurement ───────────────────────────────────────────
 // Renders a window around the drop at the harness frame rate, records mean
 // screen luminance per frame and scores how the picture responds to each
@@ -249,7 +283,7 @@ async function runSync(page, meta, name) {
   const dt = 1 / opts.fps;
   await page.reload();
   await page.waitForFunction(() => window.__sonora?.ready === true);
-  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera }), opts);
+  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp }), opts);
   await page.evaluate((n) => window.__sonora.loadTrack(n), name);
   await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
   await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);

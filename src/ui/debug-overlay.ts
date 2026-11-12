@@ -250,7 +250,7 @@ function eventsHTML(st: EventState | undefined, stats: RendererStats | undefined
     const fresh = now - e.time < 2 && e === st.recent[st.recent.length - 1];
     return `<div class="ev ${fresh ? 'fresh' : ''}"><span>${e.type}</span><span>${e.strength.toFixed(2)} @ ${e.time.toFixed(1)}s</span></div>`;
   }).join('');
-  const s = stats ? `<div class="stats">${stats.fps.toFixed(0)} fps · ${stats.frameMs.toFixed(1)} ms cpu · ${stats.quality.level} · ${stats.sceneWidth}×${stats.sceneHeight} · flashes ${stats.flashes}/s</div>` : '';
+  const s = stats ? `<div class="stats">${stats.fps.toFixed(0)} fps · ${stats.frameMs.toFixed(1)} ms cpu · ${stats.quality.level} · ${stats.sceneWidth}×${stats.sceneHeight} · flashes ${stats.flashes}/s · exposure ${stats.exposure.toFixed(2)}</div>` : '';
   return `<div class="section events">
     <div class="section-title">Events</div>
     <div class="section-name">${st.section}</div>

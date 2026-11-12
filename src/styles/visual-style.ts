@@ -106,8 +106,11 @@ export interface PostControls {
 export interface StyleSignals {
   fadeInOut: number;
   intensity: number;
-  /** Intensity through the responsiveness envelope. */
+  /** Intensity through the responsiveness envelope: drive motion with this. */
   intensitySmoothed: number;
+  /** Slow, fixed intensity follower: drive brightness / density with this, so
+   *  the Responsiveness slider never turns into flicker. */
+  intensityGlow: number;
   bassHits: number;
   bassPresence: number;
   midHits: number;

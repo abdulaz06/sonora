@@ -167,10 +167,10 @@ class Track {
 
   mixIn(layer, amp = 1) { for (let i = 0; i < this.buf.length; i++) this.buf[i] += layer[i] * amp; }
 
-  master() {
+  master(driveTo = 2.6) {
     let pre = 0;
     for (let i = 0; i < this.buf.length; i++) pre = Math.max(pre, Math.abs(this.buf[i]));
-    const drive = pre > 0 ? 2.6 / pre : 1;
+    const drive = pre > 0 ? driveTo / pre : 1;
     let peak = 0;
     for (let i = 0; i < this.buf.length; i++) { this.buf[i] = Math.tanh(this.buf[i] * drive); peak = Math.max(peak, Math.abs(this.buf[i])); }
     const target = Math.pow(10, PEAK_DBFS / 20);
@@ -354,9 +354,66 @@ function silenceFadeIn() {
   };
 }
 
+
+// ── Track E: dense-128 (loud, busy modern mix) ──────────────────────
+// Stands in for real streaming-loudness music: 16th hats, open hats,
+// claps, sidechained supersaw chords and bass, heavy mastering. Used for
+// flicker and exposure checks, where sparse test tracks under-represent.
+function dense128() {
+  const bpm = 128; const beat = 60 / bpm; const bar = beat * 4; const off = 2;
+  const B = (b) => off + b * bar;
+  const total = B(48) + 2;
+  const tr = new Track(total, 128);
+  const chords = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]];
+  const roots = [36, 33, 29, 31];
+  const kicks = [];
+  const bassLayer = new Track(total, 17);
+  const synthLayer = new Track(total, 18);
+  for (let b = 0; b < 48; b++) {
+    const ci = Math.floor(b / 2) % 4;
+    const intro = b < 4; const build = b >= 4 && b < 12; const drop1 = b >= 12 && b < 28;
+    const brk = b >= 28 && b < 36; const drop2 = b >= 36 && b < 46;
+    const drop = drop1 || drop2;
+    for (let q = 0; q < 4; q++) {
+      const t = B(b) + q * beat;
+      if (intro || build || drop) { tr.kick(t, drop ? 1.0 : 0.8); kicks.push(t); }
+      for (let s16 = 0; s16 < 4; s16++) if (drop || build || (intro && s16 === 2)) tr.hat(t + s16 * beat / 4, s16 === 2 ? 0.5 : 0.28, drop && s16 === 2);
+      if ((build || drop) && (q === 1 || q === 3)) { tr.clap(t, 1.0); tr.snare(t, 0.4); }
+      if (drop) { bassLayer.bass(t, beat * 0.95, roots[ci], 1.0, null, 2.2); bassLayer.bass(t + beat / 2, beat * 0.4, roots[ci] + 12, 0.6, null, 2); }
+      if (build) bassLayer.bass(t + beat / 2, beat * 0.4, roots[ci] + 12, 0.5);
+    }
+    if (b % 2 === 0) {
+      const amp = intro ? 0.4 : build ? 0.5 : drop ? 0.75 : 0.8;
+      synthLayer.pad(B(b), bar * 2, chords[ci].concat(chords[ci].map((n) => n + 12)), amp, (t) => {
+        if (t >= B(4) && t < B(12)) return 800 + 6000 * ((t - B(4)) / (B(12) - B(4))) ** 2;
+        return (t >= B(12) && t < B(28)) || t >= B(36) ? 6500 : 1600;
+      }, drop ? 0.01 : 0.6, 0.6);
+    }
+    if (drop && b % 1 === 0) for (const s of [0, 0.75, 1.5, 2.5, 3.25]) tr.stab(B(b) + s * beat, chords[ci].map((n) => n + 24), 0.35);
+    if (brk) for (let k = 0; k < 8; k++) tr.bell(B(b) + k * beat / 2, chords[ci][k % 4] + 24, 0.22);
+  }
+  tr.sweep(B(8), B(12) - B(8), (u) => ({ cutoff: 500 + 10000 * u * u, gain: 0.1 + 0.6 * u * u }));
+  tr.sweep(B(32), B(36) - B(32), (u) => ({ cutoff: 500 + 10000 * u * u, gain: 0.08 + 0.5 * u * u }));
+  Track.sidechain(bassLayer.buf, kicks, 0.9);
+  Track.sidechain(synthLayer.buf, kicks, 0.7);
+  tr.mixIn(bassLayer.buf); tr.mixIn(synthLayer.buf, 1.1);
+  tr.gain(B(0), B(1), (t) => smooth((t - B(0)) / bar));
+  tr.gain(B(46), total, (t) => 1 - smooth((t - B(46)) / (bar * 2)));
+  tr.gain(0, off, () => 0);
+  return {
+    samples: tr.master(4.5),
+    // The first drop has no gap before it (realistic) and is not flagged as a
+    // drop event; markers use the second, which is.
+    markers: { silence: 1.0, fadeIn: B(1), build: B(34), drop: B(36), breakdown: B(31) },
+    kicks,
+    sections: [['silence', 0, off], ['intro', off, B(4)], ['build', B(4), B(12)], ['drop', B(12), B(28)],
+      ['breakdown', B(28), B(36)], ['drop', B(36), B(46)], ['outro', B(46), total]],
+  };
+}
+
 // ── Main ────────────────────────────────────────────────────────────
 mkdirSync(OUT_DIR, { recursive: true });
-const tracks = { 'house-124': house124, 'halftime-140': halftime140, 'ambient-pad': ambient, 'silence-fadein': silenceFadeIn };
+const tracks = { 'house-124': house124, 'halftime-140': halftime140, 'ambient-pad': ambient, 'silence-fadein': silenceFadeIn, 'dense-128': dense128 };
 const meta = {};
 for (const [name, fn] of Object.entries(tracks)) {
   const t0 = Date.now();

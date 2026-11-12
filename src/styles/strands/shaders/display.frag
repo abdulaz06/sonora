@@ -49,7 +49,7 @@ void main() {
     float e = 1.0 + 0.6 * u_pulse;
     col = u_bg * 0.6;
     col += u_c0 * c * 1.1 * e;
-    col += u_c3 * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 1.6 * e;
+    col += u_c3 * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 0.9 * e;
     col += mix(u_c0, u_c3, 0.6) * dust * 0.9 * e;
   }
 #elif VARIANT == 1

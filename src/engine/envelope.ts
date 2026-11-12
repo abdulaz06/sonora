@@ -12,7 +12,11 @@ export interface EnvelopeParams {
 /** Preset envelope speeds. */
 export const SMOOTH: EnvelopeParams  = { attack: 0.08,  release: 0.5  };
 export const MEDIUM: EnvelopeParams  = { attack: 0.035, release: 0.2  };
-export const PUNCHY: EnvelopeParams  = { attack: 0.005, release: 0.05 };
+// Punchy still follows the music closely, but not frame-by-frame noise: a
+// 5 ms / 50 ms follower made speeds and anything tied to them jitter.
+export const PUNCHY: EnvelopeParams  = { attack: 0.015, release: 0.12 };
+/** Fixed, slow follower for brightness and density (never responsiveness-driven). */
+export const GLOW: EnvelopeParams    = { attack: 0.12,  release: 0.7  };
 
 /** Interpolate between smooth and punchy based on a 0–1 slider. */
 export function lerpParams(t: number): EnvelopeParams {

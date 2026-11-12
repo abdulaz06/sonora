@@ -304,7 +304,7 @@ function render(): void {
       <div class="field"><div class="label">Responsiveness</div>
         <input type="range" data-a="resp" min="0" max="100" value="${Math.round(state.responsiveness * 100)}">
         ${ends('Smooth', 'Punchy')}
-        ${hint('How hard the visuals react to each beat. Smooth flows and glows gently; punchy snaps and flashes on every hit.')}
+        ${hint('How hard the visuals move on each beat. Smooth flows gently; punchy snaps and jumps on every hit. Brightness stays steady either way.')}
       </div>
     </div>
     <div class="sec">

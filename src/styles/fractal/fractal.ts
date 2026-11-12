@@ -243,7 +243,7 @@ export function createFractalStyle(deps: StyleDeps): VisualStyle {
         u_steps: Math.round(b.steps * stepScale), u_detail: b.detail, u_far: FAR, u_ao_on: b.ao,
         u_sun: sun, u_bg: pal.bg, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
         u_time: time, u_pulse: clamp01(breath) * (0.4 + 0.6 * fade),
-        u_glow: clamp01(0.5 * ctx.intensitySmoothed + 0.5 * ctx.eventState.buildProgress + 0.6 * ctx.eventState.dropEnvelope) * fade,
+        u_glow: clamp01(0.5 * ctx.intensityGlow + 0.5 * ctx.eventState.buildProgress + 0.6 * ctx.eventState.dropEnvelope) * fade,
         u_shimmer: clamp01(0.6 * ctx.highPresence + 0.6 * ctx.highHits) * fade,
         u_fog: fogS, u_light: 0.45 + 0.55 * fade,
       });

@@ -26,6 +26,21 @@ vec3 aces(vec3 x) {
   const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
   return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
 }
+float acesS(float x) {
+  const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+// Hue-preserving filmic: the ACES curve is applied to the brightest channel
+// and the colour is scaled with it, so bright saturated colours stay
+// saturated instead of burning to white. A share of per-channel ACES keeps
+// the filmic look; only extreme highlights roll toward white.
+vec3 filmic(vec3 x) {
+  float m = max(max(x.r, x.g), x.b);
+  vec3 hue = m > 1e-5 ? x * (acesS(m) / m) : x;
+  float white = 0.25 + 0.45 * smoothstep(2.5, 8.0, m);
+  return mix(hue, aces(x), white);
+}
 
 void main() {
   vec2 uv = gl_FragCoord.xy / u_resolution;
@@ -39,7 +54,7 @@ void main() {
   float vig = 1.0 - u_vignette * smoothstep(0.35, 1.45, length(v));
   col *= vig;
 
-  if (u_tonemap == 0) col = aces(col);
+  if (u_tonemap == 0) col = filmic(col);
   col = clamp(col * u_lum_scale, 0.0, 1.0);
 
   // Grain: strongest in mid-tones, per-pixel, animated.

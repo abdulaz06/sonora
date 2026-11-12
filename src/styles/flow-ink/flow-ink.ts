@@ -74,7 +74,9 @@ const BASS_JETS = 2;
 const BASS_JET_SPEED = 0.35;
 const BASS_SWIRL = 0.02;
 /** Frame-accurate brightening of all ink on bass hits, per variant (ink, sumi, marble). */
-const PULSE_GAIN = [0.7, 1.0, 0.5];
+/** How much ink brightens (or deepens, on paper) on a hit, per variant. Not
+ * scaled by Responsiveness: that drives motion, never brightness. */
+const PULSE_GAIN = [0.35, 0.8, 0.28];
 /** Black ink on paper reads much heavier than glowing ink: scale Sumi's dye. */
 const SUMI_DYE = 0.5;
 /** Energy channel decay (1/s): ~150 ms glow. */
@@ -288,7 +290,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
       dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, BASS_ENERGY * strength],
       vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (rng() < 0.5 ? -1 : 1)), detail: 0.8,
     });
-    const snap = 0.6 + 0.8 * ctx.responsiveness;
+    const snap = 0.45 + 1.1 * ctx.responsiveness;
     sim.kick(x, y, radius * BASS_KICK_RADIUS, BASS_KICK_SPEED * strength * snap);
     // Ink already in view jumps on the same frame.
     const [vx, vy] = screenToUv(ctx, (rng() - 0.5) * 1.2, (rng() - 0.5) * 1.0);
@@ -487,7 +489,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
         post.vignette = 0.16;
         post.grain = 0.028;
       } else {
-        post.exposure = (vIdx === 2 ? 1.05 : 1.15) * (1 + 0.1 * pulse);
+        post.exposure = vIdx === 2 ? 1.0 : 1.05;
         post.bloom = vIdx === 2 ? 0.35 : 0.6;
         post.bloomThreshold = 1.0;
         post.flash = 0.03 * ctx.eventState.dropEnvelope;
@@ -513,7 +515,7 @@ export function createFlowInkStyle(deps: StyleDeps): VisualStyle {
         gl.uniform1f(u.u_sharpen, quality.level === 'low' ? 0.4 : 0.6);
         gl.uniform1f(u.u_glow, 1.0);
         gl.uniform1f(u.u_pulse, pulse);
-        gl.uniform1f(u.u_pulse_gain, (PULSE_GAIN[vIdx] ?? 0.8) * (0.5 + ctx.responsiveness));
+        gl.uniform1f(u.u_pulse_gain, PULSE_GAIN[vIdx] ?? 0.4);
       };
 
       if (!ctx.depth) {

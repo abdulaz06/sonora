@@ -28,7 +28,7 @@ import { ArtPost } from './art-post';
 import { BeatPulse } from './beat-pulse';
 import { WorldCamera } from './camera';
 import { ColorEngine } from './color-engine';
-import { EnvelopeFollower, lerpParams, MEDIUM } from './envelope';
+import { EnvelopeFollower, GLOW, lerpParams, MEDIUM } from './envelope';
 import { EventDetector, type SonoraEvent } from './events';
 import { FlashGuard } from './flash-guard';
 import { GenerativeState } from './generative';
@@ -42,6 +42,14 @@ import postCompositeFragSrc from './shaders/post-composite.frag?raw';
 
 /** A display frame up to this early still counts as on time for the cap (ms). */
 const CAP_SLACK_MS = 2;
+/** Auto exposure: allowed blown-out fraction and mean linear luminance,
+ *  lowest exposure it may reach, and how fast it falls / recovers (s). Slow
+ *  enough that it never pumps on beats. */
+const AE_HOT_TARGET = 0.03;
+const AE_LUMA_TARGET = 0.2;
+const AE_MIN = 0.5;
+const AE_DOWN_TAU = 0.8;
+const AE_UP_TAU = 4;
 
 // ── Tuning ──────────────────────────────────────────────────────
 /** Style swap: fade out, swap, fade in (total seconds). */
@@ -61,6 +69,8 @@ export interface RendererStats {
   quality: QualityParams;
   /** Large luminance flashes measured in the last second (flash guard). */
   flashes: number;
+  /** Auto-exposure multiplier currently applied (1 = none). */
+  exposure: number;
   sceneWidth: number;
   sceneHeight: number;
 }
@@ -162,6 +172,11 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   const camera = new WorldCamera(seed % 997);
   const quality = new QualityManager();
   const envIntensity = new EnvelopeFollower(MEDIUM);
+  const envGlow = new EnvelopeFollower(GLOW);
+  // Auto exposure (filmic scenes): pulls exposure down when the measured
+  // frame is too bright or too much of it is blown out; recovers slowly.
+  let autoExposure = 1;
+  let aeTarget = 1;
   const post: PostControls = { ...POST_DEFAULTS };
   const flash = new FlashGuard();
   quality.setFrameBudget(1000 / 60);
@@ -205,7 +220,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     frame, time: 0, dt: 0,
     fadeInOut: 0, intensity: 0, intensitySmoothed: 0,
     bassHits: 0, bassPresence: 0, midHits: 0, midPresence: 0, highHits: 0, highPresence: 0,
-    beatPhase: 0, beatConfidence: 0, beatOnset: false, responsiveness: 0.6,
+    beatPhase: 0, beatConfidence: 0, beatOnset: false, responsiveness: 0.6, intensityGlow: 0,
     events: [], eventState: events.state, camera,
     palette: colorEngine.getResolved(), light: false, depth,
     quality: quality.params, post, flash,
@@ -247,6 +262,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     ctx.fadeInOut = f.fade_in_out;
     ctx.intensity = f.intensity;
     ctx.intensitySmoothed = envIntensity.update(f.intensity, dt);
+    ctx.intensityGlow = envGlow.update(f.intensity, dt);
     ctx.bassHits = Math.max(f.hits.sub_bass, f.hits.bass);
     ctx.bassPresence = Math.max(f.presence.sub_bass, f.presence.bass);
     ctx.midHits = Math.max(f.hits.low_mid, f.hits.mid, f.hits.upper_mid);
@@ -305,6 +321,14 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       style.render(ctx);
       const measured = artPost.takeLuma();
       if (measured !== null) flash.observe(measured);
+      if (post.tonemap === 'filmic') {
+        if (measured !== null) {
+          const over = Math.max((artPost.latestHot - AE_HOT_TARGET) / AE_HOT_TARGET, (measured - AE_LUMA_TARGET) / AE_LUMA_TARGET);
+          aeTarget = over > 0 ? Math.max(AE_MIN, autoExposure * (1 - Math.min(0.4, over * 0.25))) : Math.min(1, autoExposure * 1.05);
+        }
+        autoExposure += (aeTarget - autoExposure) * (1 - Math.exp(-dt / (aeTarget < autoExposure ? AE_DOWN_TAU : AE_UP_TAU)));
+        post.exposure *= autoExposure;
+      }
       const hold = flash.current > 0.002 ? Math.min(1.6, Math.max(0.4, flash.target / flash.current)) : 1;
       artPost.apply(quadVAO, post, time, fadeAlpha, 1 + (hold - 1) * flash.damping);
     }
@@ -409,7 +433,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
         if (i >= 0) eventListeners.splice(i, 1);
       };
     },
-    stats: () => ({ fps, frameMs, quality: quality.params, flashes: flash.recentFlashes, sceneWidth: sceneW, sceneHeight: sceneH }),
+    stats: () => ({ fps, frameMs, quality: quality.params, flashes: flash.recentFlashes, exposure: autoExposure, sceneWidth: sceneW, sceneHeight: sceneH }),
   };
 
   if (options.autoStart ?? true) api.start();

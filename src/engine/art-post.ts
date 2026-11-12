@@ -82,6 +82,8 @@ export class ArtPost {
   private fence: WebGLSync | null = null;
   private probePixels = new Uint8Array(PROBE_W * PROBE_H * 4);
   private latestLuma: number | null = null;
+  /** Fraction of probe pixels with any channel ≥ 250 (blown out). */
+  latestHot = 0;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -236,13 +238,15 @@ export class ArtPost {
       gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, this.probePixels);
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
       const px = this.probePixels;
-      let sum = 0;
+      let sum = 0, hot = 0;
       for (let i = 0; i < px.length; i += 4) {
+        if (px[i] >= 250 || px[i + 1] >= 250 || px[i + 2] >= 250) hot++;
         // Approximate sRGB decode, then relative luminance.
         const r = (px[i] / 255) ** 2.2, g = (px[i + 1] / 255) ** 2.2, b = (px[i + 2] / 255) ** 2.2;
         sum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
       }
       this.latestLuma = sum / (PROBE_W * PROBE_H);
+      this.latestHot = hot / (PROBE_W * PROBE_H);
     }
     if (!this.probe) {
       const tex = gl.createTexture()!;
