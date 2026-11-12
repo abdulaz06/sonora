@@ -19,7 +19,9 @@ PICKS = [
     ("silk", "silk", "silk", "3-build"),
     ("wisp", "wisp", "wisp", "3-build"),
     ("warp", "warp", "warp", "3-build"),
-    ("voyage", "voyage", "voyage", "3-build"),
+    ("voyage", "void", "voyage-void", "3-build"),
+    ("voyage", "city", "voyage-city", "3-build"),
+    ("voyage", "ocean", "voyage-ocean", "3-build"),
 ]
 
 

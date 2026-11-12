@@ -4,12 +4,11 @@ precision highp float;
 // sub-pixel jitter; resolve.frag accumulates the frames to full resolution.
 // Output: rgb = shaded colour (HDR), a = hit distance (large for sky).
 //
-// Space is bent by a slow "melting" sine warp before the fractal is sampled
-// (mirrored on the CPU for the flight planner). Rays that leave the fractal
-// meet a thin landscape drawn on the inside of a giant cylinder (axis z) whose
-// floor lies just below the fractal: fields, ridges and rivers rise on both
-// sides into the haze and over the top, with the sun at the far end of the
-// axis. The world never reacts to beats; only light (veins) does.
+// Space is bent before the fractal is sampled (corkscrew on beats + a slow
+// melting warp, the warp mirrored on the CPU for the flight planner). Rays
+// that leave the fractal meet the chosen backdrop (backdrop.glsl): Void
+// (stars), City (a curved world of land and cities on the inside of a
+// cylinder) or Ocean (the same cylinder covered by rolling swells).
 uniform vec2 u_res;
 uniform vec2 u_jitter;
 uniform vec3 u_cam_pos;
@@ -28,10 +27,14 @@ uniform float u_warp_amp;    // melt amplitude (world units)
 uniform float u_warp_freq;
 uniform float u_twist;       // fractal corkscrew (rad per world unit ahead of the camera)
 uniform float u_lip;         // distance-bound correction for the bending
-// Landscape cylinder
-uniform float u_land_r;      // radius
+// Backdrop
+uniform int u_backdrop;      // 0 Void, 1 City, 2 Ocean
+uniform float u_land_r;      // cylinder radius
 uniform float u_land_cy;     // axis height (axis along z through (0, cy))
-uniform int u_land_steps;    // building march budget (quality)
+uniform int u_land_steps;    // backdrop march budget (quality)
+uniform float u_land_fog;    // aerial perspective density
+uniform sampler2D u_land_tex; // baked City layout (landbake.frag)
+uniform float u_zspan;       // z range the layout texture covers
 // March budget
 uniform int u_steps;
 uniform float u_detail;      // surface epsilon in pixels
@@ -113,238 +116,7 @@ vec3 sky(vec3 rd) {
   return c;
 }
 
-// Atmosphere inside the cylinder: hazy, lit toward the sun end of the axis.
-vec3 atmosphere(vec3 rd) {
-  float s = max(dot(rd, u_sun), 0.0);
-  vec3 c = mix(u_bg * 1.6 + u_c1 * 0.18, u_c0 * 0.35 + u_c3 * 0.12, 0.5 + 0.5 * rd.z * sign(u_sun.z));
-  c += u_c3 * (pow(s, 40.0) * 2.4 + pow(s, 5.0) * 0.45);
-  return c;
-}
-
-float fbm2(vec2 q) {
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 4; i++) { v += a * snoise(vec3(q, 3.7 * float(i))); q = q * 2.07 + 1.3; a *= 0.5; }
-  return v;
-}
-
-vec2 cellHash(vec2 c) { return fract(sin(vec2(dot(c, vec2(127.1, 311.7)), dot(c, vec2(269.5, 183.3)))) * 43758.5453); }
-
-// Cheap value noise for fine texture (one octave, smooth).
-float vnoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float a = cellHash(i).x, b = cellHash(i + vec2(1, 0)).x, c = cellHash(i + vec2(0, 1)).x, d = cellHash(i + vec2(1, 1)).x;
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-// ── Land layout (unrolled coordinates q: x around the cylinder, y along) ──
-// Large-scale terrain classes; everything is in world units.
-struct Land { float h; float water; float shore; float forest; float rock; float city; float cityCore; };
-
-Land landAt(vec2 q) {
-  Land L;
-  float roll = fbm2(q * 0.02);
-  float ridge = 1.0 - abs(snoise(vec3(q * 0.008, 9.1)));
-  L.h = 0.4 + 0.3 * roll + 0.35 * ridge * ridge * ridge;
-  float rv = abs(fbm2(q * 0.006 + 4.0));
-  L.water = smoothstep(0.03, 0.018, rv);
-  L.shore = smoothstep(0.05, 0.03, rv) * (1.0 - L.water);
-  L.rock = smoothstep(0.72, 0.85, L.h);
-  L.forest = smoothstep(0.05, 0.3, fbm2(q * 0.035 + 11.0)) * (1.0 - L.water) * (1.0 - L.rock);
-  // Clustered cities: districts from a slow noise; cores where it peaks.
-  float region = snoise(vec3(q * 0.0055, 2.3));
-  L.city = smoothstep(0.35, 0.5, region) * (1.0 - L.water) * (1.0 - L.rock);
-  L.cityCore = smoothstep(0.5, 0.8, region);
-  L.forest *= 1.0 - L.city;
-  return L;
-}
-
-// Buildings: a grid of plots (period BP) in the city mask; each plot holds a
-// tower whose footprint and height come from its hash (taller in the cores).
-// Uses a cheap mask (two noise taps) since it runs inside the march loop.
-const float BP = 1.6;
-float buildingH(vec2 cell) {
-  vec2 c = (cell + 0.5) * BP;
-  float region = snoise(vec3(c * 0.0055, 2.3));
-  if (region < 0.42) return 0.0;
-  if (abs(snoise(vec3(c * 0.006 + 4.0, 0.0))) < 0.06) return 0.0;   // keep rivers clear
-  vec2 hh = cellHash(cell * 1.31 + 7.0);
-  if (hh.x < 0.18) return 0.0;                      // some empty plots (squares, parks)
-  float core = smoothstep(0.5, 0.8, region);
-  float h = 0.35 + hh.y * (0.9 + 2.6 * core) * (0.7 + 0.6 * hh.x);
-  // Occasional skyscrapers, mostly near the cores, so towers stand out on the curve.
-  if (cellHash(cell * 3.7 + 1.0).x > 0.93 - 0.12 * core) h = 2.8 + 2.6 * hh.y * (0.5 + 0.5 * core);
-  return h;
-}
-
-// Cheap terrain height for slope shading.
-float heightAt(vec2 q) {
-  float roll = snoise(vec3(q * 0.02, 0.0)) * 0.5 + snoise(vec3(q * 0.041 + 1.3, 3.7)) * 0.25;
-  float ridge = 1.0 - abs(snoise(vec3(q * 0.008, 9.1)));
-  return 0.4 + 0.3 * roll + 0.35 * ridge * ridge * ridge;
-}
-
-// Signed distance to the buildings in unrolled space p = (around, up, along).
-float sdBuildings(vec3 p, out vec3 info) {
-  vec2 cell = floor(p.xz / BP);
-  float d = 1e9;
-  info = vec3(0.0);
-  for (int j = 0; j <= 1; j++) for (int i = 0; i <= 1; i++) {
-    vec2 c = cell + vec2(i, j) - vec2(step(fract(p.x / BP), 0.5), step(fract(p.z / BP), 0.5));
-    float h = buildingH(c);
-    if (h <= 0.0) continue;
-    vec2 hh = cellHash(c * 2.7 + 3.0);
-    vec2 halfSz = vec2(0.28 + 0.16 * hh.x, 0.28 + 0.16 * hh.y) * BP;
-    vec2 ctr = (c + 0.5) * BP;
-    vec3 q = vec3(p.x - ctr.x, p.y - h * 0.5, p.z - ctr.y);
-    vec3 b = vec3(halfSz.x, h * 0.5, halfSz.y);
-    vec3 dq = abs(q) - b;
-    float db = length(max(dq, 0.0)) + min(max(dq.x, max(dq.y, dq.z)), 0.0);
-    if (db < d) { d = db; info = vec3(h, hh.x, hh.y); }
-  }
-  return d;
-}
-
-// Surface colour of the ground at q with footprint fp (world units per pixel).
-vec3 groundColour(vec2 q, Land L, float fp, out float waterOut) {
-  // Detail fades out as a pixel covers more ground (no shimmer far away).
-  float d1 = 1.0 - smoothstep(0.08, 0.35, fp);
-  float d2 = 1.0 - smoothstep(0.25, 1.2, fp);
-  // Fields: rectangular plots aligned with the cylinder, varied sizes.
-  // Strips along the cylinder; each strip has its own field width and offset,
-  // so plots never line up into a checkerboard.
-  float stripW = 2.6;
-  float strip = floor(q.y / stripW);
-  vec2 sh = cellHash(vec2(strip, 17.0));
-  vec2 fsz = vec2(2.4 + 3.2 * sh.x, stripW);
-  vec2 qq = vec2(q.x + sh.y * 7.0, q.y);
-  vec2 fc = floor(qq / fsz);
-  vec2 fh = cellHash(fc + vec2(0.0, strip * 3.1));
-  vec2 local = fract(qq / fsz);
-  float hedge = smoothstep(0.0, 0.035, min(min(local.x, 1.0 - local.x), min(local.y, 1.0 - local.y)));
-  vec3 crops[5] = vec3[5](vec3(0.3, 0.42, 0.16), vec3(0.36, 0.46, 0.18), vec3(0.52, 0.5, 0.24), vec3(0.4, 0.35, 0.21), vec3(0.26, 0.38, 0.15));
-  vec3 field = crops[int(fh.x * 4.99)] * (0.92 + 0.16 * fh.y);
-  float rows = 0.5 + 0.5 * sin((fh.y > 0.5 ? local.x * fsz.x : local.y * fsz.y) * 22.0);
-  field *= 0.86 + 0.14 * mix(1.0, rows, d1);
-  // Grass texture: two octaves of fine noise.
-  float g = 0.75 + 0.25 * mix(0.5, vnoise(q * 3.1), d1) + 0.12 * (mix(0.5, vnoise(q * 0.7), d2) - 0.5);
-  vec3 col = field * g;
-  col = mix(col * 0.55 + vec3(0.04, 0.06, 0.03), col, hedge);        // hedgerows
-  // Forests: dark clumps with lit treetops.
-  float trees = mix(0.5, vnoise(q * 4.3), d1);
-  vec3 forest = vec3(0.07, 0.16, 0.07) * (0.7 + 0.6 * trees) + vec3(0.1, 0.16, 0.05) * smoothstep(0.7, 0.9, trees) * d1;
-  col = mix(col, forest, L.forest);
-  // Rock and snow on high ridges.
-  vec3 rock = vec3(0.42, 0.4, 0.37) * (0.8 + 0.3 * mix(0.5, vnoise(q * 2.0 + 9.0), d2));
-  col = mix(col, rock, L.rock);
-  col = mix(col, vec3(0.86, 0.88, 0.9), smoothstep(0.88, 0.95, L.h) * L.rock);
-  // Shores, city ground, water.
-  col = mix(col, vec3(0.72, 0.66, 0.5), L.shore);
-  col = mix(col, vec3(0.32, 0.31, 0.3) * (0.85 + 0.15 * vnoise(q * 1.7)), L.city * 0.85);
-  // A light palette tint keeps it of a piece with the rest of Sonora.
-  col = mix(col, col * (0.6 + 0.8 * u_c0), 0.18);
-  waterOut = L.water;
-  return col;
-}
-
-// The landscape on the inside of the cylinder, or the hazy axis / sun.
-vec3 landscape(vec3 ro, vec3 rd, float pix, out float tHit) {
-  vec3 atm = atmosphere(rd) * mix(0.6, 1.0, u_light);
-  tHit = 1000.0;
-  vec2 o = ro.xy - vec2(0.0, u_land_cy);
-  vec2 d = rd.xy;
-  float a = dot(d, d);
-  if (a < 1e-5) return atm;
-  float b = dot(o, d);
-  float c0 = dot(o, o) - u_land_r * u_land_r;
-  float disc0 = b * b - a * c0;
-  if (disc0 < 0.0) return atm;
-  float tGround = (-b + sqrt(disc0)) / a;
-  // Buildings live in a thin layer above the ground (inner radius R - HMAX).
-  const float HMAX = 5.5;
-  float rIn = u_land_r - HMAX;
-  float c1 = dot(o, o) - rIn * rIn;
-  float disc1 = b * b - a * c1;
-  float t = tGround;
-  bool building = false;
-  vec3 binfo = vec3(0.0);
-  vec3 bp = vec3(0.0);
-  if (disc1 > 0.0) {
-    float tl = max((-b + sqrt(disc1)) / a, 0.0);
-    float tt = tl;
-    for (int i = 0; i < 64; i++) {
-      if (i >= u_land_steps || tt >= tGround) break;
-      vec3 pw = ro + rd * tt;
-      vec2 rel = pw.xy - vec2(0.0, u_land_cy);
-      vec3 pu = vec3(atan(rel.x, -rel.y) * u_land_r, u_land_r - length(rel), pw.z);
-      vec3 inf;
-      float dd = sdBuildings(pu, inf);
-      if (dd < max(0.004 * tt, 0.01)) { building = true; binfo = inf; bp = pu; t = tt; break; }
-      tt += max(dd * 0.8, 0.03);
-    }
-  }
-  vec3 p = ro + rd * t;
-  vec2 rel = p.xy - vec2(0.0, u_land_cy);
-  float ang = atan(rel.x, -rel.y);               // 0 on the floor, ±π overhead
-  vec2 q = vec2(ang * u_land_r, p.z);
-  vec3 nIn = normalize(vec3(-rel, 0.0));
-  vec3 tA = normalize(vec3(-rel.y, rel.x, 0.0));
-  float fp = pix * t;
-  vec3 col;
-  float dif;
-  if (building) {
-    // Face normal from the SDF (unrolled → world through the local frame).
-    vec3 inf;
-    float e = 0.01;
-    vec3 gu = vec3(sdBuildings(bp + vec3(e, 0, 0), inf) - sdBuildings(bp - vec3(e, 0, 0), inf),
-                   sdBuildings(bp + vec3(0, e, 0), inf) - sdBuildings(bp - vec3(0, e, 0), inf),
-                   sdBuildings(bp + vec3(0, 0, e), inf) - sdBuildings(bp - vec3(0, 0, e), inf));
-    vec3 nu = normalize(gu + vec3(0.0, 1e-6, 0.0));
-    vec3 n = normalize(tA * nu.x + nIn * nu.y + vec3(0.0, 0.0, 1.0) * nu.z);
-    bool roof = nu.y > 0.7;
-    vec3 wall = mix(vec3(0.5, 0.52, 0.55), vec3(0.62, 0.58, 0.5), binfo.y) * (0.8 + 0.25 * binfo.z);
-    // Windows on walls: a grid that fades to an average far away.
-    float side = abs(nu.x) > abs(nu.z) ? bp.z : bp.x;
-    vec2 wg = vec2(side * 7.0, bp.y * 9.0);
-    vec2 wf = fract(wg);
-    float win = step(0.25, wf.x) * step(wf.x, 0.75) * step(0.3, wf.y) * step(wf.y, 0.8);
-    float dW = 1.0 - smoothstep(0.03, 0.12, fp);
-    float lit = step(0.55, cellHash(floor(wg) + binfo.yz * 91.0).x);
-    vec3 albedo = roof ? vec3(0.28, 0.29, 0.3) : mix(wall, wall * 0.35, mix(0.3, win, dW));
-    dif = max(dot(n, u_sun), 0.0);
-    col = albedo * (dif * 1.2 + 0.32);
-    col += (u_c3 * 0.6 + vec3(0.6, 0.5, 0.3)) * mix(0.12, win * lit, dW) * (roof ? 0.0 : 0.55);
-    // Glass catching the sky on sunlit faces.
-    col += atmosphere(reflect(rd, n)) * 0.12 * (roof ? 0.0 : 1.0);
-  } else {
-    Land L = landAt(q);
-    float water;
-    vec3 albedo = groundColour(q, L, fp, water);
-    // Slope shading from the terrain height.
-    float e = 0.9;
-    float h0 = heightAt(q);
-    float hx = heightAt(q + vec2(e, 0.0)) - h0;
-    float hz = heightAt(q + vec2(0.0, e)) - h0;
-    vec3 n = normalize(nIn - (tA * hx + vec3(0.0, 0.0, 1.0) * hz) * 2.5);
-    dif = max(dot(n, u_sun), 0.0);
-    col = albedo * (dif * 1.25 + 0.3);
-    if (water > 0.01) {
-      // Water: deep colour, moving ripples, gentle sky reflection, sun glint.
-      vec2 rq = q * 1.4 + vec2(u_time * 0.25, u_time * 0.18);
-      vec3 wn = normalize(nIn + (tA * (vnoise(rq) - 0.5) + vec3(0.0, 0.0, 1.0) * (vnoise(rq + 5.0) - 0.5)) * 0.25 * (1.0 - smoothstep(0.1, 0.6, fp)));
-      float fres = pow(1.0 - max(dot(wn, -rd), 0.0), 4.0);
-      vec3 wcol = vec3(0.04, 0.12, 0.16) + u_c0 * 0.05;
-      wcol = mix(wcol, atmosphere(reflect(rd, wn)) * 0.55, 0.25 + 0.6 * fres);
-      wcol += u_c3 * pow(max(dot(reflect(rd, wn), u_sun), 0.0), 120.0) * 1.5;
-      col = mix(col, wcol, water);
-    }
-  }
-  col *= u_light;
-  // Aerial perspective: the far side (overhead) fades into the haze.
-  float fog = 1.0 - exp(-t * 0.011);
-  tHit = t;
-  return mix(col, atm, fog);
-}
+//#include backdrop
 
 void main() {
   vec2 fc = gl_FragCoord.xy + u_jitter;
@@ -407,10 +179,10 @@ void main() {
     col += u_c2 * vein * (0.04 + 1.4 * u_pulse + 0.5 * u_glow) * ao;
     col *= u_light;
     float fog = 1.0 - exp(-t * u_fog);
-    col = mix(col, atmosphere(rd) * mix(0.6, 1.0, u_light), fog);
+    col = mix(col, envColour(rd), fog);
   } else {
-    // Out of the fractal: the landscape curving up around and over us.
-    col = landscape(ro, rd, pix, tOut);
+    // Out of the fractal: the backdrop.
+    col = backdrop(ro, rd, pix, tOut);
   }
   // Edge halo.
   col += mix(u_c2, u_c3, 0.5) * min(glow * 0.006, 0.6) * (0.08 + 0.6 * u_glow + 1.0 * u_pulse) * u_light;

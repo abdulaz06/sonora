@@ -12,7 +12,7 @@ try {
   const p = await b.newPage({ viewport: { width: Number(process.env.SNAP_W || 960), height: Number(process.env.SNAP_H || 540) } });
   await p.goto('http://localhost:5199/web.html?harness=1');
   await p.waitForFunction(() => window.__sonora?.ready === true);
-  await p.evaluate((s) => window.__sonora.configure({ style: s, drift: false }), style);
+  await p.evaluate(([s, v]) => window.__sonora.configure({ style: s, variant: v || undefined, drift: false }), [style, process.env.SNAP_LOOK || '']);
   await p.evaluate((n) => window.__sonora.loadTrack(n), track);
   let now = 0;
   for (const ts of times) {
@@ -20,7 +20,7 @@ try {
     await p.evaluate(([s, d]) => window.__sonora.advance(s, d), [t - now, 1 / 30]);
     now = t;
     const u = await p.evaluate(() => window.__sonora.snapshot());
-    writeFileSync(`verify/snap-${style}-${ts}.png`, Buffer.from(u.split(',')[1], 'base64'));
+    writeFileSync(`verify/snap-${style}${process.env.SNAP_LOOK ? '-' + process.env.SNAP_LOOK : ''}-${ts}.png`, Buffer.from(u.split(',')[1], 'base64'));
     if (process.env.SNAP_COST) console.log(`t=${ts} frame cost ${(await p.evaluate(() => window.__sonora.frameCost(90, 1 / 60))).toFixed(2)} ms`);
   }
   await b.close();

@@ -35,6 +35,8 @@ import noiseSrc from '../shared/noise.glsl?raw';
 import marchFrag from './shaders/march.frag?raw';
 import resolveFrag from './shaders/resolve.frag?raw';
 import presentFrag from './shaders/present.frag?raw';
+import backdropSrc from './shaders/backdrop.glsl?raw';
+import landBakeFrag from './shaders/landbake.frag?raw';
 import fullscreenVert from '../../engine/shaders/fullscreen.vert?raw';
 
 // ── Tuning ──────────────────────────────────────────────────────
@@ -58,10 +60,16 @@ const FOLD_BREATH = 0.035;
 const TWIST_BASE = 0.004;
 const TWIST_BEAT = 0.016;
 /** Landscape cylinder: radius, and how far below the fractal's centre its floor lies. */
-const LAND_R = 70;
+const LAND_R = 40;
 const LAND_FLOOR = 9;
 /** Building march steps per quality (wide shots). */
-const LAND_STEPS: Record<QualityLevel, number> = { low: 24, medium: 44, high: 64 };
+const LAND_STEPS: Record<QualityLevel, number> = { low: 32, medium: 56, high: 80 };
+/** Backdrop looks, the City layout texture (size, z range) and aerial haze. */
+type Backdrop = 'void' | 'city' | 'ocean';
+const BACKDROP_INDEX: Record<Backdrop, number> = { void: 0, city: 1, ocean: 2 };
+const LAND_TEX = 2048;
+const LAND_ZSPAN = 240;
+const LAND_FOG = 0.0075;
 /** Wide shots: after this long without one (s), a calm moment also pulls out. */
 const VISTA_IDLE_S = 60;
 /** Exit: give up flying out after this long and cut (s); "outside" = |p|∞ beyond. */
@@ -115,7 +123,24 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
   const { gl, quadVAO } = deps;
   const rng = createRng(deps.seed ^ 0xf4ac);
   let quality = deps.quality;
-  const march = makeProgram(gl, fullscreenVert, withIncludes(marchFrag, { noise: noiseSrc }));
+  const march = makeProgram(gl, fullscreenVert, withIncludes(marchFrag, { noise: noiseSrc, backdrop: backdropSrc }));
+  let backdrop: Backdrop = 'void';
+  // City layout: baked once on first use (terrain, water, cities, forests).
+  let landTex: Target | null = null;
+  function ensureLand(): void {
+    if (landTex) return;
+    landTex = createTarget(gl, LAND_TEX, LAND_TEX, { internal: gl.RGBA16F, filter: gl.LINEAR });
+    gl.bindTexture(gl.TEXTURE_2D, landTex.tex[0]);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const bake = makeProgram(gl, fullscreenVert, withIncludes(landBakeFrag, { noise: noiseSrc }));
+    bindTarget(gl, landTex);
+    gl.disable(gl.BLEND);
+    gl.useProgram(bake.prog);
+    setUniforms(gl, bake, { u_size: [LAND_TEX, LAND_TEX], u_r: LAND_R, u_zspan: LAND_ZSPAN });
+    drawQuad(gl, quadVAO);
+    gl.deleteProgram(bake.prog);
+  }
   const resolve = makeProgram(gl, fullscreenVert, resolveFrag);
   const present = makeProgram(gl, fullscreenVert, presentFrag);
   let low: Target | null = null;
@@ -384,6 +409,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     },
 
     render(ctx: StyleContext): void {
+      if (backdrop === 'city') ensureLand();
       ensure(ctx.width, ctx.height);
       const L = low!, H = hist!;
       const b = BUDGET[quality.level];
@@ -414,6 +440,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_tan_half: tan, u_aspect: aspect,
         u_warp_amp: params.warpAmp ?? 0, u_warp_freq: WARP_FREQ, u_lip: params.lip ?? 1,
         u_twist: (TWIST_BASE + TWIST_BEAT * twistEnv * (0.6 + 0.8 * ctx.responsiveness)) * twistSign,
+        u_backdrop: BACKDROP_INDEX[backdrop], u_land_tex: landTex ? landTex.tex[0] : H.read.tex[0], u_zspan: LAND_ZSPAN, u_land_fog: LAND_FOG,
         u_land_r: LAND_R, u_land_cy: LAND_R - LAND_FLOOR, u_land_steps: LAND_STEPS[quality.level],
         u_scale: params.scale, u_min_r2: params.minR2, u_fold: params.fold, u_iters: b.iters,
         u_steps: Math.round(b.steps * stepScale), u_detail: b.detail, u_far: mode === 'inside' ? FAR : FAR_VISTA, u_ao_on: b.ao,
@@ -457,11 +484,14 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
       post.flash = 0;
     },
 
-    setVariant(): void { /* single look */ },
-    getVariant: () => 'voyage',
+    setVariant(id: string): void {
+      if (id === 'void' || id === 'city' || id === 'ocean') { backdrop = id; resetHist = true; }
+    },
+    getVariant: () => backdrop,
     setQuality(q: QualityParams): void { quality = q; resetHist = true; },
     dispose(): void {
       deleteTarget(gl, low);
+      deleteTarget(gl, landTex);
       hist?.dispose();
       gl.deleteProgram(march.prog);
       gl.deleteProgram(resolve.prog);

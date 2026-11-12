@@ -37,7 +37,7 @@ export const STYLES: StyleDescriptor[] = [
   },
   {
     id: 'voyage', label: 'Voyage', category: 'art',
-    variants: STYLE_VARIANTS.voyage, defaultVariant: 'voyage',
+    variants: STYLE_VARIANTS.voyage, defaultVariant: 'void',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: createVoyageStyle,
   },

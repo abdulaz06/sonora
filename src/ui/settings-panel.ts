@@ -44,6 +44,9 @@ const VARIANT_HINTS: Record<string, string> = {
   sumi: 'Black ink on bone paper, like ink dropped in water.',
   circle: 'Round rings.', triangle: 'Triangular rings.', square: 'Square rings.',
   soft: 'Soft, glowing bars.', sharp: 'Crisp, thin bars.',
+  void: 'The fractal floats in a dark, star-filled sky tinted by your colours.',
+  city: 'A curved world of fields, rivers and cities rises around the fractal and hangs overhead.',
+  ocean: 'The curved world is a single ocean with huge swells rolling toward the horizon.',
 };
 const QUALITY_HINTS: Record<QualityPreset, string> = {
   low: 'Smaller simulation and render size. Use on laptops or integrated graphics.',

@@ -50,7 +50,11 @@ export const STYLE_VARIANTS: Record<StyleId, VariantOption[]> = {
   silk: [{ id: 'silk', label: 'Silk' }],
   wisp: [{ id: 'wisp', label: 'Wisp', lightCapable: false }],
   warp: [{ id: 'warp', label: 'Warp', lightCapable: false }],
-  voyage: [{ id: 'voyage', label: 'Voyage' }],
+  voyage: [
+    { id: 'void', label: 'Void' },
+    { id: 'city', label: 'City' },
+    { id: 'ocean', label: 'Ocean' },
+  ],
   aura: [
     { id: 'circle', label: 'Circle' },
     { id: 'triangle', label: 'Triangle' },
