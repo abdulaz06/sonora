@@ -22,6 +22,7 @@
 
 import { buildProgram } from '../../engine/gl-utils';
 import { clamp01, createRng, smoothstep } from '../../engine/math';
+import { simplex2 } from '../../engine/noise';
 import type { SonoraEvent } from '../../engine/events';
 import type { QualityParams } from '../../engine/quality';
 import type { StyleContext, StyleDeps, VisualStyle } from '../visual-style';
@@ -59,7 +60,7 @@ const INFLOW_SPEED = 0.16;      // uv/s jet
 /** Bass splats. */
 const BASS_THRESHOLD = 0.4;
 const BASS_COOLDOWN = 0.11;
-const BASS_RADIUS = [0.024, 0.045];   // uv range: big enough to read as one splash
+const BASS_RADIUS = [0.022, 0.038];   // uv range: big enough to read as one splash
 const BASS_DYE = 1.0;
 /** Energy (fast glow) injected by a bass splat. */
 const BASS_ENERGY = 1.0;
@@ -69,9 +70,6 @@ const BASS_KICK_RADIUS = 1.9;
 /** A second, wider kick inside the view so ink already on screen jumps too. */
 const VIEW_KICK_SPEED = 0.55;
 const VIEW_KICK_RADIUS = 0.07;
-/** Jets per bass splat and their speed (uv/s): jets become vortex pairs. */
-const BASS_JETS = 2;
-const BASS_JET_SPEED = 0.35;
 const BASS_SWIRL = 0.02;
 /** Frame-accurate brightening of all ink on bass hits, per variant (ink, sumi, marble). */
 /** How much ink brightens (or deepens, on paper) on a hit, per variant. Not
@@ -100,12 +98,32 @@ const INK_FLOOR_DECAY = 0.04;
  * Each kick's splash should read on its own and fade in ~1–2 s, as v0.1
  * did, instead of piling up into a field that swallows new hits. */
 const INK_DECAY_QUIET = 0.55;
-const INK_DECAY_LOUD = 0.48;
+const INK_DECAY_LOUD = 0.75;
 const INK_DECAY_SILENT = 1.2;
 /** Breakdowns: ink lingers and drifts (calm, not empty), with more inflow. */
 const INK_DECAY_BREAKDOWN = 0.18;
 const INFLOW_BREAKDOWN = 1.8;
 const MARBLE_DECAY = 0.004;
+
+/** Beat anchors: stable compositions (screen coords, x/y in -1..1, +y up).
+ * Kicks bloom from these spots so the beat reads as the same places pulsing
+ * in time instead of splashes scattered at random. A new layout is chosen on
+ * drops and section changes. */
+const ANCHOR_LAYOUTS: [number, number][][] = [
+  [[-0.52, 0.18], [0.46, -0.24], [0.08, 0.56]],
+  [[-0.62, -0.28], [0.02, 0.34], [0.6, -0.12]],
+  [[-0.4, 0.46], [0.56, 0.32], [-0.12, -0.44], [0.42, -0.5]],
+  [[-0.66, 0.06], [0.64, 0.02], [0.0, 0.52], [0.02, -0.48]],
+  [[-0.3, -0.12], [0.36, 0.2], [0.7, -0.4]],
+];
+/** Anchor drift (screen units) and how fast a new layout eases in (s). */
+const ANCHOR_DRIFT = 0.07;
+const ANCHOR_EASE = 1.6;
+/** Every Nth kick (and every big hit) blooms from all anchors at once. */
+const ANCHOR_ALL_EVERY = 4;
+/** Satellite (mid) and sparkle (high) distance from an anchor (screen units). */
+const SATELLITE_R = 0.2;
+const SPARKLE_R = 0.38;
 
 /** Shader variant index per look (Glow was called "ink" before v1.0). */
 const VARIANT_INDEX: Record<string, number> = { glow: 0, sumi: 1, marble: 2 };
@@ -222,10 +240,17 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   let grid = createGrid(gl, quality.meshResolution);
 
   let variant = 'glow';
+  // Beat anchors
+  let layoutIdx = 0;
+  let anchorRR = 0;
+  let kickCount = 0;
+  let lastSection = '';
+  let clock = 0;
+  let lastDropAt = -99;
+  const anchors: [number, number][] = ANCHOR_LAYOUTS[0].map((a) => [a[0], a[1]]);
   let breakdownEnv = 0;
   let noiseZ = rng() * 100;
   let bassCooldown = 0, highCooldown = 0, midCooldown = 0;
-  let inkToggle = 0;
   let time = 0;
   const emitters: Emitter[] = [];
   const resetEmitters = (): void => {
@@ -260,19 +285,6 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     return [w[0] / DOMAIN, w[1] / DOMAIN];
   }
 
-  /** Random placement: mostly in view, some at the edges, some off-screen. */
-  function randomScreen(): [number, number] {
-    const r = rng();
-    if (r < 0.8) {
-      // In view, biased away from the centre so compositions stay off-axis.
-      const x = (rng() < 0.5 ? -1 : 1) * (0.2 + 0.75 * Math.sqrt(rng()));
-      return [x, rng() * 1.6 - 0.85];
-    }
-    const a = rng() * Math.PI * 2;
-    const rad = r < 0.85 ? 0.95 + rng() * 0.25 : 1.25 + rng() * 0.35;
-    return [Math.cos(a) * rad, Math.sin(a) * rad * 0.8];
-  }
-
   /** Uv-per-second velocities → sim texels per second. */
   const tps = (v: number): number => v * sim.simRes;
 
@@ -287,36 +299,64 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     push({ x, y, radius, dye: [0, 0, 0, 0], vx: tps(dirX * speed), vy: tps(dirY * speed), radial: 0, swirl: 0, detail: 0 });
   }
 
-  function bassSplat(ctx: StyleContext, strength: number): void {
-    const [sx, sy] = randomScreen();
-    const [x, y] = screenToUv(ctx, sx, sy);
-    const radius = BASS_RADIUS[0] + (BASS_RADIUS[1] - BASS_RADIUS[0]) * (0.3 + 0.7 * rng()) * (0.6 + 0.4 * strength);
-    const ch = (inkToggle++ % 3 === 2) ? 1 : 0;
-    const amt = BASS_DYE * (0.6 + 0.6 * strength) * (variant === 'marble' ? 0.3 : 1);
-    push({
-      x, y, radius,
-      dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, BASS_ENERGY * strength],
-      vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (rng() < 0.5 ? -1 : 1)), detail: 0.8,
-    });
+  /** Anchor i in screen coords for the current view (Depth keeps them on the ground in view). */
+  function anchorScreen(ctx: StyleContext, i: number): [number, number] {
+    const a = anchors[i % anchors.length];
+    return ctx.depth ? [a[0] * 0.85, -0.1 + a[1] * 0.28] : [a[0], a[1]];
+  }
+
+  function updateAnchors(ctx: StyleContext, dt: number): void {
+    const sec = ctx.eventState.section;
+    if (lastSection && sec !== lastSection && (sec === 'drop' || sec === 'breakdown' || sec === 'build')) nextLayout();
+    lastSection = sec;
+    const layout = ANCHOR_LAYOUTS[layoutIdx];
+    const k = 1 - Math.exp(-dt / ANCHOR_EASE);
+    while (anchors.length < layout.length) anchors.push([0, 0]);
+    anchors.length = layout.length;
+    for (let i = 0; i < layout.length; i++) {
+      const tx = layout[i][0] + ANCHOR_DRIFT * simplex2(noiseZ * 0.4 + i * 3.1, 1.7);
+      const ty = layout[i][1] + ANCHOR_DRIFT * simplex2(noiseZ * 0.4 + i * 3.1, 5.3);
+      anchors[i][0] += (tx - anchors[i][0]) * k;
+      anchors[i][1] += (ty - anchors[i][1]) * k;
+    }
+  }
+
+  function nextLayout(): void {
+    layoutIdx = (layoutIdx + 1 + Math.floor(rng() * (ANCHOR_LAYOUTS.length - 1))) % ANCHOR_LAYOUTS.length;
+    anchorRR = 0;
+  }
+
+  /** A kick: blooms from the next anchor in turn, or from every anchor at once. */
+  function bassSplat(ctx: StyleContext, strength: number, all = false): void {
+    kickCount++;
+    const every = all || (ctx.beatConfidence > 0.3 && kickCount % ANCHOR_ALL_EVERY === 0 && clock - lastDropAt > 1.5);
+    const list = every ? anchors.map((_, i) => i) : [anchorRR++ % anchors.length];
     const snap = 0.45 + 1.1 * ctx.responsiveness;
-    sim.kick(x, y, radius * BASS_KICK_RADIUS, BASS_KICK_SPEED * strength * snap);
-    // Ink already in view jumps on the same frame.
-    const [vx, vy] = screenToUv(ctx, (rng() - 0.5) * 1.2, (rng() - 0.5) * 1.0);
-    sim.kick(vx, vy, VIEW_KICK_RADIUS, VIEW_KICK_SPEED * strength * snap);
-    // 1–3 jets at irregular angles: symmetric jets read as propellers.
-    const jets = 1 + Math.floor(rng() * BASS_JETS);
-    let a = rng() * Math.PI * 2;
-    for (let i = 0; i < jets; i++) {
-      a += 1.2 + rng() * 2.6;
-      const off = radius * 0.4;
-      jet(x + Math.cos(a) * off, y + Math.sin(a) * off, Math.cos(a), Math.sin(a),
-        BASS_JET_SPEED * strength * (0.6 + 0.6 * rng()), radius * 0.55);
+    for (const i of list) {
+      const [ax, ay] = anchorScreen(ctx, i);
+      const [x, y] = screenToUv(ctx, ax + (rng() - 0.5) * 0.04, ay + (rng() - 0.5) * 0.04);
+      const radius = (BASS_RADIUS[0] + (BASS_RADIUS[1] - BASS_RADIUS[0]) * (0.75 + 0.25 * rng()))
+        * (0.6 + 0.4 * strength) * (every && !all ? 0.85 : 1);
+      // Each anchor keeps its own ink colour and spin, so it has an identity.
+      const ch = (i % 2) as 0 | 1;
+      const amt = BASS_DYE * (0.6 + 0.6 * strength) * (variant === 'marble' ? 0.3 : 1);
+      push({
+        x, y, radius,
+        dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, BASS_ENERGY * strength],
+        vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (i % 2 ? -1 : 1)), detail: 0.8,
+      });
+      // Outward bloom on the frame of the hit, and ink around it jumps too.
+      sim.kick(x, y, radius * BASS_KICK_RADIUS, BASS_KICK_SPEED * strength * snap);
+      sim.kick(x, y, VIEW_KICK_RADIUS, VIEW_KICK_SPEED * strength * snap * 0.6);
     }
   }
 
   function sparkle(ctx: StyleContext, strength: number, count: number): void {
     for (let i = 0; i < count; i++) {
-      const [x, y] = screenToUv(ctx, rng() * 2 - 1, rng() * 1.6 - 0.9);
+      // Around the anchors: the composition stays readable.
+      const [ax, ay] = anchorScreen(ctx, Math.floor(rng() * anchors.length));
+      const a = rng() * Math.PI * 2, r = SPARKLE_R * Math.sqrt(rng());
+      const [x, y] = screenToUv(ctx, ax + Math.cos(a) * r, ay + Math.sin(a) * r * 0.8);
       push({
         x, y, radius: SPARK_RADIUS[0] + rng() * (SPARK_RADIUS[1] - SPARK_RADIUS[0]),
         dye: [0.05 * strength, 0, 0.5 + 0.7 * strength, 0],
@@ -326,26 +366,23 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   }
 
   function dropBurst(ctx: StyleContext, strength: number): void {
-    const n = 7;
-    const base = rng() * Math.PI * 2;
-    for (let i = 0; i < n; i++) {
-      const a = base + (i / n) * Math.PI * 2 + (rng() - 0.5) * 0.5;
-      const sx = Math.cos(a) * 1.25, sy = Math.sin(a) * 1.0;
-      const [x, y] = screenToUv(ctx, sx, sy);
-      const [cx, cy] = screenToUv(ctx, sx * 0.15, sy * 0.15);
-      let dx = cx - x, dy = cy - y;
-      dx -= Math.round(dx); dy -= Math.round(dy);
-      const len = Math.hypot(dx, dy) || 1;
-      const amt = (0.9 + 0.6 * strength) * (variant === 'marble' ? 0.35 : 1);
-      const radius = 0.03 + rng() * 0.02;
+    // Every anchor blooms big at once, then the composition moves on.
+    const snap = 0.45 + 1.1 * ctx.responsiveness;
+    anchors.forEach((_, i) => {
+      const [ax, ay] = anchorScreen(ctx, i);
+      const [x, y] = screenToUv(ctx, ax, ay);
+      const amt = (0.8 + 0.4 * strength) * (variant === 'marble' ? 0.35 : 1);
+      const radius = BASS_RADIUS[1] * (0.85 + 0.15 * strength);
+      const ch = (i % 2) as 0 | 1;
       push({
         x, y, radius,
-        dye: [i % 2 === 0 ? amt : amt * 0.15, i % 2 === 1 ? amt : amt * 0.1, 0.25, 1.1],
-        vx: 0, vy: 0, radial: 0, swirl: 0, detail: 1,
+        dye: [ch === 0 ? amt : amt * 0.15, ch === 1 ? amt : amt * 0.1, 0.25, 1.1],
+        vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * 1.5 * (i % 2 ? -1 : 1)), detail: 1,
       });
-      jet(x, y, dx / len, dy / len, 1.3 * strength, radius * 0.7);
-    }
+      sim.kick(x, y, radius * BASS_KICK_RADIUS * 1.3, BASS_KICK_SPEED * 1.4 * strength * snap);
+    });
     sparkle(ctx, 0.8, 24);
+    nextLayout();
   }
 
   function seedField(ctx: StyleContext | null, marble: boolean): void {
@@ -418,8 +455,10 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       highCooldown = HIGH_COOLDOWN;
     }
     if (ctx.midHits > MID_THRESHOLD && midCooldown <= 0) {
-      const [sx, sy] = randomScreen();
-      const [x, y] = screenToUv(ctx, sx, sy);
+      // Satellites: a small splash orbiting one of the anchors.
+      const [ax, ay] = anchorScreen(ctx, Math.floor(rng() * anchors.length));
+      const sa = rng() * Math.PI * 2;
+      const [x, y] = screenToUv(ctx, ax + Math.cos(sa) * SATELLITE_R, ay + Math.sin(sa) * SATELLITE_R * 0.8);
       push({
         x, y, radius: 0.016 + rng() * 0.012,
         dye: [0.05, 0.6 * ctx.midHits * fade * (variant === 'marble' ? 0.4 : 1), 0.1, 0.7 * ctx.midHits],
@@ -436,8 +475,9 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     id: 'ink',
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
-      if (e.type === 'drop') dropBurst(ctx, e.strength);
-      else if (e.type === 'bigHit') bassSplat(ctx, 1);
+      if (e.type === 'drop') { dropBurst(ctx, e.strength); lastDropAt = clock; }
+      // A big hit right on top of the drop would just pile more ink on it.
+      else if (e.type === 'bigHit' && clock - lastDropAt > 1.5) bassSplat(ctx, 1, true);
       else if (e.type === 'trackChange') { resetEmitters(); noiseZ += 37; }
     },
 
@@ -471,6 +511,8 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       params.dyeDissipation[2] = 1.4;
       params.dyeDissipation[3] = ENERGY_DECAY;
 
+      clock += dt;
+      updateAnchors(ctx, dt);
       emit(ctx, dt);
       mapAudio(ctx);
     },
