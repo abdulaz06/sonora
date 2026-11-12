@@ -228,8 +228,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
           const base = 0.12 + 0.45 * ctx.intensitySmoothed;
           a.speed += ((base + ctx.bassHits * 0.6) - a.speed) * (1 - Math.exp(-dt / 0.3));
           a.heading += a.turn * dt;
-          // Stay near the view.
-          const dx = c.center[0] - a.x, dy = c.center[1] - a.y;
+          // Stay near the view (Wisp's own fixed centre, see viewOf()).
+          const dx = -a.x, dy = -a.y;
           if (Math.hypot(dx, dy) > c.viewHeight * 0.45) {
             const want = Math.atan2(dy, dx);
             let diff = want - a.heading;
@@ -273,6 +273,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       const cam = ctx.camera;
       const pal = ctx.palette;
       const view = cam.viewHeight;
+      const vw = viewOf(ctx, kind);
       const aspect = ctx.width / ctx.height;
       const count = Math.floor(side * side * cfg.count);
       const rows = Math.ceil(count / side);
@@ -314,8 +315,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       }
 
       const common = {
-        u_time: time, u_center: [cam.center[0], cam.center[1]], u_view: view, u_aspect: aspect,
-        u_rot: cam.rotation, u_field_t: fieldT, u_active: active,
+        u_time: time, u_center: vw.center, u_view: view, u_aspect: aspect,
+        u_rot: vw.rot, u_field_t: fieldT, u_active: active,
       };
 
       // ── 1. Update particles ──
@@ -376,9 +377,9 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       const agentDir: number[] = [];
       for (let i = 0; i < 4; i++) {
         const a = agents[i];
-        const uv = a ? worldToUv(cam, a.x, a.y, view, aspect) : [0, 0];
+        const uv = a ? worldToUv(vw, a.x, a.y, view, aspect) : [0, 0];
         agentUv.push(uv[0], uv[1], a ? (0.45 + 0.55 * ctx.fadeInOut) * a.glow * (0.8 + a.speed) : 0, 0.011 + 0.006 * (a?.glow ?? 1));
-        agentDir.push(a ? Math.cos(a.heading - cam.rotation) : 1, a ? Math.sin(a.heading - cam.rotation) : 0, a ? a.speed : 0, 0);
+        agentDir.push(a ? Math.cos(a.heading - vw.rot) : 1, a ? Math.sin(a.heading - vw.rot) : 0, a ? a.speed : 0, 0);
       }
       setUniforms(gl, p.display, {
         u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
@@ -386,7 +387,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_light: kind === 'silk' ? silkLight : false, u_gain: cfg.display, u_fade: ctx.fadeInOut,
         u_pulse: ctx.bassHits,
         u_warp: kind === 'silk' ? [ZOOM_PUNCH * zoom, snapAmp / view * 0.5, pluckT, snapAmp / view * 0.35] : [0, 0, 0, 0],
-        u_warp_origin: worldToUv(cam, pluckOrigin[0], pluckOrigin[1], view, aspect),
+        u_warp_origin: worldToUv(vw, pluckOrigin[0], pluckOrigin[1], view, aspect),
         u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: kind === 'wisp' ? agents.length : 0,
       });
       drawQuad(gl, quadVAO);
@@ -418,9 +419,19 @@ function mixRgb(a: [number, number, number], b: [number, number, number], t: num
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
-function worldToUv(cam: StyleContext['camera'], x: number, y: number, view: number, aspect: number): [number, number] {
-  const dx = x - cam.center[0], dy = y - cam.center[1];
-  const c = Math.cos(-cam.rotation), s = Math.sin(-cam.rotation);
+interface View { center: [number, number]; rot: number }
+
+/** Where a style looks. Wisp keeps its own fixed centre and no rotation, so
+ * camera drift and dragging never carry its flames off screen (zoom still
+ * applies through the camera's view height). The others follow the camera. */
+function viewOf(ctx: StyleContext, kind: StrandsKind): View {
+  const cam = ctx.camera;
+  return kind === 'wisp' ? { center: [0, 0], rot: 0 } : { center: [cam.center[0], cam.center[1]], rot: cam.rotation };
+}
+
+function worldToUv(vw: View, x: number, y: number, view: number, aspect: number): [number, number] {
+  const dx = x - vw.center[0], dy = y - vw.center[1];
+  const c = Math.cos(-vw.rot), s = Math.sin(-vw.rot);
   const rx = dx * c - dy * s, ry = dx * s + dy * c;
   return [0.5 + rx / (view * aspect), 0.5 + ry / view];
 }
