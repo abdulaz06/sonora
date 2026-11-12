@@ -125,3 +125,12 @@ The look depends on blue-night vs warm-star contrast. Night colours rotate by th
 
 ## D36 — Mosh removed
 After two rebuilds Mosh still did not hold up; removed. Saved settings move to Ink.
+
+## D37 — Voyage: only the backdrop is stable
+"Stable world" (D35) meant the backdrop only. The fractal's bass fold breath and alternating beat corkscrew are back (fractal space only); the landscape never moves on beats.
+
+## D38 — Voyage: wide shots and a detailed curved world
+**Decision:** breakdowns (or a calm moment after 60 s without one) steer the flight planner outward with a goal bias that relaxes its bound, so the camera flies out through an opening (cut after 12 s if no way out); it then eases into a slow drift outside the fractal looking down the cylinder axis. The drop dives back in (handover hidden in the dive and barrel roll); idle-triggered shots return after ~15 s. The landscape is analytic: strips of rectangular fields with crop rows and hedges, grass, forests, rock/snow ridges, shores, rippling water with sky reflection and sun glint, and clustered 3D tower blocks raymarched in a thin layer above the ground (cheap masks inside that loop; step budget per quality). Vista frames ~4–8 ms at 1080p Medium. NaN guards in the march and the temporal resolve.
+
+## D39 — Warp: slow-motion sections
+Breakdowns, and intros while intensity is still low, drift at 10% pace (streaks shrink to near-hanging stars); regular pace once the beat is in; builds accelerate; drops jump. Pace changes settle in ~2 s.

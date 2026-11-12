@@ -16,8 +16,8 @@ Built with Rust, TypeScript, raw WebGL 2 and Tauri 2.
 - **Ink** (flagship): a real fluid simulation on a world several screens wide. Kicks bloom from a few stable anchor points, so you see the same spots pulse in time; mids feed a drizzle of ink, highs scatter sparkle, drops burst. **Depth** (default) turns the ink into a lit surface with a gliding camera (presets Glide, Horizon, Planet, Valley, Overhead; height, tilt and planet/bowl curvature); **Flat** looks straight down. Looks: **Glow**, **Marble** (two-tone marbling), **Sumi** (black ink on paper).
 - **Silk**: millions of particles drawn into flowing threads that light up on every kick; builds gather the threads into a knot and the drop bursts them into a starburst.
 - **Wisp**: three coloured flames darting through the dark, trailing smoke; bass hits blow smoke rings.
-- **Warp**: hyperspace streaks whose speed follows the song: near-still in silence, drifting in breakdowns, accelerating through builds, jumping at the drop.
-- **Voyage**: a flight through a raymarched 3D fractal hanging inside a vast curved landscape that rises around and over it. Space slowly melts; the camera sways on the beat and dives into a barrel roll on the drop.
+- **Warp**: hyperspace streaks whose speed follows the song: slow motion in breakdowns and quiet intros, regular pace with the beat, accelerating through builds, jumping at the drop.
+- **Voyage**: a flight through a raymarched 3D fractal hanging inside a vast curved world of fields, rivers and cities that rises around and over it. The fractal breathes and twists on the beat; breakdowns fly out for wide shots of the curve and the drop dives back in with a barrel roll.
 
 Responsiveness (Smooth → Punchy) changes how hard things move, never how much they flash; brightness stays steady and every deliberate flash goes through a limiter (at most three per second). Frame rate is capped at 60 by default (30 – 144 or max in Settings).
 

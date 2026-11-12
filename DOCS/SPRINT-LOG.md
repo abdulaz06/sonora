@@ -1,3 +1,19 @@
+# Feedback round 4 — done
+
+Notes: "stable world" in Voyage meant only the backdrop; the backdrop looked like low-res pastel blocks; add wide shots so the curve can be seen, with buildings hanging off it; Warp needs slow-motion sections. Decided with Abdul: fractal fold breath + corkscrew back; wide shots in breakdowns (or after ~60 s at a calm moment) with a dive back on the drop; natural textures + modern clustered cities; Warp slow-mo in breakdowns and quiet intros.
+
+- [x] Warp slow-motion sections (D39)
+- [x] Voyage fractal beat reactions restored, backdrop stays still (D37)
+- [x] Voyage wide shots: planner-steered exit, vista drift, dive back on the drop (D38)
+- [x] Voyage land: fields, grass, forests, rock/snow, shores, water, clustered 3D cities (D38)
+- [x] Verified: Voyage and Warp on five tracks, sync 100%, flicker 0.6 / 1.3 swings/s, vista cost 4–8 ms Medium, live desktop app (Voyage wide shot during the breakdown)
+
+## Phase 2 (next, unchanged)
+- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [ ] Wisp Depth view (same rules)
+
+---
+
 # Feedback round 3 — done
 
 Abdul's notes after Phase 1: Silk's beat ripple/zoom overdid it on bass-heavy songs; Wisp drifted off screen and went blank on a second visit; Ink hit the beats but looked scattered; Voyage's backdrop reacted to beats and read as a thick dome, and the Kaleido drop replaced the best camera moment; Mosh still not good. Decided with him: remove Silk's ripple/zoom; Ink fixed anchors; Voyage thin curved world, stable on beats, drop = dive + barrel roll, beats = roll sway + FOV breath; scrap Mosh.

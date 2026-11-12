@@ -99,8 +99,8 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 | **Ink** (Glow, Marble, Sumi) | Stable fluids on a periodic world; Depth surface or Flat | Mid presence → ink drizzle; intensity → turbulence, camera speed | Every 4th kick blooms all anchors | Bass → bloom from the next beat anchor (stable composition, fixed colour per anchor); mids → satellites; highs → sparkle around anchors | Every anchor blooms, new layout; camera lurch |
 | **Silk** | GPU particles, density accumulation | Presence → active threads; intensity → flow speed | — | Bass → shockwave, thread brightening | Build gathers a knot → drop bursts into an eight-spoke starburst; inversion cut |
 | **Wisp** | GPU particles + three CPU agents in a fixed view (zoom only) | Intensity → agent speed | — | Bass → smoke rings, flame flare; mids → swerves | Agents surge |
-| **Warp** | GPU particle streaks | Slow intensity → cruise speed; sections set the pace | Speed surge | Bass → streak glow | Hyperspace jump |
-| **Voyage** | Mandelbox raymarch, CPU-planned spline flight, analytic cylinder landscape, half-res + temporal upscale | Presence → slow fold params and melt; intensity → flight speed, glow | Camera roll sway + FOV breath (the world never moves on beats) | Bass → emissive veins, slight chromatic split; highs → iridescence | Surge + wide-angle punch + barrel roll |
+| **Warp** | GPU particle streaks | Slow intensity → cruise speed; slow-motion in breakdowns and quiet intros, regular pace with the beat, builds accelerate | Speed surge | Bass → streak glow | Hyperspace jump |
+| **Voyage** | Mandelbox raymarch, CPU-planned spline flight, analytic cylinder landscape (fields, water, forests, cities), half-res + temporal upscale | Presence → fold params and melt; intensity → flight speed, glow; breakdowns fly out for wide shots | Camera roll sway + FOV breath; fractal corkscrew (the landscape never moves) | Bass → fold breath, emissive veins, slight chromatic split; highs → iridescence | Dive back in / surge + wide-angle punch + barrel roll |
 
 **Performance** (RX 7700S, 1080p, synced frame cost at the house-124 drop; budget 16.7 ms):
 
