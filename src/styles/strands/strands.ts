@@ -61,12 +61,6 @@ const CFG: Record<StrandsKind, KindCfg> = {
 /** Silk: shockwave speed (world units/s) and lifetime (s). */
 const SHOCK_SPEED = 0.9;
 const SHOCK_LIFE = 1.1;
-/** Silk pluck on kicks: ripple and radial snap amplitude (view heights). */
-const PLUCK_AMP = 0.02;
-const SNAP_AMP = 0.09;
-/** Silk beat zoom punch (fraction of the view) and spring stiffness. */
-const ZOOM_PUNCH = 0.08;
-const ZOOM_OMEGA = 16;
 /** Silk drop: burst decay (s), formation hold and fade (s). */
 const BURST_TAU = 0.45;
 const FORM_HOLD = 5;
@@ -130,9 +124,6 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
   let cutUntil = -1;
   let sparkle = 0;
   // Silk beat / drop state
-  let pluckT = 9, pluckAmp = 0, snapAmp = 0;
-  let pluckOrigin: [number, number] = [0, 0];
-  let zoom = 0, zoomVel = 0;
   let burst = 0, formT = 99, formRot = 0;
   // Wisp
   const agents: Agent[] = [0, 1, 2].map((i) => ({
@@ -192,26 +183,15 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       sparkle = Math.max(sparkle * Math.exp(-dt / 0.15), ctx.highHits);
       bassCooldown -= dt;
 
-      // Silk shockwaves and plucks on bass hits.
+      // Silk shockwaves on bass hits.
       if (kind === 'silk' && ctx.bassHits > 0.55 && bassCooldown <= 0 && fade > 0.1) {
         const c = ctx.camera;
         const q = c.screenToWorld2D((rng() - 0.5) * 1.4, (rng() - 0.5) * 1.2);
         shocks.push({ x: q[0], y: q[1], r: 0.02, s: 0.6 * ctx.bassHits, age: 0 });
         if (shocks.length > 4) shocks.shift();
         bassCooldown = 0.18;
-        const motion = (0.55 + 0.9 * ctx.responsiveness) * ctx.bassHits * (0.4 + 0.6 * fade);
-        pluckT = 0;
-        pluckAmp = PLUCK_AMP * c.viewHeight * motion;
-        snapAmp = SNAP_AMP * c.viewHeight * motion;
-        pluckOrigin = c.screenToWorld2D((rng() - 0.5) * 0.6, (rng() - 0.5) * 0.5);
       }
-      pluckT += dt;
       if (kind === 'silk') {
-        // Beat-locked camera push: zoom in on the beat, spring back.
-        const onBeat = ctx.beatConfidence > 0.3 ? ctx.beatOnset : ctx.bassHits > 0.6 && pluckT === dt;
-        if (onBeat && fade > 0.1) zoomVel += ZOOM_OMEGA * (0.6 + 0.8 * ctx.responsiveness) * (0.5 + 0.5 * fade);
-        zoomVel += (-ZOOM_OMEGA * ZOOM_OMEGA * zoom - 2 * 0.55 * ZOOM_OMEGA * zoomVel) * dt;
-        zoom += zoomVel * dt;
         burst *= Math.exp(-dt / BURST_TAU);
         formT += dt;
         formRot += dt * 0.15;
@@ -359,7 +339,6 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_sparkle: sparkle, u_res: [ctx.width, ctx.height],
         u_vp: [simplex2(time * 0.07, 4) * 0.25, simplex2(time * 0.06, 5) * 0.18], u_roll: cam.roll * 3,
         u_streak: 0.02,
-        u_pluck: [pluckAmp, pluckT, pluckOrigin[0], pluckOrigin[1]], u_snap: 0,
         u_c0: pal.primary, u_c1: pal.secondary, u_c2: mixRgb(pal.highlight, [1, 1, 1], 0.6), u_c3: pal.accent,
         u_wisp_col: [...pal.primary, 1, ...pal.accent, 1, ...pal.highlight, 1, ...mixRgb(pal.highlight, [1, 1, 1], 0.5), 1],
       });
@@ -386,8 +365,6 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
         u_light: kind === 'silk' ? silkLight : false, u_gain: cfg.display, u_fade: ctx.fadeInOut,
         u_pulse: ctx.bassHits,
-        u_warp: kind === 'silk' ? [ZOOM_PUNCH * zoom, snapAmp / view * 0.5, pluckT, snapAmp / view * 0.35] : [0, 0, 0, 0],
-        u_warp_origin: worldToUv(vw, pluckOrigin[0], pluckOrigin[1], view, aspect),
         u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: kind === 'wisp' ? agents.length : 0,
       });
       drawQuad(gl, quadVAO);
