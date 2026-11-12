@@ -11,13 +11,16 @@ Built with Rust, TypeScript, raw WebGL 2 and Tauri 2.
 </p>
 <p align="center"><a href="https://www.youtube.com/watch?v=kDKyOMpcxeI"><strong>▶ Flow Ink (v0.1) with sound</strong></a></p>
 
-## Flow Ink 2.0
+## Styles
 
-The flagship style is a real fluid simulation: stable fluids (advection, pressure projection, vorticity confinement) on a periodic world several screens wide, with ink advected at high resolution so it stretches into fine filaments.
+- **Ink** (flagship): a real fluid simulation on a world several screens wide. Every bass hit lands as its own splash on the frame of the hit; mids feed a drizzle of ink, highs scatter sparkle, drops burst. **Depth** (default) turns the ink into a lit surface with a gliding camera (presets Glide, Horizon, Planet, Valley, Overhead; height, tilt and planet/bowl curvature); **Flat** looks straight down. Looks: **Glow**, **Marble** (two-tone marbling), **Sumi** (black ink on paper).
+- **Silk**: millions of particles drawn into flowing threads. Kicks punch the whole sheet in and snap it outward with a ripple; builds gather the threads into a knot and the drop bursts them into a starburst.
+- **Wisp**: three coloured flames darting through the dark, trailing smoke; bass hits blow smoke rings.
+- **Warp**: hyperspace streaks whose speed follows the song: near-still in silence, drifting in breakdowns, accelerating through builds, jumping at the drop.
+- **Voyage**: a flight through a raymarched 3D fractal inside an endless cylinder world that curves overhead. Space melts and corkscrews on the beat; drops fold the view into a kaleidoscope.
+- **Mosh**: a twisting glitch tunnel of nested frames that reverses direction with the music, morphs shape, smears and freezes on the drop.
 
-- **Depth view (default):** the ink becomes a lit, displaced surface; a camera glides over it through fog, banks on beats and lurches on drops. Camera presets (Glide, Horizon, Planet, Valley, Overhead) and sliders for height, tilt and curvature — curve the world away like a planet or up like a bowl. **Flat** is a drifting top-down view.
-- **Looks:** **Ink** (luminous palette ink on night), **Sumi** (black ink on bone paper), **Marble** (duotone marbling with stipple grain). Each has a light or dark background.
-- **Listening:** every bass hit bursts and brightens the ink on the same frame (about 40 ms after the sound), mid-range presence feeds ink inflow, highs scatter fine sparkle, intensity drives turbulence and camera speed, and a detected drop fires a burst plus a camera lurch. Silence lets the ink settle and fade.
+Responsiveness (Smooth → Punchy) changes how hard things move, never how much they flash; brightness stays steady and every deliberate flash goes through a limiter (at most three per second). Frame rate is capped at 60 by default (30 – 144 or max in Settings).
 
 Aura and Halo from v0.1 remain available under **Show classic styles** in settings.
 

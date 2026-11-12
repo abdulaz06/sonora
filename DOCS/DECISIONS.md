@@ -82,3 +82,28 @@ The look depends on blue-night vs warm-star contrast. Night colours rotate by th
 
 ## D24 — Fractal: Mandelbox flight with a CPU-mirrored planner and temporal upscale
 **Decision:** a Mandelbox (Voyage: scale 2.9, Kaleido: 2.6 with rounder folds), chosen after measuring the free space inside candidate scales: negative scales were almost solid at a flyable clearance. A JS copy of the distance estimator lays waypoints ahead of the camera so every point of each segment keeps at least ¼ of the preferred clearance, scoring candidates by turn smoothness and closeness to the preferred clearance; the camera rides a Catmull-Rom spline through them at a speed measured in clearances per second. The march runs at half the scene resolution (¾ on High) with a Halton jitter; `resolve.frag` reprojects the previous frame through the hit depth, clamps it to the current neighbourhood and blends. Brightening is accepted immediately, so bass pulses land on the hit frame (sync 100% of kicks, ~62 ms). The step budget adapts to the measured frame time. Kaleido folds the resolved image into 5–8 mirrored wedges; drops change the wedge count.
+
+## D25 — Responsiveness drives motion, never brightness
+**Context:** at Punchy, Ink flickered and blew out in the live app: its beat pulse scaled ink brightness by up to 2x (plus an exposure bump), and the Punchy intensity follower (5 ms / 50 ms) passed frame-to-frame noise from real music straight into brightness-linked values in several styles.
+**Decision:** the Responsiveness slider only scales motion (kick strength, plucks, zoom punches, beat pushes). Brightness and density use `intensityGlow`, a fixed slow follower (120 ms / 700 ms). Punchy becomes 15 ms / 120 ms. Hit brightening has fixed headroom per style and no global exposure bump.
+
+## D26 — Hue-preserving tonemap and auto exposure
+**Context:** saturated palette colours above 1.0 (Ocean on Ink, Silk cores, Warp at speed) went white under per-channel ACES.
+**Decision:** the composite tonemaps the brightest channel and scales the colour with it (hue and saturation kept), blended 25% with per-channel ACES for the filmic look; only extreme highlights roll to white. A slow auto exposure (0.8 s down, 4 s up, floor 0.5) uses the luminance probe's mean and blown-out fraction for filmic scenes. Harness `--flicker` reports swings/s, jitter and blown-out pixels; `dense-128` is a loud, busy test track because the sparse tracks under-represented real music.
+
+## D27 — v1.0 lineup
+**Decision:** Ink (Glow, Marble, Sumi), Silk, Wisp, Warp, Voyage, Mosh. Silk, Wisp and Warp are separate styles sharing the particle engine. Lumen, Starry Night, Turing and Kaleido (as a look) were removed after review; Kaleido's mirror became a Voyage drop effect. Settings v4 migrates saved choices to the nearest successor.
+
+## D28 — Ink: one kick, one splash
+**Context:** Ink 2.0's dye lasted ~14 s, so the field filled up and new splashes were swallowed; the original Flow Ink faded in ~1 s and read as tightly synced.
+**Decision:** Glow/Sumi dye decays in ~1-2 s (longer when loud), inflow is a drizzle, bass splats are larger and land in view, turbulence is lower between hits; breakdowns let ink linger (decay 0.18/s) so they read calm rather than empty. Marble keeps its persistent marbling.
+
+## D29 — Silk: beat motion in the display pass
+**Context:** displacing particles on the beat barely showed: the trail buffer keeps 84% of the previous frame, so a moved thread appears as a faint echo next to its old trace.
+**Decision:** the beat zoom punch, the radial snap and the ripple ring are applied in the display pass, warping the whole image (trails included) on the frame of the hit; a smaller per-thread "pluck" ripple stays in the particle draw. Builds gather threads into a knot; drops burst them into an eight-spoke starburst for ~5 s.
+
+## D30 — Mosh: a palette-mapped, reversing vortex
+**Decision:** Signal patterns are luminance-only and coloured through a gradient map (background → primary → highlight), which keeps every palette coherent. Nested frames rotate against each other (twist rides intensity, flips on drops), the shape morphs between rectangle, circle and diamond, and direction is musical: each beat pushes a step, drops reverse every bar, builds go in, breakdowns drift out.
+
+## D31 — Voyage: cylinder backdrop and camera-relative bending
+**Decision:** rays leaving the Mandelbox continue into a cylinder (radius 36) whose inner wall is tiled with mini Mandelboxes sliced flush with the wall, so their carved interiors face inward: an endless world curving overhead. Space is bent by a slow sine warp (mirrored in the CPU planner, with a distance-bound correction and a camera safety push) and by a corkscrew about the view axis that is zero at the camera and kicks on beats. Drops fold the screen into a Kaleido mirror for ~3 s.

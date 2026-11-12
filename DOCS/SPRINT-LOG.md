@@ -1,3 +1,31 @@
+# Feedback round 2 (after Prompt 2) — Phase 1 done
+
+Abdul's review of every mode: Punchy flickered and several palettes blew out (all styles); Ink lost the original's tight sync; Silk is the favourite but friends could not see the sync on a phone video; Lumen, Starry Night, Turing and Kaleido not worth keeping; Wisp looked blank; Warp should follow the song's pace; Mosh repetitive and Concrete ugly; Voyage the most promising but should be more warped, with an endless curving world. Decisions taken with him first: lineup Ink/Silk/Wisp/Warp/Voyage/Mosh, Glow as Ink's default look, Punchy = motion not flashes, Silk sync via pluck + beat camera + drop transformation, Voyage cylinder world + beat folds, fixes first and 3D (Depth toggle, Flat default) as a separate phase.
+
+## Phase 1 checklist
+- [x] Flicker and exposure: hue-preserving tonemap, auto exposure, Responsiveness → motion only, `intensityGlow`, harness `--flicker` + `dense-128` (D25, D26)
+- [x] Lineup and names; settings v4 migration (D27)
+- [x] Ink: one kick, one splash (D28)
+- [x] Silk: display-pass beat zoom / snap / ripple, pluck, build knot → drop starburst (D29)
+- [x] Wisp: coloured smoke, bigger flames, bolder rings
+- [x] Warp: pace follows the song; no blow-out at speed
+- [x] Mosh: twisting palette-mapped Signal tunnel that reverses with the music (D30)
+- [x] Voyage: cylinder backdrop world, melting space, beat corkscrew, drop Kaleido fold (D31)
+- [x] Verified: all styles × five tracks, sync, flicker, perf, live desktop app (Punchy, Ocean, dense track)
+
+## Phase 2 (next)
+- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [ ] Wisp Depth view (same rules)
+
+## Notes
+- Root cause of the live flicker: Ink's beat pulse scaled brightness up to 2× at Punchy (45% of the frame blown out in a live capture) and the Punchy follower passed per-frame intensity noise into brightness. Live after the fix: no whiteouts on any style.
+- The harness's sparse tracks did not reproduce real-music loudness; `dense-128` (16th hats, sidechained chords, heavy mastering) now backs the flicker / exposure checks.
+- Silk: moving particles on the beat barely showed (trail buffer keeps 84% of the last frame); the beat motion now warps the whole image in the display pass. The harness "motion on kicks" figure did not capture this well; `scripts/kick-frames.mjs` frame sequences were used to judge it.
+- Live desktop checks run on the primary display while Abdul works on the second; settings are backed up and restored around each run.
+- Perf (1080p Medium): 1.4–4.5 ms for every style.
+
+---
+
 # Prompt 2: the art styles
 
 ## Summary (Prompt 2 complete)
