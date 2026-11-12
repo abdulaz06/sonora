@@ -31,6 +31,7 @@ uniform float u_lip;         // distance-bound correction for the bending
 // Landscape cylinder
 uniform float u_land_r;      // radius
 uniform float u_land_cy;     // axis height (axis along z through (0, cy))
+uniform int u_land_steps;    // building march budget (quality)
 // March budget
 uniform int u_steps;
 uniform float u_detail;      // surface epsilon in pixels
@@ -271,8 +272,8 @@ vec3 landscape(vec3 ro, vec3 rd, float pix, out float tHit) {
   if (disc1 > 0.0) {
     float tl = max((-b + sqrt(disc1)) / a, 0.0);
     float tt = tl;
-    for (int i = 0; i < 48; i++) {
-      if (tt >= tGround) break;
+    for (int i = 0; i < 64; i++) {
+      if (i >= u_land_steps || tt >= tGround) break;
       vec3 pw = ro + rd * tt;
       vec2 rel = pw.xy - vec2(0.0, u_land_cy);
       vec3 pu = vec3(atan(rel.x, -rel.y) * u_land_r, u_land_r - length(rel), pw.z);

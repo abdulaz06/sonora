@@ -60,6 +60,8 @@ const TWIST_BEAT = 0.016;
 /** Landscape cylinder: radius, and how far below the fractal's centre its floor lies. */
 const LAND_R = 70;
 const LAND_FLOOR = 9;
+/** Building march steps per quality (wide shots). */
+const LAND_STEPS: Record<QualityLevel, number> = { low: 24, medium: 44, high: 64 };
 /** Wide shots: after this long without one (s), a calm moment also pulls out. */
 const VISTA_IDLE_S = 60;
 /** Exit: give up flying out after this long and cut (s); "outside" = |p|∞ beyond. */
@@ -412,7 +414,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_tan_half: tan, u_aspect: aspect,
         u_warp_amp: params.warpAmp ?? 0, u_warp_freq: WARP_FREQ, u_lip: params.lip ?? 1,
         u_twist: (TWIST_BASE + TWIST_BEAT * twistEnv * (0.6 + 0.8 * ctx.responsiveness)) * twistSign,
-        u_land_r: LAND_R, u_land_cy: LAND_R - LAND_FLOOR,
+        u_land_r: LAND_R, u_land_cy: LAND_R - LAND_FLOOR, u_land_steps: LAND_STEPS[quality.level],
         u_scale: params.scale, u_min_r2: params.minR2, u_fold: params.fold, u_iters: b.iters,
         u_steps: Math.round(b.steps * stepScale), u_detail: b.detail, u_far: mode === 'inside' ? FAR : FAR_VISTA, u_ao_on: b.ao,
         u_sun: sun, u_bg: pal.bg, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
