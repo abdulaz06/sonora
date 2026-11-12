@@ -9,7 +9,7 @@ const kill = () => { try { execFileSync('taskkill', ['/pid', String(server.pid),
 try {
   for (let i = 0; i < 80; i++) { try { if ((await fetch('http://localhost:5199/web.html')).ok) break; } catch {} await new Promise((r) => setTimeout(r, 400)); }
   const b = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
-  const p = await b.newPage({ viewport: { width: 960, height: 540 } });
+  const p = await b.newPage({ viewport: { width: Number(process.env.SNAP_W || 960), height: Number(process.env.SNAP_H || 540) } });
   await p.goto('http://localhost:5199/web.html?harness=1');
   await p.waitForFunction(() => window.__sonora?.ready === true);
   await p.evaluate((s) => window.__sonora.configure({ style: s, drift: false }), style);
@@ -21,6 +21,7 @@ try {
     now = t;
     const u = await p.evaluate(() => window.__sonora.snapshot());
     writeFileSync(`verify/snap-${style}-${ts}.png`, Buffer.from(u.split(',')[1], 'base64'));
+    if (process.env.SNAP_COST) console.log(`t=${ts} frame cost ${(await p.evaluate(() => window.__sonora.frameCost(90, 1 / 60))).toFixed(2)} ms`);
   }
   await b.close();
 } finally { kill(); }
