@@ -76,6 +76,21 @@ const CUT_BEATS_DROP = 2;
 const CUT_BEATS_HIT = 1;
 const CUT_HIT_CHANCE = 0.3;
 
+/** Warp pace (tunnel units/s): cruise from quiet to loud, and the section
+ * multipliers that make slow parts drift and builds/drops rush. */
+const WARP_CRUISE = [1.6, 15];
+const WARP_SECTION: Record<string, number> = { silence: 0.06, intro: 0.55, steady: 1, build: 1, drop: 1.35, breakdown: 0.28 };
+/** Builds accelerate up to this multiple at full build progress. */
+const WARP_BUILD_MAX = 2.6;
+/** Drop jump: extra multiple, decay (s). Beat surge: extra fraction, decay (s). */
+const WARP_JUMP = 2.2;
+const WARP_JUMP_TAU = 1.1;
+const WARP_SURGE = 0.18;
+const WARP_SURGE_TAU = 0.18;
+/** Speed easing (s): accelerate / decelerate. */
+const WARP_ACCEL_TAU = 0.45;
+const WARP_DECEL_TAU = 1.4;
+
 interface Shock { x: number; y: number; r: number; s: number; age: number }
 interface Agent { x: number; y: number; heading: number; speed: number; turn: number; glow: number }
 
@@ -127,6 +142,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
   // Warp
   let warpJump = 0;
   let warpSpeed = 6;
+  let warpSurge = 0;
+  let warpSection = 1;
 
   function ensureAccum(w: number, h: number): void {
     if (accum && accum.w === w && accum.h === h) return;
@@ -158,7 +175,6 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         else if (e.type === 'bigHit' && rng() < CUT_HIT_CHANCE) cut(ctx, CUT_BEATS_HIT);
       } else if (kind === 'warp' && e.type === 'drop') {
         warpJump = 1;
-        if (ctx.flash.request()) ctx.post.flash = 0.1;
       } else if (kind === 'wisp' && e.type === 'drop') {
         agents.forEach((a) => { a.speed += 1.2; a.glow = 2; });
       }
@@ -233,10 +249,21 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
 
       // Warp speed: intensity and tempo, build accelerates, drop jumps.
       if (kind === 'warp') {
+        // Pace follows the song: cruise on the slow intensity follower, section
+        // multipliers (silence ≈ still, breakdown drift, drop rush), builds
+        // accelerate, the drop jumps, every beat surges a little.
         const bpmFactor = Math.sqrt(Math.max(60, Math.min(200, ctx.frame.beat.bpm || 120)) / 120);
-        warpJump *= Math.exp(-dt / 0.9);
-        const warpTarget = (2.5 + 16 * ctx.intensitySmoothed) * bpmFactor * (1 + 1.5 * build) * (0.25 + 0.75 * fade) + 32 * warpJump;
-        warpSpeed += (1 - Math.exp(-dt / 0.4)) * (warpTarget - warpSpeed);
+        const sec = WARP_SECTION[ctx.eventState.section] ?? 1;
+        warpSection += (sec - warpSection) * (1 - Math.exp(-dt / 1.2));
+        warpJump *= Math.exp(-dt / WARP_JUMP_TAU);
+        const onBeat = ctx.beatConfidence > 0.3 ? ctx.beatOnset : ctx.bassHits > 0.7;
+        warpSurge = Math.max(warpSurge * Math.exp(-dt / WARP_SURGE_TAU), onBeat ? 1 : 0);
+        const cruise = WARP_CRUISE[0] + (WARP_CRUISE[1] - WARP_CRUISE[0]) * Math.pow(clamp01(ctx.intensityGlow), 1.3);
+        const buildMul = 1 + (WARP_BUILD_MAX - 1) * build * build;
+        const warpTarget = cruise * bpmFactor * warpSection * buildMul * (0.15 + 0.85 * fade)
+          * (1 + WARP_JUMP * warpJump) * (1 + WARP_SURGE * warpSurge * (0.6 + 0.8 * ctx.responsiveness));
+        const tau = warpTarget > warpSpeed ? WARP_ACCEL_TAU : WARP_DECEL_TAU;
+        warpSpeed += (1 - Math.exp(-dt / tau)) * (warpTarget - warpSpeed);
       }
     },
 
@@ -325,10 +352,12 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       setUniforms(gl, p.render, {
         ...common,
         u_stateA: state.read.tex[0], u_stateB: state.read.tex[1], u_side: side,
-        u_point: cfg.point * Math.max(1, ctx.height / 1080), u_gain: cfg.gain * (kind === 'silk' ? 0.6 + 0.8 * ctx.fadeInOut : 1),
+        u_point: cfg.point * Math.max(1, ctx.height / 1080), u_gain: cfg.gain * (kind === 'silk' ? 0.6 + 0.8 * ctx.fadeInOut
+          // Warp: longer streaks at speed cover more screen; keep brightness even.
+          : kind === 'warp' ? Math.min(1.5, Math.max(0.4, Math.sqrt(7 / Math.max(warpSpeed, 0.1)))) : 1),
         u_sparkle: sparkle, u_res: [ctx.width, ctx.height],
         u_vp: [simplex2(time * 0.07, 4) * 0.25, simplex2(time * 0.06, 5) * 0.18], u_roll: cam.roll * 3,
-        u_streak: 0.016 + 0.012 * ctx.intensitySmoothed,
+        u_streak: 0.02,
         u_pluck: [pluckAmp, pluckT, pluckOrigin[0], pluckOrigin[1]], u_snap: 0,
         u_c0: pal.primary, u_c1: pal.secondary, u_c2: mixRgb(pal.highlight, [1, 1, 1], 0.6), u_c3: pal.accent,
         u_wisp_col: [...pal.primary, 1, ...pal.accent, 1, ...pal.highlight, 1, ...mixRgb(pal.highlight, [1, 1, 1], 0.5), 1],
