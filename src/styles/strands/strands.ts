@@ -73,7 +73,11 @@ const CUT_HIT_CHANCE = 0.3;
 /** Warp pace (tunnel units/s): cruise from quiet to loud, and the section
  * multipliers that make slow parts drift and builds/drops rush. */
 const WARP_CRUISE = [1.6, 15];
-const WARP_SECTION: Record<string, number> = { silence: 0.06, intro: 0.55, steady: 1, build: 1, drop: 1.35, breakdown: 0.28 };
+const WARP_SECTION: Record<string, number> = { silence: 0.06, intro: 0.8, steady: 1, build: 1, drop: 1.35, breakdown: 0.1 };
+/** Slow motion: breakdowns, and intros while still quiet, drift at this pace
+ * (streaks shrink to near-hanging stars). Anything louder runs at regular pace. */
+const WARP_SLOMO = 0.1;
+const WARP_QUIET_INTRO = 0.35;
 /** Builds accelerate up to this multiple at full build progress. */
 const WARP_BUILD_MAX = 2.6;
 /** Drop jump: extra multiple, decay (s). Beat surge: extra fraction, decay (s). */
@@ -83,7 +87,7 @@ const WARP_SURGE = 0.18;
 const WARP_SURGE_TAU = 0.18;
 /** Speed easing (s): accelerate / decelerate. */
 const WARP_ACCEL_TAU = 0.45;
-const WARP_DECEL_TAU = 1.4;
+const WARP_DECEL_TAU = 0.9;
 
 interface Shock { x: number; y: number; r: number; s: number; age: number }
 interface Agent { x: number; y: number; heading: number; speed: number; turn: number; glow: number }
@@ -233,15 +237,18 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         // multipliers (silence ≈ still, breakdown drift, drop rush), builds
         // accelerate, the drop jumps, every beat surges a little.
         const bpmFactor = Math.sqrt(Math.max(60, Math.min(200, ctx.frame.beat.bpm || 120)) / 120);
-        const sec = WARP_SECTION[ctx.eventState.section] ?? 1;
-        warpSection += (sec - warpSection) * (1 - Math.exp(-dt / 1.2));
+        const section = ctx.eventState.section;
+        let sec = WARP_SECTION[section] ?? 1;
+        if (section === 'intro' && ctx.intensityGlow < WARP_QUIET_INTRO) sec = WARP_SLOMO;
+        const slomo = sec <= WARP_SLOMO + 1e-6;
+        warpSection += (sec - warpSection) * (1 - Math.exp(-dt / 0.8));
         warpJump *= Math.exp(-dt / WARP_JUMP_TAU);
         const onBeat = ctx.beatConfidence > 0.3 ? ctx.beatOnset : ctx.bassHits > 0.7;
         warpSurge = Math.max(warpSurge * Math.exp(-dt / WARP_SURGE_TAU), onBeat ? 1 : 0);
         const cruise = WARP_CRUISE[0] + (WARP_CRUISE[1] - WARP_CRUISE[0]) * Math.pow(clamp01(ctx.intensityGlow), 1.3);
         const buildMul = 1 + (WARP_BUILD_MAX - 1) * build * build;
         const warpTarget = cruise * bpmFactor * warpSection * buildMul * (0.15 + 0.85 * fade)
-          * (1 + WARP_JUMP * warpJump) * (1 + WARP_SURGE * warpSurge * (0.6 + 0.8 * ctx.responsiveness));
+          * (1 + WARP_JUMP * warpJump) * (1 + WARP_SURGE * warpSurge * (0.6 + 0.8 * ctx.responsiveness) * (slomo ? 0.4 : 1));
         const tau = warpTarget > warpSpeed ? WARP_ACCEL_TAU : WARP_DECEL_TAU;
         warpSpeed += (1 - Math.exp(-dt / tau)) * (warpTarget - warpSpeed);
       }
