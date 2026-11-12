@@ -134,3 +134,9 @@ After two rebuilds Mosh still did not hold up; removed. Saved settings move to I
 
 ## D39 — Warp: slow-motion sections
 Breakdowns, and intros while intensity is still low, drift at 10% pace (streaks shrink to near-hanging stars); regular pace once the beat is in; builds accelerate; drops jump. Pace changes settle in ~2 s.
+
+## D40 — Voyage backdrops: Void, City, Ocean
+**Decision:** three looks. **Void** (default): a dark sky tinted by the palette accent with a faint nebula and three layers of twinkling stars. **City:** the curved world, rebuilt in 3D — its large-scale layout (terrain height, rivers/lakes with fixed-width shores, city districts kept off banks and mountains, forests, a dry featured district overhead) is baked once into a 2048² texture wrapped round the cylinder; a short raymarch then finds real terrain relief with rock crags, tree canopies and street-grid blocks of 2x2 lots (setback towers, parks, varied roofs, lit windows), with fine procedural ground detail on top. Lit from the axis as in a habitat. **Ocean:** the cylinder is all sea with four swell trains rolling down the axis, chop, backlit crests, foam and glints. World radius 30 so the far side is close. Backdrop code in `backdrop.glsl`, bake in `landbake.frag`.
+
+## D41 — Voyage wide shots follow the music
+**Decision:** shots per backdrop — Void circles the fractal in the stars, Ocean looks down the axis, City alternates the axis view and an angled look up at the hanging city. A shot ends as soon as the music picks up (intensity above its starting level, a build or drop, or the breakdown ending), capped at 10 s (8 s idle-triggered). The camera eases back and replays its recorded exit path in reverse (collision-free, smooth), then the planner resumes from there (`FlightPath.restartAt`). A drop while out still dives straight in. Wide shots render at a higher march scale (0.7 Medium, 1.0 High) without the chromatic fringe.

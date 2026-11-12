@@ -100,7 +100,7 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 | **Silk** | GPU particles, density accumulation | Presence → active threads; intensity → flow speed | — | Bass → shockwave, thread brightening | Build gathers a knot → drop bursts into an eight-spoke starburst; inversion cut |
 | **Wisp** | GPU particles + three CPU agents in a fixed view (zoom only) | Intensity → agent speed | — | Bass → smoke rings, flame flare; mids → swerves | Agents surge |
 | **Warp** | GPU particle streaks | Slow intensity → cruise speed; slow-motion in breakdowns and quiet intros, regular pace with the beat, builds accelerate | Speed surge | Bass → streak glow | Hyperspace jump |
-| **Voyage** | Mandelbox raymarch, CPU-planned spline flight, analytic cylinder landscape (fields, water, forests, cities), half-res + temporal upscale | Presence → fold params and melt; intensity → flight speed, glow; breakdowns fly out for wide shots | Camera roll sway + FOV breath; fractal corkscrew (the landscape never moves) | Bass → fold breath, emissive veins, slight chromatic split; highs → iridescence | Dive back in / surge + wide-angle punch + barrel roll |
+| **Voyage** (Void, City, Ocean) | Mandelbox raymarch, CPU-planned spline flight, backdrops: starfield / baked-layout 3D curved city world / curved ocean of swells; half-res + temporal upscale (wide shots sharper) | Presence → fold params and melt; intensity → flight speed, glow; calm moments fly out for wide shots, return as the music picks up | Camera roll sway + FOV breath; fractal corkscrew (backdrops never move) | Bass → fold breath, emissive veins, slight chromatic split; highs → iridescence | Dive back in / surge + wide-angle punch + barrel roll |
 
 **Performance** (RX 7700S, 1080p, synced frame cost at the house-124 drop; budget 16.7 ms):
 
@@ -111,7 +111,7 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 | Silk | 1.5 ms | 3.3 ms |
 | Wisp | 1.1 ms | 1.6 ms |
 | Warp | 1.1 ms | 1.4 ms |
-| Voyage | 1.9 ms | 3.3 ms |
+| Voyage · Void / City / Ocean | 2.0 / 2.3 / 2.1 ms | 3.4 / 3.5 / 3.3 ms (wide shots 3.5–5.8 ms at 1080p) |
 
 **Beat sync** (`--sync`, house-124): Ink Glow 100% (Depth and Flat), Marble 100%, Sumi 96%, Silk 91% (92% on dense-128), Wisp 100%, Warp 100%, Voyage 100% of kicks.
 

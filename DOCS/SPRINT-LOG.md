@@ -1,3 +1,19 @@
+# Feedback round 5 — done
+
+Notes: Voyage backdrop too low-res and flat (needs 3D grass, buildings, proper cities; buildings stood on water); show a city hanging upside down; wide shots too long, sometimes covering main sections; add backdrop choices (Void with stars, Ocean with huge waves, the City world). Decided with Abdul: Void / City / Ocean looks with Void as default; City alternates axis and look-up shots; return when the music picks up (cap ~12 s); fast dive on drops; Void wide shots show the fractal in the stars; no low flyovers, but high-quality 3D at viewing distance.
+
+- [x] Looks Void / City / Ocean (D40)
+- [x] City rebuilt: baked layout texture, 3D terrain and crags, tree canopies, street-grid cities with setback towers and parks, never on water, axis lighting, radius 30 (D40)
+- [x] Ocean: four swell trains rolling down the axis, chop, crests, foam (D40)
+- [x] Wide shots per backdrop incl. the upside-down city; music-driven return retracing the exit; sharper wide shots (D41)
+- [x] Verified: three looks × five tracks, sync 100% each, flicker ≤1.1 swings/s, 3.3–3.5 ms Medium (wide shots ≤5.8 ms), live desktop app
+
+## Phase 2 (next, unchanged)
+- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [ ] Wisp Depth view (same rules)
+
+---
+
 # Feedback round 4 — done
 
 Notes: "stable world" in Voyage meant only the backdrop; the backdrop looked like low-res pastel blocks; add wide shots so the curve can be seen, with buildings hanging off it; Warp needs slow-motion sections. Decided with Abdul: fractal fold breath + corkscrew back; wide shots in breakdowns (or after ~60 s at a calm moment) with a dive back on the drop; natural textures + modern clustered cities; Warp slow-mo in breakdowns and quiet intros.
