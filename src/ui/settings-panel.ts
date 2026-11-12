@@ -35,7 +35,6 @@ const STYLE_HINTS: Partial<Record<StyleId, string>> = {
   wisp: 'Three flames darting through the dark, trailing smoke rings on the bass.',
   warp: 'Streaking stars at hyperspace speed. Quiet parts drift, builds accelerate, drops jump.',
   voyage: 'A flight through an endless 3D fractal world. Heavy on the graphics card; try Low on laptops.',
-  mosh: 'A glitch tunnel of nested frames that twists, reverses and freezes with the music.',
   aura: 'Classic v0.1 rings, particles and glow.',
   halo: 'Classic v0.1 circular spectrum.',
 };

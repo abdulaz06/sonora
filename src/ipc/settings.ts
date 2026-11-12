@@ -155,7 +155,7 @@ export function createSettingsSaver(delayMs = 500): {
 /** v4 lineup: map retired style ids to their nearest successor. */
 function migrateStyleId(mode: unknown, strandsVariant: unknown): unknown {
   switch (mode) {
-    case 'flow-ink': case 'turing': return 'ink';
+    case 'flow-ink': case 'turing': case 'mosh': return 'ink';
     case 'strands': return strandsVariant === 'wisp' || strandsVariant === 'warp' ? strandsVariant : 'silk';
     case 'fractal': return 'voyage';
     default: return mode;

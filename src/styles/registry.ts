@@ -7,7 +7,6 @@ import { createAuraStyle } from './classic/aura';
 import { createHaloStyle } from './classic/halo-spectrum';
 import { createInkStyle } from './ink/ink';
 import { createSilkStyle, createWarpStyle, createWispStyle } from './strands/strands';
-import { createMoshStyle } from './mosh/mosh';
 import { createVoyageStyle } from './voyage/voyage';
 import { STYLE_VARIANTS, type StyleCategory, type StyleDescriptor, type StyleId } from './visual-style';
 
@@ -41,12 +40,6 @@ export const STYLES: StyleDescriptor[] = [
     variants: STYLE_VARIANTS.voyage, defaultVariant: 'voyage',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: createVoyageStyle,
-  },
-  {
-    id: 'mosh', label: 'Mosh', category: 'art',
-    variants: STYLE_VARIANTS.mosh, defaultVariant: 'signal',
-    supportsLight: false, supportsDepth: false, defaultDepth: false,
-    create: createMoshStyle,
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',

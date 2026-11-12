@@ -20,7 +20,6 @@ PICKS = [
     ("wisp", "wisp", "wisp", "3-build"),
     ("warp", "warp", "warp", "3-build"),
     ("voyage", "voyage", "voyage", "3-build"),
-    ("mosh", "signal", "mosh-signal", "3-build"),
 ]
 
 
