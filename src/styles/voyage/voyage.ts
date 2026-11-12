@@ -527,7 +527,8 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_scale: params.scale, u_min_r2: params.minR2, u_fold: params.fold, u_iters: b.iters,
         u_steps: Math.round(b.steps * stepScale), u_detail: b.detail, u_far: mode === 'inside' ? FAR : FAR_VISTA, u_ao_on: b.ao,
         u_sun: sun, u_bg: pal.bg, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
-        u_time: time, u_pulse: clamp01(veins) * (0.4 + 0.6 * fade),
+        // Against Void's dark sky the bass-lit veins read stronger: keep them gentler there.
+        u_time: time, u_pulse: clamp01(veins) * (0.4 + 0.6 * fade) * (backdrop === 'void' ? 0.55 : 1),
         u_glow: clamp01(0.5 * ctx.intensityGlow + 0.5 * ctx.eventState.buildProgress + 0.6 * ctx.eventState.dropEnvelope) * fade,
         u_shimmer: clamp01(0.6 * ctx.highPresence + 0.6 * ctx.highHits) * fade,
         u_fog: fogS, u_light: 0.45 + 0.55 * fade,
