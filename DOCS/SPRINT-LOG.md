@@ -1,3 +1,23 @@
+# Feedback round 3 — done
+
+Abdul's notes after Phase 1: Silk's beat ripple/zoom overdid it on bass-heavy songs; Wisp drifted off screen and went blank on a second visit; Ink hit the beats but looked scattered; Voyage's backdrop reacted to beats and read as a thick dome, and the Kaleido drop replaced the best camera moment; Mosh still not good. Decided with him: remove Silk's ripple/zoom; Ink fixed anchors; Voyage thin curved world, stable on beats, drop = dive + barrel roll, beats = roll sway + FOV breath; scrap Mosh.
+
+- [x] Wisp: fixed view (zoom only); second-visit blank fixed — cause was a fresh instance spawning at its world origin while the shared camera had drifted (D33)
+- [x] Silk: beat zoom, ripple ring and thread pluck removed (D32)
+- [x] Ink: beat anchors, all-anchor bloom every 4th kick, satellites, anchored drop (D34)
+- [x] Voyage: world stable on beats, Kaleido drop removed, barrel-roll drop, roll sway + FOV breath, thin analytic cylinder landscape (D35)
+- [x] Mosh removed (D36)
+- [x] Verified: all styles × five tracks, sync, flicker, perf (1.1–3.3 ms Medium), live desktop app (Punchy, Ocean, dense track)
+
+## Phase 2 (next, unchanged)
+- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [ ] Wisp Depth view (same rules)
+
+## Notes
+- Voyage's landscape is seen through the fractal's openings, so the "curving up" reads best when the flight passes near the box's edges; a fly-out vista was the alternative not chosen.
+
+---
+
 # Feedback round 2 (after Prompt 2) — Phase 1 done
 
 Abdul's review of every mode: Punchy flickered and several palettes blew out (all styles); Ink lost the original's tight sync; Silk is the favourite but friends could not see the sync on a phone video; Lumen, Starry Night, Turing and Kaleido not worth keeping; Wisp looked blank; Warp should follow the song's pace; Mosh repetitive and Concrete ugly; Voyage the most promising but should be more warped, with an endless curving world. Decisions taken with him first: lineup Ink/Silk/Wisp/Warp/Voyage/Mosh, Glow as Ink's default look, Punchy = motion not flashes, Silk sync via pluck + beat camera + drop transformation, Voyage cylinder world + beat folds, fixes first and 3D (Depth toggle, Flat default) as a separate phase.

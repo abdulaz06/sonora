@@ -90,33 +90,31 @@ Classic: Aura and Halo move to a hidden "Classic" section (settings toggle, off 
 
 ---
 
-## 7. What shipped in v1.0 (Prompt 2 + feedback round 2)
+## 7. What shipped in v1.0 (Prompt 2 + feedback rounds 2 and 3)
 
-Registry order: **Ink, Silk, Wisp, Warp, Voyage, Mosh**; Aura and Halo stay in the hidden Classic group. Lumen, Starry Night, Turing and the Kaleido look were removed after review (Kaleido's mirror is now a Voyage drop effect). Every style consumes only mapping signals and events, honours the palette, asks the flash guard before any deliberate flash, and follows the brightness rules: Responsiveness drives motion only, brightness rides the slow `intensityGlow` follower, hits have fixed headroom, and the hue-preserving tonemap plus auto exposure keep bright palettes coloured. Previews live in `src/assets/previews/`.
+Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hidden Classic group. Lumen, Starry Night, Turing, Kaleido and Mosh were removed after review. Every style consumes only mapping signals and events, honours the palette, asks the flash guard before any deliberate flash, and follows the brightness rules: Responsiveness drives motion only, brightness rides the slow `intensityGlow` follower, hits have fixed headroom, and the hue-preserving tonemap plus auto exposure keep bright palettes coloured. Previews live in `src/assets/previews/`.
 
 | Style | Engine | Body / intensity | Beat | Hits | Drop |
 |-------|--------|------------------|------|------|------|
-| **Ink** (Glow, Marble, Sumi) | Stable fluids on a periodic world; Depth surface or Flat | Mid presence → ink drizzle; intensity → turbulence, camera speed | Camera bank | Bass → one distinct splash per kick (+ dye-only kick, energy glow); highs → sparkle | Burst + camera lurch |
-| **Silk** | GPU particles, density accumulation | Presence → active threads; intensity → flow speed | Whole-image zoom punch | Bass → snap + ripple ring (display pass), thread pluck, shockwave, glow | Build gathers a knot → drop bursts into an eight-spoke starburst; inversion cut |
-| **Wisp** | GPU particles + three CPU agents | Intensity → agent speed | — | Bass → smoke rings, flame flare; mids → swerves | Agents surge |
-| **Warp** | GPU particle streaks | Slow intensity → cruise speed; sections set the pace (silence ≈ still, breakdown drift, builds accelerate) | Speed surge | Bass → streak glow | Hyperspace jump |
-| **Voyage** | Mandelbox raymarch, CPU-planned spline flight, cylinder backdrop world, half-res + temporal upscale | Presence → fold params and melt; intensity → flight speed, glow | Camera roll + far-world corkscrew | Bass → fold breath, emissive veins, chromatic split; highs → iridescence | Dive + Kaleido fold (~3 s) |
-| **Mosh** | Analytic twisting Droste tunnel + feedback datamosh | Intensity → twist, spin, drift | One push per beat; drops reverse direction every bar | Bass → smear, rim light; highs → glitch blocks, tears | Freeze → release with twist reversed, shape change |
+| **Ink** (Glow, Marble, Sumi) | Stable fluids on a periodic world; Depth surface or Flat | Mid presence → ink drizzle; intensity → turbulence, camera speed | Every 4th kick blooms all anchors | Bass → bloom from the next beat anchor (stable composition, fixed colour per anchor); mids → satellites; highs → sparkle around anchors | Every anchor blooms, new layout; camera lurch |
+| **Silk** | GPU particles, density accumulation | Presence → active threads; intensity → flow speed | — | Bass → shockwave, thread brightening | Build gathers a knot → drop bursts into an eight-spoke starburst; inversion cut |
+| **Wisp** | GPU particles + three CPU agents in a fixed view (zoom only) | Intensity → agent speed | — | Bass → smoke rings, flame flare; mids → swerves | Agents surge |
+| **Warp** | GPU particle streaks | Slow intensity → cruise speed; sections set the pace | Speed surge | Bass → streak glow | Hyperspace jump |
+| **Voyage** | Mandelbox raymarch, CPU-planned spline flight, analytic cylinder landscape, half-res + temporal upscale | Presence → slow fold params and melt; intensity → flight speed, glow | Camera roll sway + FOV breath (the world never moves on beats) | Bass → emissive veins, slight chromatic split; highs → iridescence | Surge + wide-angle punch + barrel roll |
 
 **Performance** (RX 7700S, 1080p, synced frame cost at the house-124 drop; budget 16.7 ms):
 
 | Style | Low | Medium |
 |-------|-----|--------|
-| Ink · Glow | 1.9 ms | 3.4 ms |
-| Ink · Marble | 1.9 ms | 3.3 ms |
-| Silk | 2.0 ms | 4.5 ms |
-| Wisp | 1.4 ms | 1.8 ms |
-| Warp | 1.4 ms | 1.9 ms |
-| Voyage | 2.1 ms | 3.4 ms |
-| Mosh | 1.3 ms | 1.4 ms |
+| Ink · Glow | 1.5 ms | 3.0 ms |
+| Ink · Marble | 1.6 ms | 3.3 ms |
+| Silk | 1.5 ms | 3.3 ms |
+| Wisp | 1.1 ms | 1.6 ms |
+| Warp | 1.1 ms | 1.4 ms |
+| Voyage | 1.9 ms | 3.3 ms |
 
-**Beat sync** (`--sync`, house-124): Ink Glow 100% (Depth and Flat), Marble 100%, Sumi 87% (paper undersells on luminance), Silk 100%, Wisp 100%, Warp 100%, Voyage 100%, Mosh 96% of kicks.
+**Beat sync** (`--sync`, house-124): Ink Glow 100% (Depth and Flat), Marble 100%, Sumi 96%, Silk 91% (92% on dense-128), Wisp 100%, Warp 100%, Voyage 100% of kicks.
 
-**Flicker / exposure** (`--flicker`, dense-128, Punchy, Ocean): 0.4–1.6 brightness swings per second, at most a few percent blown-out pixels at peak; bright palettes (Aurora, Neon, Gold, Ember/Black) checked the same way.
+**Flicker / exposure** (`--flicker`, dense-128, Punchy, Ocean): Ink 0.08, Voyage 0.58, Silk 1.17, Wisp 1.25, Warp 1.42 brightness swings per second; at most 3.5% blown-out pixels at peak.
 
 **Frame rate.** Settings › Quality › Frame rate caps rendering at 30, 60 (default), 90, 120, 144 fps or the display rate.

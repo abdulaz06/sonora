@@ -107,3 +107,21 @@ The look depends on blue-night vs warm-star contrast. Night colours rotate by th
 
 ## D31 — Voyage: cylinder backdrop and camera-relative bending
 **Decision:** rays leaving the Mandelbox continue into a cylinder (radius 36) whose inner wall is tiled with mini Mandelboxes sliced flush with the wall, so their carved interiors face inward: an endless world curving overhead. Space is bent by a slow sine warp (mirrored in the CPU planner, with a distance-bound correction and a camera safety push) and by a corkscrew about the view axis that is zero at the camera and kicks on beats. Drops fold the screen into a Kaleido mirror for ~3 s.
+
+## D32 — Silk: no beat zoom or ripple
+**Context:** on bass-heavy songs the display-pass zoom punch and ripple ring (D29) fired constantly and made Silk look worse.
+**Decision:** removed, together with the per-thread pluck. Silk's beat response is the on-hit thread brightening and shockwaves; the build-knot / drop-starburst moment stays. Supersedes D29.
+
+## D33 — Wisp has its own fixed view
+**Context:** Wisp came back blank on a second visit: a fresh instance placed its flames near its world origin while the shared camera had drifted (or been dragged) far away.
+**Decision:** Wisp ignores the camera centre and rotation (fixed centre, no pan or drag); only the zoom (view height) follows the camera.
+
+## D34 — Ink: beat anchors
+**Context:** kicks landed at random spots, so even though every kick produced a splash, the result looked scattered and the sync was hard to see.
+**Decision:** 3-4 anchor points per layout form a stable off-centre composition that drifts slowly. Normal kicks bloom from the anchors in turn; every fourth kick and big hits bloom from all of them; each anchor keeps its ink colour and spin; mids are satellites and highs sparkle around anchors; random jets removed. Drops bloom every anchor and move to a new layout (also at build / breakdown). Loud sections fade faster (0.75/s) so each pulse clears.
+
+## D35 — Voyage: the world stays still, the camera moves
+**Decision:** the beat corkscrew, the bass fold breath and the Kaleido drop fold are gone. Beats roll the camera (alternating sway) and breathe the field of view; drops surge with a wide-angle punch and one eased barrel roll. The tiled cylinder backdrop (D31) read as a thick dome; it is replaced by a thin landscape drawn analytically on the inside of a giant cylinder (radius 70, floor 9 units below the fractal): patchwork fields with crop rows, forests, ridges, rivers and fractal-slice cities, palette-tinted earth, rising into haze with the sun at the axis end. Supersedes D31's backdrop and beat folds.
+
+## D36 — Mosh removed
+After two rebuilds Mosh still did not hold up; removed. Saved settings move to Ink.
