@@ -10,6 +10,10 @@ export default defineConfig(async () => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  // The verify harness runs its own server next to `npm run dev:web`; a
+  // separate dependency cache keeps the two from invalidating each other.
+  // @ts-expect-error process is a nodejs global
+  cacheDir: process.env.SONORA_VITE_CACHE || 'node_modules/.vite',
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
