@@ -147,10 +147,11 @@ float sdCity(vec3 pu, out vec4 info) {
   return min(db, toLot + 0.03);
 }
 
-// Ground surface height (terrain, waterline, tree canopies).
+// Ground surface height (terrain, waterline, tree canopies, rock crags).
 float groundH(vec2 q, vec4 L) {
   float forest = (1.0 - step(0.5, L.b)) * L.a;
-  return max(L.r, 0.0) + treeH(q, forest);
+  float crag = smoothstep(1.4, 2.4, L.r) * (vnoise(q * 1.7) * 0.35 + vnoise(q * 4.3) * 0.15);
+  return max(L.r, 0.0) + treeH(q, forest) + crag;
 }
 
 // Ground colour (fields, grass, forest floor, rock, snow, shores, streets).
@@ -182,8 +183,10 @@ vec3 cityGround(vec2 q, vec4 L, float fp, out float water) {
   // Forest floor between canopies.
   col = mix(col, vec3(0.06, 0.12, 0.05), smoothstep(0.1, 0.4, forest));
   // Rock and snow on mountains.
-  float rock = smoothstep(1.9, 2.6, hT);
-  col = mix(col, vec3(0.43, 0.41, 0.38) * (0.82 + 0.3 * mix(0.5, vnoise(q * 3.0 + 9.0), d2)), rock);
+  float rock = smoothstep(1.7, 2.4, hT);
+  float strata = 0.5 + 0.5 * sin(hT * 9.0 + vnoise(q * 0.8) * 3.0);
+  vec3 rockCol = mix(vec3(0.36, 0.33, 0.3), vec3(0.52, 0.49, 0.44), strata) * (0.75 + 0.4 * mix(0.5, vnoise(q * 3.0 + 9.0), d2));
+  col = mix(col, rockCol, rock);
   col = mix(col, vec3(0.88, 0.9, 0.93), smoothstep(3.4, 3.9, hT));
   // Shores: sand where the land meets the water.
   // g holds water (1) and closeness to water (0.05-0.5): sand on the shores only.
@@ -203,9 +206,9 @@ vec3 cityGround(vec2 q, vec4 L, float fp, out float water) {
   return col;
 }
 
-vec3 cityBuilding(vec3 pu, vec4 info, vec3 n, vec3 nu, vec3 rd, float fp) {
+vec3 cityBuilding(vec3 pu, vec4 info, vec3 n, vec3 nu, vec3 rd, float fp, vec3 Ls) {
   bool roof = nu.y > 0.7;
-  float glass = step(0.72, info.y);
+  float glass = step(0.86, info.y);
   vec3 wall = mix(mix(vec3(0.52, 0.53, 0.55), vec3(0.66, 0.6, 0.5), info.z), vec3(0.32, 0.4, 0.48), glass);
   float side = abs(nu.x) > abs(nu.z) ? pu.z : pu.x;
   vec2 wg = vec2(side * 6.0, (pu.y - info.w) * 8.0);
@@ -213,11 +216,16 @@ vec3 cityBuilding(vec3 pu, vec4 info, vec3 n, vec3 nu, vec3 rd, float fp) {
   float win = step(0.22, wf.x) * step(wf.x, 0.78) * step(0.28, wf.y) * step(wf.y, 0.82);
   float dW = 1.0 - smoothstep(0.025, 0.1, fp);
   float lit = step(0.6, cellHash(floor(wg) + info.yz * 91.0).x);
-  vec3 albedo = roof ? vec3(0.27, 0.28, 0.29) : mix(wall, wall * 0.3, mix(0.32, win, dW) * (1.0 - glass * 0.5));
-  float dif = max(dot(n, u_sun), 0.0);
+  // Roofs: varied light materials with darker rooftop plant boxes.
+  vec3 roofCol = info.z < 0.33 ? vec3(0.62, 0.6, 0.57) : info.z < 0.66 ? vec3(0.5, 0.44, 0.38) : vec3(0.42, 0.45, 0.47);
+  vec2 rp = fract(vec2(pu.x, pu.z) * 1.7 + info.yz * 5.0);
+  float plant = step(0.62, rp.x) * step(rp.x, 0.86) * step(0.55, rp.y) * step(rp.y, 0.8) * dW;
+  roofCol *= 1.0 - 0.35 * plant;
+  vec3 albedo = roof ? roofCol : mix(wall, wall * 0.3, mix(0.32, win, dW) * (1.0 - glass * 0.5));
+  float dif = max(dot(n, Ls), 0.0);
   vec3 col = albedo * (dif * 1.2 + 0.32);
   col += (u_c3 * 0.5 + vec3(0.65, 0.52, 0.32)) * mix(0.1, win * lit, dW) * (roof ? 0.0 : 0.45);
-  col += atmosphere(reflect(rd, n)) * (roof ? 0.0 : 0.1 + 0.35 * glass);
+  col += atmosphere(reflect(rd, n)) * (roof ? 0.0 : 0.06 + 0.25 * glass);
   return col;
 }
 
@@ -255,6 +263,9 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   vec2 rel = p.xy - vec2(0.0, u_land_cy);
   vec3 nIn = normalize(vec3(-rel, 0.0));
   vec3 tA = normalize(vec3(-rel.y, rel.x, 0.0));
+  // Light comes from the axis (as in a habitat) blended with the end-cap sun,
+  // so the land overhead is lit as well as the land below.
+  vec3 Ls = normalize(nIn * 0.85 + u_sun * 0.5);
   float fp = pix * t;
   vec3 col;
   if (mat == 2) {
@@ -265,7 +276,7 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
                    sdCity(pu + vec3(0, 0, e), inf) - sdCity(pu - vec3(0, 0, e), inf));
     vec3 nu = normalize(gu + vec3(0.0, 1e-6, 0.0));
     vec3 n = normalize(tA * nu.x + nIn * nu.y + vec3(0.0, 0.0, 1.0) * nu.z);
-    col = cityBuilding(pu, binfo, n, nu, rd, fp);
+    col = cityBuilding(pu, binfo, n, nu, rd, fp, Ls);
   } else {
     float water;
     vec3 albedo = cityGround(pu.xz, L, fp, water);
@@ -279,7 +290,7 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
     float canopy = smoothstep(0.02, 0.15, treeH(pu.xz, forest));
     vec3 leaf = vec3(0.1, 0.22, 0.08) * (0.75 + 0.5 * vnoise(pu.xz * 9.0));
     albedo = mix(albedo, leaf, canopy);
-    float dif = max(dot(n, u_sun), 0.0);
+    float dif = max(dot(n, Ls), 0.0);
     // Soft occlusion between canopies and in valleys.
     float occ = 0.75 + 0.25 * smoothstep(-0.2, 0.25, pu.y - max(L.r, 0.0) - 0.3 * canopy);
     col = albedo * (dif * 1.25 + 0.3) * occ;
@@ -360,7 +371,7 @@ vec3 oceanWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   float crest = smoothstep(0.6, 1.7, h0);
   vec3 sss = vec3(0.05, 0.32, 0.34) * crest * (0.5 + 0.5 * max(dot(-u_sun, rd), 0.0) + 0.4);
   vec3 col = deep + sss;
-  float dif = max(dot(n, u_sun), 0.0);
+  float dif = max(dot(n, normalize(nIn * 0.85 + u_sun * 0.5)), 0.0);
   col *= 0.6 + 0.6 * dif;
   col = mix(col, atmosphere(reflect(rd, n)) * 0.7, 0.08 + 0.85 * fres);
   float slope = length(vec2(hx, hz)) / e;

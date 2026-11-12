@@ -40,11 +40,11 @@ import landBakeFrag from './shaders/landbake.frag?raw';
 import fullscreenVert from '../../engine/shaders/fullscreen.vert?raw';
 
 // ── Tuning ──────────────────────────────────────────────────────
-interface Budget { marchScale: number; steps: number; iters: number; detail: number; ao: boolean; blend: number }
+interface Budget { marchScale: number; vistaScale: number; steps: number; iters: number; detail: number; ao: boolean; blend: number }
 const BUDGET: Record<QualityLevel, Budget> = {
-  low: { marchScale: 0.5, steps: 56, iters: 8, detail: 1.6, ao: false, blend: 0.2 },
-  medium: { marchScale: 0.5, steps: 88, iters: 10, detail: 1.1, ao: true, blend: 0.15 },
-  high: { marchScale: 0.75, steps: 130, iters: 12, detail: 0.8, ao: true, blend: 0.12 },
+  low: { marchScale: 0.5, vistaScale: 0.5, steps: 56, iters: 8, detail: 1.6, ao: false, blend: 0.2 },
+  medium: { marchScale: 0.5, vistaScale: 0.7, steps: 88, iters: 10, detail: 1.1, ao: true, blend: 0.15 },
+  high: { marchScale: 0.75, vistaScale: 1.0, steps: 130, iters: 12, detail: 0.8, ao: true, blend: 0.12 },
 };
 /** Fractal parameters and the flight space inside the box. */
 const BASE: BoxParams = { scale: 2.9, minR2: 0.25, fold: 1.0 };
@@ -60,7 +60,7 @@ const FOLD_BREATH = 0.035;
 const TWIST_BASE = 0.004;
 const TWIST_BEAT = 0.016;
 /** Landscape cylinder: radius, and how far below the fractal's centre its floor lies. */
-const LAND_R = 40;
+const LAND_R = 30;
 const LAND_FLOOR = 9;
 /** Building march steps per quality (wide shots). */
 const LAND_STEPS: Record<QualityLevel, number> = { low: 32, medium: 56, high: 80 };
@@ -73,7 +73,7 @@ const LAND_FOG = 0.0075;
 /** Wide shots: after this long without one (s), a calm moment also pulls out. */
 const VISTA_IDLE_S = 60;
 /** Exit: give up flying out after this long and cut (s); "outside" = |p|∞ beyond. */
-const EXIT_MAX_S = 12;
+const EXIT_MAX_S = 6;
 const OUTSIDE = 4.5;
 /** Exit flight speed multiplier (a purposeful fly-out, even in a breakdown). */
 const EXIT_SPEED = 3.5;
@@ -82,9 +82,22 @@ const VISTA_EASE = 3.5;
 const VISTA_R = 13;
 const VISTA_Y = -1.5;
 const VISTA_LOOK: Vec3 = [0, -3, 55];
-/** Vista ends: idle-triggered after this long, any after the max (s). */
-const VISTA_IDLE_HOLD = 15;
-const VISTA_MAX = 45;
+/** Vista ends when the music picks up (intensity this far above where it
+ * was, or a build / drop), or after the max (s). Idle-triggered shots are
+ * shorter. Return: ease back to the exit, then replay the exit path backwards. */
+const VISTA_PICKUP = 0.12;
+const VISTA_IDLE_HOLD = 8;
+const VISTA_MAX = 10;
+const RETURN_EASE = 1.6;
+const RETURN_RATE = 2;
+/** Look-up shot (City): orbit radius and the camera height beside the fractal. */
+const LOOKUP_R = 7.5;
+const LOOKUP_Y = -2.5;
+const LOOKUP_Z = -28;
+/** Where on the ceiling (z) the look-up shot aims: the featured district sits around z = 0. */
+const LOOKUP_AIM_Z = 6;
+/** Void shot: orbit radius around the fractal. */
+const FRACTAL_R = 13;
 /** Dive back in (s) and the wide-shot field of view (deg). */
 const DIVE_IN_S = 1.0;
 const FOV_VISTA = 72;
@@ -170,7 +183,14 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
   let lastReal = -1, realMs = TARGET_MS;
   let prev: { pos: Vec3; right: Vec3; up: Vec3; fwd: Vec3; tan: number } | null = null;
   // Wide shots
-  type Mode = 'inside' | 'exit' | 'vista' | 'dive';
+  type Mode = 'inside' | 'exit' | 'vista' | 'return' | 'dive';
+  type Shot = 'axis' | 'lookup' | 'fractal';
+  let shot: Shot = 'axis';
+  let lookupNext = true;
+  let entryGlow = 0;
+  const trailPos: Vec3[] = [];
+  const trailFwd: Vec3[] = [];
+  let retFrom: { pos: Vec3; fwd: Vec3 } = { pos: [0, 0, 0], fwd: [0, 0, 1] };
   let mode: Mode = 'inside';
   let modeT = 0;
   let lastVista = 0;
@@ -186,8 +206,20 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     path.setGoal(null);
     vistaFrom = { pos: [...pos], fwd: [...fwd] };
     vistaAngle = Math.atan2(pos[2], pos[0]) || 0;
-    if (cut) resetHist = true;
+    // Which shot: Void shows the fractal among the stars, Ocean looks down the
+    // axis at the swells, City alternates the axis view and the city overhead.
+    if (backdrop === 'void') shot = 'fractal';
+    else if (backdrop === 'ocean') shot = 'axis';
+    else { shot = lookupNext ? 'lookup' : 'axis'; lookupNext = !lookupNext; }
+    if (cut) { resetHist = true; trailPos.length = 0; trailFwd.length = 0; }
     setMode('vista');
+  }
+
+  /** Fly back in: retrace the exit path (collision-free) if we have one. */
+  function startReturn(): void {
+    if (trailPos.length < 12) { startDive(); return; }
+    retFrom = { pos: [...pos], fwd: [...fwd] };
+    setMode('return');
   }
 
   function startDive(): void {
@@ -197,17 +229,29 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     setMode('dive');
   }
 
-  /** Vista orbit position / look target at time t into the vista. */
-  function vistaPose(t: number): { p: Vec3; look: Vec3 } {
+  /** Wide-shot camera position / look target / up hint at time t into the shot. */
+  function vistaPose(t: number): { p: Vec3; look: Vec3; upHint: Vec3 } {
     const a = vistaAngle + t * 0.035;
+    if (shot === 'lookup') {
+      // Beside the fractal, looking up at the city hanging overhead.
+      // Back down the axis from the fractal, looking up at an angle so the
+      // towers overhead show in profile, hanging down, past the fractal.
+      const p: Vec3 = [Math.cos(a * 0.6) * LOOKUP_R, LOOKUP_Y + 0.6 * Math.sin(t * 0.2), LOOKUP_Z + Math.sin(a * 0.6) * 2];
+      return { p, look: [p[0] * 0.2, LAND_R * 2 - LAND_FLOOR - 6, LOOKUP_AIM_Z], upHint: [0, 0, 1] };
+    }
+    if (shot === 'fractal') {
+      const p: Vec3 = [Math.cos(a) * FRACTAL_R, 1.5 + 1.5 * Math.sin(t * 0.13), Math.sin(a) * FRACTAL_R];
+      return { p, look: [0, 0, 0], upHint: [0, 1, 0] };
+    }
     const p: Vec3 = [Math.cos(a) * VISTA_R, VISTA_Y + 1.2 * Math.sin(t * 0.11), Math.sin(a) * VISTA_R * 0.7 - 4];
-    const look: Vec3 = [VISTA_LOOK[0] * 0.3 + p[0] * 0.2, VISTA_LOOK[1], VISTA_LOOK[2]];
-    return { p, look };
+    return { p, look: [VISTA_LOOK[0] * 0.3 + p[0] * 0.2, VISTA_LOOK[1], VISTA_LOOK[2]], upHint: [0, 1, 0] };
   }
 
   function ensure(w: number, h: number): void {
     const b = BUDGET[quality.level];
-    const lw = Math.max(32, Math.round(w * b.marchScale)), lh = Math.max(32, Math.round(h * b.marchScale));
+    // Wide shots render sharper (the landscape is the subject there).
+    const sc = mode === 'vista' || mode === 'return' ? b.vistaScale : b.marchScale;
+    const lw = Math.max(32, Math.round(w * sc)), lh = Math.max(32, Math.round(h * sc));
     if (!low || low.w !== lw || low.h !== lh) {
       deleteTarget(gl, low);
       low = createTarget(gl, lw, lh, { internal: gl.RGBA16F, filter: gl.LINEAR });
@@ -234,14 +278,45 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     const es = ctx.eventState;
     const fade = ctx.fadeInOut;
     let target: Vec3, look: Vec3;
+    let upHint: Vec3 = [0, 1, 0];
+    const lerp3 = (a: Vec3, b: Vec3, k: number): Vec3 => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
     if (mode === 'vista') {
       const e = Math.min(1, modeT / VISTA_EASE);
       const k = e * e * (3 - 2 * e);
       const vp = vistaPose(modeT);
-      target = [vistaFrom.pos[0] + (vp.p[0] - vistaFrom.pos[0]) * k, vistaFrom.pos[1] + (vp.p[1] - vistaFrom.pos[1]) * k, vistaFrom.pos[2] + (vp.p[2] - vistaFrom.pos[2]) * k];
+      target = lerp3(vistaFrom.pos, vp.p, k);
       const ahead: Vec3 = [vistaFrom.pos[0] + vistaFrom.fwd[0] * 4, vistaFrom.pos[1] + vistaFrom.fwd[1] * 4, vistaFrom.pos[2] + vistaFrom.fwd[2] * 4];
-      look = [ahead[0] + (vp.look[0] - ahead[0]) * k, ahead[1] + (vp.look[1] - ahead[1]) * k, ahead[2] + (vp.look[2] - ahead[2]) * k];
+      look = lerp3(ahead, vp.look, k);
+      upHint = k > 0.5 ? vp.upHint : [0, 1, 0];
       pos = target;
+    } else if (mode === 'return') {
+      // Ease back to where the exit ended, then retrace the exit backwards.
+      const n = trailPos.length;
+      const end = trailPos[n - 1];
+      const endIn: Vec3 = [end[0] - trailFwd[n - 1][0] * 3, end[1] - trailFwd[n - 1][1] * 3, end[2] - trailFwd[n - 1][2] * 3];
+      if (modeT < RETURN_EASE) {
+        const e = modeT / RETURN_EASE;
+        const k = e * e * (3 - 2 * e);
+        pos = lerp3(retFrom.pos, end, k);
+        const ahead: Vec3 = [retFrom.pos[0] + retFrom.fwd[0] * 4, retFrom.pos[1] + retFrom.fwd[1] * 4, retFrom.pos[2] + retFrom.fwd[2] * 4];
+        look = lerp3(ahead, endIn, k);
+      } else {
+        const fi = (n - 1) - (modeT - RETURN_EASE) * 60 * RETURN_RATE;
+        if (fi <= 0) {
+          const f0 = trailFwd[0];
+          path.restartAt(trailPos[0], [-f0[0], -f0[1], -f0[2]]);
+          pos = [...trailPos[0]];
+          lastVista = time;
+          trailPos.length = 0; trailFwd.length = 0;
+          setMode('inside');
+          return;
+        }
+        const i0 = Math.floor(fi), k = fi - i0;
+        const i1 = Math.min(n - 1, i0 + 1);
+        pos = lerp3(trailPos[i0], trailPos[i1], k);
+        const f = lerp3(trailFwd[i0], trailFwd[i1], k);
+        look = [pos[0] - f[0] * 3, pos[1] - f[1] * 3, pos[2] - f[2] * 3];
+      }
     } else {
       // Dive: accelerate from the vista into the fractal; hand over to the
       // planner at the end (masked by speed, the FOV punch and the roll).
@@ -262,7 +337,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     const k = expApproach(dt, mode === 'dive' ? 0.12 : 0.6);
     fwd = norm([fwd[0] + (fwdT[0] - fwd[0]) * k, fwd[1] + (fwdT[1] - fwd[1]) * k, fwd[2] + (fwdT[2] - fwd[2]) * k]);
     const lean = expApproach(dt, 1.5);
-    up = [up[0], up[1] + lean, up[2]];
+    up = [up[0] + upHint[0] * lean, up[1] + upHint[1] * lean, up[2] + upHint[2] * lean];
     const d = up[0] * fwd[0] + up[1] * fwd[1] + up[2] * fwd[2];
     up = norm([up[0] - fwd[0] * d, up[1] - fwd[1] * d, up[2] - fwd[2] * d]);
     // Beat camera still works out here: roll sway and FOV breath.
@@ -273,7 +348,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
       fovVel += FOV_BEAT * 6 * (0.5 + 0.5 * fade);
     }
     [roll, rollVel] = spring(roll, rollVel, 0.15 * simplex2(time * 0.05, 11), 2.2, dt);
-    const fovT = mode === 'vista' ? FOV_VISTA : FOV + FOV_DROP * 0.5;
+    const fovT = mode === 'vista' ? FOV_VISTA : mode === 'return' ? FOV : FOV + FOV_DROP * 0.5;
     [fov, fovVel] = spring(fov, fovVel, fovT, 3, dt);
     dive *= Math.exp(-dt / DIVE_TAU);
     barrelT += dt;
@@ -288,7 +363,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
       if (e.type === 'drop') {
         // Out on a wide shot: the drop dives back into the fractal.
-        if (mode === 'vista' || mode === 'exit') startDive();
+        if (mode === 'vista' || mode === 'exit' || mode === 'return') startDive();
         // The drop belongs to the camera: surge, wide-angle punch, barrel roll.
         if (ctx.flash.request()) flashEnv = 1;
         dive = 1;
@@ -337,19 +412,26 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         const breakdown = es.section === 'breakdown';
         if (breakdown || (time - lastVista > VISTA_IDLE_S && calm)) {
           vistaIdle = !breakdown;
+          entryGlow = ctx.intensityGlow;
+          trailPos.length = 0; trailFwd.length = 0;
           // Head outward through the structure toward a point beyond the box.
           const out = norm([pos[0] || 0.1, pos[1] * 0.3, pos[2] || 0.1]);
           path.setGoal([out[0] * 14, out[1] * 14, out[2] * 14]);
           setMode('exit');
         }
       }
+      // The music picking up ends a wide shot (or cancels a fly-out).
+      const pickup = ctx.intensityGlow > entryGlow + VISTA_PICKUP || es.section === 'build' || es.section === 'drop'
+        || (!vistaIdle && es.section !== 'breakdown');
       if (mode === 'exit') {
+        trailPos.push([...pos]); trailFwd.push([...fwd]);
         const outside = Math.max(Math.abs(pos[0]), Math.abs(pos[1]), Math.abs(pos[2])) > OUTSIDE;
-        if (outside) startVista(false);
+        if (pickup) { path.setGoal(null); lastVista = time; setMode('inside'); }
+        else if (outside) startVista(false);
         else if (modeT > EXIT_MAX_S) startVista(true);
       }
-      if (mode === 'vista' && ((vistaIdle && modeT > VISTA_IDLE_HOLD) || modeT > VISTA_MAX)) startDive();
-      if (mode === 'vista' || mode === 'dive') {
+      if (mode === 'vista' && (pickup || modeT > (vistaIdle ? VISTA_IDLE_HOLD : VISTA_MAX))) startReturn();
+      if (mode === 'vista' || mode === 'dive' || mode === 'return') {
         flyScripted(ctx, dt);
         return;
       }
@@ -470,7 +552,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
       gl.useProgram(present.prog);
       setUniforms(gl, present, {
         u_src: H.read.tex[0], u_res: [ctx.width, ctx.height],
-        u_chroma: (0.002 + 0.0035 * ctx.bassHits) * (0.4 + 0.6 * fade),
+        u_chroma: mode === 'inside' || mode === 'exit' ? (0.002 + 0.0035 * ctx.bassHits) * (0.4 + 0.6 * fade) : 0,
       });
       drawQuad(gl, quadVAO);
 

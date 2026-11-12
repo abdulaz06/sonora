@@ -135,6 +135,18 @@ export class FlightPath {
     if (p && this.pts.length > this.seg + 6) this.pts.length = this.seg + 6;
   }
 
+  /** Continue from point p heading along dir (after replaying a wide-shot exit backwards). */
+  restartAt(p: Vec3, dir: Vec3): void {
+    const sp = this.space();
+    const d = norm(dir);
+    this.goal = null;
+    this.pts = [sub(p, scl(d, sp.clearance)), [...p] as Vec3];
+    while (this.pts.length < 5) this.extend();
+    this.seg = 0;
+    this.u = 0;
+    this.segLen = this.measure();
+  }
+
   /** Find a fresh start inside the structure. */
   reset(): void {
     const sp = this.space();

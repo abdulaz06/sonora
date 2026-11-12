@@ -29,19 +29,22 @@ void main() {
   // Terrain: rolling ground plus ridged mountains.
   float roll = fbm3(P * 0.03);
   float ridge = 1.0 - abs(snoise(P * 0.011 + 9.1));
-  float mount = pow(ridge, 4.0);
+  float mount = pow(ridge, 6.0) * smoothstep(-0.2, 0.4, snoise(P * 0.005 + 5.0));
   float h = 0.7 + 0.8 * roll + 3.4 * mount;
+  // The featured district overhead (θ = π, z ≈ 0) stays dry: water is
+  // pushed away in the noise itself, so shorelines stay natural.
+  vec2 dq = vec2((th - 3.14159265) * u_r, z);
+  float feature = exp(-dot(dq, dq) / (26.0 * 26.0));
   // Water: meandering rivers and a few lakes; a wider buffer keeps cities off the banks.
-  float rv = abs(fbm3(P * 0.008 + 4.0));
+  float rv = abs(fbm3(P * 0.008 + 4.0)) + 0.12 * feature;
   float river = smoothstep(0.042, 0.022, rv);
-  float lakeN = -snoise(P * 0.012 + 2.0);
+  float lakeN = -snoise(P * 0.012 + 2.0) - 0.9 * feature;
   float lake = smoothstep(0.5, 0.62, lakeN);
   float wet = max(river, lake);
   float bank = max(smoothstep(0.085, 0.045, rv), smoothstep(0.4, 0.5, lakeN));
   // Cities: districts where a slow noise peaks, plus the featured one overhead.
   float region = snoise(P * 0.0065 + 2.3) * 0.5 + 0.5;
-  vec2 dq = vec2((th - 3.14159265) * u_r, z);
-  region = max(region, 0.95 * exp(-dot(dq, dq) / (18.0 * 18.0)));
+  region = max(region, 0.97 * feature * (0.82 + 0.3 * snoise(P * 0.03 + 7.0)));
   float flatLand = 1.0 - smoothstep(0.2, 0.5, mount);
   float city = smoothstep(0.62, 0.7, region) * flatLand * (1.0 - bank);
   float core = smoothstep(0.7, 0.92, region);
@@ -49,6 +52,9 @@ void main() {
   // Cities sit on level ground; water is carved below the waterline.
   h = mix(h, 0.35, city);
   h = mix(h, -0.7, wet);
-  float shore = 0.5 * max(smoothstep(0.052, 0.04, rv), smoothstep(0.47, 0.5, lakeN));
+  // Shores a fixed few texels wide (measured with the noise's screen derivative).
+  float rs = clamp(1.0 - (rv - 0.022) / (fwidth(rv) * 7.0 + 1e-5), 0.0, 1.0);
+  float ls = clamp(1.0 + (lakeN - 0.5) / (fwidth(lakeN) * 7.0 + 1e-5), 0.0, 1.0);
+  float shore = 0.5 * max(rs, ls);
   frag = vec4(h, max(wet, shore * (1.0 - wet)), city, city > 0.5 ? core : forest * (1.0 - city));
 }
