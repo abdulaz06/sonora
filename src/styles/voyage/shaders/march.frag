@@ -26,6 +26,7 @@ uniform int u_iters;
 // Space bending
 uniform float u_warp_amp;    // melt amplitude (world units)
 uniform float u_warp_freq;
+uniform float u_twist;       // fractal corkscrew (rad per world unit ahead of the camera)
 uniform float u_lip;         // distance-bound correction for the bending
 // Landscape cylinder
 uniform float u_land_r;      // radius
@@ -84,8 +85,17 @@ vec4 trap(vec3 pos) {
   return t;
 }
 
-// Slow melting warp. Mirrored on the CPU for the planner.
+// Bend the fractal's space (the landscape is never bent): a corkscrew about
+// the view axis that kicks on beats (zero at the camera, so the flight never
+// clips), then the slow melting warp (mirrored on the CPU for the planner).
 vec3 bend(vec3 p) {
+  vec3 rel = p - u_cam_pos;
+  float along = max(dot(rel, u_cam_fwd), 0.0);
+  float ang = u_twist * along;
+  float x = dot(rel, u_cam_right), y = dot(rel, u_cam_up);
+  float c = cos(ang), s = sin(ang);
+  rel += u_cam_right * ((c * x - s * y) - x) + u_cam_up * ((s * x + c * y) - y);
+  p = u_cam_pos + rel;
   return p + u_warp_amp * sin(p.yzx * u_warp_freq + vec3(u_time * 0.35, u_time * 0.29, u_time * 0.41));
 }
 

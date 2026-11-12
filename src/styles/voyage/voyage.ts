@@ -7,9 +7,10 @@
  * read at a comfortable pace. Beyond the fractal lies a thin landscape on the
  * inside of a giant cylinder (march.frag), rising on both sides into the sky.
  *
- * The world itself is stable: it never reacts to beats. The camera moves.
- *   presence     → slow fold parameters and melt (seconds, not beats)
- *   bass hits    → emissive veins, slight chromatic split (light, not shape)
+ * The landscape never reacts to beats; the fractal and the camera do.
+ *   presence     → slow fold parameters and melt
+ *   bass hits    → fold breath, emissive veins, slight chromatic split
+ *   beat         → corkscrew twist of the fractal ahead (alternating)
  *   highs        → iridescent sheen
  *   beat         → alternating roll sway + a short FOV breath
  *   intensity    → flight speed and glow; build → faster, wider
@@ -51,6 +52,11 @@ const WARP_BASE = 0.01;
 const WARP_MID = 0.016;
 const WARP_BUILD = 0.012;
 const WARP_FREQ = 2.6;
+/** Fractal beat reactions (the landscape never moves): bass fold breath, and a
+ * corkscrew ahead of the camera on beats (rad per world unit: base + kick). */
+const FOLD_BREATH = 0.035;
+const TWIST_BASE = 0.004;
+const TWIST_BEAT = 0.016;
 /** Landscape cylinder: radius, and how far below the fractal's centre its floor lies. */
 const LAND_R = 70;
 const LAND_FLOOR = 9;
@@ -111,6 +117,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
   let scaleS = 0, minrS = 0, veins = 0;
   let fogS = 0.16;
   let warpMid = 0;
+  let twistEnv = 0, twistSign = 1;
   const safe: Vec3 = [0, 0, 0];
   let stepScale = 1;
   let lastReal = -1, realMs = TARGET_MS;
@@ -178,11 +185,11 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
       veins = Math.max(veins * Math.exp(-dt / 0.16), ctx.bassHits);
       params.scale = BASE.scale - SCALE_MOD * (scaleS - 0.4) + 0.02 * simplex2(time * 0.03, 7);
       params.minR2 = clamp(BASE.minR2 + MINR_MOD * (minrS - 0.3), 0.12, 0.5);
-      params.fold = BASE.fold;
+      params.fold = BASE.fold + FOLD_BREATH * veins;
       warpMid += (ctx.midPresence - warpMid) * expApproach(dt, 2);
       params.warpAmp = (WARP_BASE + WARP_MID * warpMid + WARP_BUILD * es.buildProgress) * (0.5 + 0.5 * fade);
       params.warpTime = time;
-      params.lip = 1 / (1 + params.warpAmp * WARP_FREQ * 2.5);
+      params.lip = 1 / (1 + params.warpAmp * WARP_FREQ * 2.5 + (TWIST_BASE + TWIST_BEAT) * 6);
 
       // Flight.
       dive *= Math.exp(-dt / DIVE_TAU);
@@ -225,7 +232,10 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         rollVel += ROLL_KICK * rollSign * (0.4 + 0.6 * fade) * (0.6 + 0.8 * ctx.responsiveness);
         rollSign = -rollSign;
         fovVel += FOV_BEAT * 9 * (0.5 + 0.5 * fade) * (0.6 + 0.8 * ctx.responsiveness);
+        twistEnv = 1;
+        twistSign = -twistSign;
       }
+      twistEnv *= Math.exp(-dt / 0.35);
       [roll, rollVel] = spring(roll, rollVel, ROLL_WANDER * simplex2(time * 0.05, 11), 2.2, dt);
       const fovT = FOV + FOV_BUILD * es.buildProgress;
       [fov, fovVel] = spring(fov, fovVel, fovT, 5, dt);
@@ -265,6 +275,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_res: [L.w, L.h], u_jitter: jit, u_cam_pos: pos, u_cam_right: right, u_cam_up: camUp, u_cam_fwd: fwd,
         u_tan_half: tan, u_aspect: aspect,
         u_warp_amp: params.warpAmp ?? 0, u_warp_freq: WARP_FREQ, u_lip: params.lip ?? 1,
+        u_twist: (TWIST_BASE + TWIST_BEAT * twistEnv * (0.6 + 0.8 * ctx.responsiveness)) * twistSign,
         u_land_r: LAND_R, u_land_cy: LAND_R - LAND_FLOOR,
         u_scale: params.scale, u_min_r2: params.minR2, u_fold: params.fold, u_iters: b.iters,
         u_steps: Math.round(b.steps * stepScale), u_detail: b.detail, u_far: FAR, u_ao_on: b.ao,
