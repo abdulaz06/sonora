@@ -97,8 +97,8 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 | Style | Engine | Body / intensity | Beat | Hits | Drop |
 |-------|--------|------------------|------|------|------|
 | **Ink** (Glow, Marble, Sumi) | Stable fluids on a periodic world; Depth surface or Flat | Mid presence → ink drizzle; intensity → turbulence, camera speed | Every 4th kick blooms all anchors | Bass → bloom from the next beat anchor (stable composition, fixed colour per anchor); mids → satellites; highs → sparkle around anchors | Every anchor blooms, new layout; camera lurch |
-| **Silk** | GPU particles, density accumulation | Presence → active threads; intensity → flow speed | — | Bass → shockwave, thread brightening | Build gathers a knot → drop bursts into an eight-spoke starburst; inversion cut |
-| **Wisp** | GPU particles + three CPU agents in a fixed view (zoom only) | Intensity → agent speed | — | Bass → smoke rings, flame flare; mids → swerves | Agents surge |
+| **Silk** | GPU particles, density accumulation; Flat (default) or Depth (ribbons floating over the ground) | Presence → active threads; intensity → flow speed | — | Bass → shockwave, thread brightening | Build gathers a knot → drop bursts into an eight-spoke starburst; inversion cut |
+| **Wisp** | GPU particles + three CPU agents; Flat (default, fixed view, zoom only) or Depth (flames at changing heights, 3D smoke) | Intensity → agent speed | — | Bass → smoke rings, flame flare; mids → swerves | Agents surge |
 | **Warp** | GPU particle streaks | Slow intensity → cruise speed; slow-motion in breakdowns and quiet intros, regular pace with the beat, builds accelerate | Speed surge | Bass → streak glow | Hyperspace jump |
 | **Voyage** (Void, City, Ocean) | Mandelbox raymarch, CPU-planned spline flight, backdrops: starfield / baked-layout 3D curved city world / curved ocean of swells; half-res + temporal upscale (wide shots sharper) | Presence → fold params and melt; intensity → flight speed, glow; calm moments fly out for wide shots, return as the music picks up | Camera roll sway + FOV breath; fractal corkscrew (backdrops never move) | Bass → fold breath, emissive veins, slight chromatic split; highs → iridescence | Dive back in / surge + wide-angle punch + barrel roll |
 
@@ -108,13 +108,13 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 |-------|-----|--------|
 | Ink · Glow | 1.5 ms | 3.0 ms |
 | Ink · Marble | 1.6 ms | 3.3 ms |
-| Silk | 1.5 ms | 3.3 ms |
-| Wisp | 1.1 ms | 1.6 ms |
+| Silk (Flat / Depth) | 1.5 / 1.8 ms | 4.6 / 4.6 ms |
+| Wisp (Flat / Depth) | 1.1 / 1.1–1.7 ms | 1.6 / 1.4–1.7 ms |
 | Warp | 1.1 ms | 1.4 ms |
 | Voyage · Void / City / Ocean | 2.0 / 2.3 / 2.1 ms | 3.4 / 3.5 / 3.3 ms (wide shots 3.5–5.8 ms at 1080p) |
 
-**Beat sync** (`--sync`, house-124): Ink Glow 100% (Depth and Flat), Marble 100%, Sumi 96%, Silk 91% (92% on dense-128), Wisp 100%, Warp 100%, Voyage 100% of kicks.
+**Beat sync** (`--sync`, house-124): Ink Glow 100% (Depth and Flat), Marble 100%, Sumi 96%, Silk 91% (92% on dense-128; Depth 91–100%), Wisp 100% (Depth 100%), Warp 100%, Voyage 100% of kicks.
 
-**Flicker / exposure** (`--flicker`, dense-128, Punchy, Ocean): Ink 0.08, Voyage 0.58, Silk 1.17, Wisp 1.25, Warp 1.42 brightness swings per second; at most 3.5% blown-out pixels at peak.
+**Flicker / exposure** (`--flicker`, dense-128, Punchy, Ocean): Ink 0.08, Voyage 0.58, Silk 1.17 (Depth 0.83), Wisp 1.25 (Depth 1.0), Warp 1.42 brightness swings per second; at most 3.5% blown-out pixels at peak.
 
 **Frame rate.** Settings › Quality › Frame rate caps rendering at 30, 60 (default), 90, 120, 144 fps or the display rate.

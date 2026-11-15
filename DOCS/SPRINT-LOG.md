@@ -1,3 +1,15 @@
+# Phase 2 — Silk and Wisp Depth views — done (awaiting review)
+
+Rules from round 2: Depth/Flat toggle with Flat as the default; the 2D path untouched; Silk and Wisp assessed separately.
+
+- [x] Silk Depth: ribbons float as thin sheets whose height rolls with position, dust as stars above, under the shared 3D camera (presets, drag, scroll, curvature, fog) (D42)
+- [x] Wisp Depth: flames at changing heights circling a point near the camera; smoke keeps its shedding height and rises; projected flames (D42)
+- [x] Flat unchanged: Flat renders pixel-identical to before on house-124
+- [x] Close-up particles spread the same light as they grow (Silk blown-out max 6.8% → 2.0%, Wisp 10.2% → 5.2%)
+- [x] Verified: both views × five tracks; sync Silk Depth 91–100%, Wisp Depth 100% (Flat unchanged); flicker 0.83 / 1.0 swings/s; Silk 1.8 / 4.6 ms, Wisp 1.1–1.7 ms Low/Medium; presets Planet and Overhead; Silk paper look
+
+---
+
 # Feedback round 5 — done
 
 Notes: Voyage backdrop too low-res and flat (needs 3D grass, buildings, proper cities; buildings stood on water); show a city hanging upside down; wide shots too long, sometimes covering main sections; add backdrop choices (Void with stars, Ocean with huge waves, the City world). Decided with Abdul: Void / City / Ocean looks with Void as default; City alternates axis and look-up shots; return when the music picks up (cap ~12 s); fast dive on drops; Void wide shots show the fractal in the stars; no low flyovers, but high-quality 3D at viewing distance.
@@ -9,8 +21,8 @@ Notes: Voyage backdrop too low-res and flat (needs 3D grass, buildings, proper c
 - [x] Verified: three looks × five tracks, sync 100% each, flicker ≤1.1 swings/s, 3.3–3.5 ms Medium (wide shots ≤5.8 ms), live desktop app
 
 ## Phase 2 (next, unchanged)
-- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
-- [ ] Wisp Depth view (same rules)
+- [x] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [x] Wisp Depth view (same rules)
 
 ---
 
@@ -25,8 +37,8 @@ Notes: "stable world" in Voyage meant only the backdrop; the backdrop looked lik
 - [x] Verified: Voyage and Warp on five tracks, sync 100%, flicker 0.6 / 1.3 swings/s, vista cost 4–8 ms Medium, live desktop app (Voyage wide shot during the breakdown)
 
 ## Phase 2 (next, unchanged)
-- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
-- [ ] Wisp Depth view (same rules)
+- [x] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [x] Wisp Depth view (same rules)
 
 ---
 
@@ -42,8 +54,8 @@ Abdul's notes after Phase 1: Silk's beat ripple/zoom overdid it on bass-heavy so
 - [x] Verified: all styles × five tracks, sync, flicker, perf (1.1–3.3 ms Medium), live desktop app (Punchy, Ocean, dense track)
 
 ## Phase 2 (next, unchanged)
-- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
-- [ ] Wisp Depth view (same rules)
+- [x] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [x] Wisp Depth view (same rules)
 
 ## Notes
 - Voyage's landscape is seen through the fractal's openings, so the "curving up" reads best when the flight passes near the box's edges; a fly-out vista was the alternative not chosen.
@@ -66,8 +78,8 @@ Abdul's review of every mode: Punchy flickered and several palettes blew out (al
 - [x] Verified: all styles × five tracks, sync, flicker, perf, live desktop app (Punchy, Ocean, dense track)
 
 ## Phase 2 (next)
-- [ ] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
-- [ ] Wisp Depth view (same rules)
+- [x] Silk Depth view (Depth/Flat toggle, Flat default; 2D path untouched)
+- [x] Wisp Depth view (same rules)
 
 ## Notes
 - Root cause of the live flicker: Ink's beat pulse scaled brightness up to 2× at Punchy (45% of the frame blown out in a live capture) and the Punchy follower passed per-frame intensity noise into brightness. Live after the fix: no whiteouts on any style.
