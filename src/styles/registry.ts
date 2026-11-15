@@ -20,13 +20,13 @@ export const STYLES: StyleDescriptor[] = [
   {
     id: 'silk', label: 'Silk', category: 'art',
     variants: STYLE_VARIANTS.silk, defaultVariant: 'silk',
-    supportsLight: true, supportsDepth: false, defaultDepth: false,
+    supportsLight: true, supportsDepth: true, defaultDepth: false,
     create: createSilkStyle,
   },
   {
     id: 'wisp', label: 'Wisp', category: 'art',
     variants: STYLE_VARIANTS.wisp, defaultVariant: 'wisp',
-    supportsLight: false, supportsDepth: false, defaultDepth: false,
+    supportsLight: false, supportsDepth: true, defaultDepth: false,
     create: createWispStyle,
   },
   {

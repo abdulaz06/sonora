@@ -19,6 +19,9 @@ uniform float u_pulse;
 uniform vec4 u_agents[4];    // uv.xy, brightness, size
 uniform vec4 u_agent_dir[4]; // direction.xy (screen), speed
 uniform int u_agent_count;
+#ifdef DEPTH
+uniform float u_horizon;      // screen y (uv) of the horizon in the Depth views
+#endif
 out vec4 frag;
 //#include noise
 
@@ -71,5 +74,9 @@ void main() {
   col = u_bg * (0.5 + 0.5 * smoothstep(0.0, 0.9, length(d))) + acc.rgb * (1.0 + 0.55 * u_pulse);
 #endif
 
+#ifdef DEPTH
+  // A faint horizon glow gives the 3D views a sense of ground and distance.
+  if (u_light == 0) col += mix(u_c1, u_c0, 0.5) * 0.06 * exp(-abs(uv.y - u_horizon) * 9.0);
+#endif
   frag = vec4(col, 1.0);
 }

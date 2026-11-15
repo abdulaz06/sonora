@@ -23,7 +23,7 @@ import type { QualityParams } from '../../engine/quality';
 import type { StyleContext, StyleDeps, VisualStyle } from '../visual-style';
 import {
   bindTarget, createTarget, deleteTarget, drawQuad, makeProgram, PingPong, setUniforms,
-  withIncludes, type Program, type Target,
+  withIncludes, type Program, type Target, type UniformValue,
 } from '../shared/gl';
 
 import noiseSrc from '../shared/noise.glsl?raw';
@@ -89,8 +89,26 @@ const WARP_SURGE_TAU = 0.18;
 const WARP_ACCEL_TAU = 0.45;
 const WARP_DECEL_TAU = 0.9;
 
+/** Depth view (Silk / Wisp): the 2D simulation lies on the ground plane of
+ * the 3D camera, scaled up (ground units per sim unit), over a region of this
+ * many sim units around the point the camera looks at. */
+const DEPTH_SCALE: Record<StrandsKind, number> = { silk: 2.4, wisp: 1.3, warp: 1 };
+const DEPTH_VIEW = 1.5;
+const DEPTH_ASPECT = 1.3;
+/** Wisp: screen height whose ground point the flames circle (below the centre = nearer). */
+const DEPTH_WISP_SY = -0.3;
+/** Height of the silk curtains / wisp flight band: base + share of camera altitude. */
+const DEPTH_HSPAN = [0.1, 0.25];
+/** Wisp smoke decay per frame in Depth (shorter, so camera motion doesn't smear it). */
+const WISP_DEPTH_DECAY = 0.955;
+/** Wisp Depth: largest a close flame grows (its brightness is eased as it grows). */
+const DEPTH_FLAME_GROW = 1.6;
+/** Wisp Depth: smoke tone-map gain (smoke spreads over more screen and fades faster). */
+const WISP_DEPTH_SMOKE = 1.8;
+
 interface Shock { x: number; y: number; r: number; s: number; age: number }
 interface Agent { x: number; y: number; heading: number; speed: number; turn: number; glow: number }
+interface Ring { x: number; y: number; age: number; s: number; h: number }
 
 export function createSilkStyle(deps: StyleDeps): VisualStyle { return createStrandsStyle(deps, 'silk'); }
 export function createWispStyle(deps: StyleDeps): VisualStyle { return createStrandsStyle(deps, 'wisp'); }
@@ -118,6 +136,18 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     render: makeProgram(gl, inc(renderVert), inc(renderFrag), def),
     display: makeProgram(gl, fullscreenVert, inc(displayFrag), def),
   };
+  // Depth view programs (Silk / Wisp), built on first use; the Flat ones stay as they are.
+  let pd: { render: Program; display: Program } | null = null;
+  const depthPrograms = (): { render: Program; display: Program } => {
+    const d = `${def}
+#define DEPTH 1`;
+    pd ??= {
+      render: makeProgram(gl, inc(renderVert), inc(renderFrag), d),
+      display: makeProgram(gl, fullscreenVert, inc(displayFrag), d),
+    };
+    return pd;
+  };
+  let wasDepth: boolean | null = null;
 
   // ── State ─────────────────────────────────────────────────────
   let time = 0;
@@ -133,7 +163,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
   const agents: Agent[] = [0, 1, 2].map((i) => ({
     x: (rng() - 0.5) * 0.6, y: (rng() - 0.5) * 0.4, heading: rng() * 6.28, speed: 0.2, turn: (i % 2 ? 1 : -1) * 1.2, glow: 1,
   }));
-  let ring = { x: 0, y: 0, age: 9, s: 0 };
+  let ring: Ring = { x: 0, y: 0, age: 9, s: 0, h: 0 };
   // Warp
   let warpJump = 0;
   let warpSpeed = 6;
@@ -160,6 +190,23 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
   function cut(ctx: StyleContext, beats: number): void {
     if (ctx.flash.request()) cutUntil = time + beats * beatSeconds(ctx);
   }
+
+  const depthOf = (ctx: StyleContext): boolean => ctx.depth && kind !== 'warp';
+  const hspan = (ctx: StyleContext): number => DEPTH_HSPAN[0] + DEPTH_HSPAN[1] * ctx.camera.position[1];
+  /** Wisp flame height (matches agentH() in render.vert). */
+  const agentH = (ctx: StyleContext, i: number, t: number): number =>
+    hspan(ctx) * (0.55 + 0.32 * Math.sin(t * 0.37 + i * 2.1) + 0.13 * Math.sin(t * 1.13 + i * 4.0));
+  /** Sim-space point for normalised screen coords: the 2D camera in Flat, the
+   * ground under the 3D camera in Depth (emitters and shocks keep to the lower,
+   * nearer part of the screen there). */
+  const toSim = (ctx: StyleContext, sx: number, sy: number): [number, number] => {
+    const cam = ctx.camera;
+    if (!depthOf(ctx)) return cam.screenToWorld2D(sx, sy);
+    const g = cam.screenToGround(sx * 0.85, -0.3 + sy * 0.45, 4);
+    if (g) return [g[0] / DEPTH_SCALE[kind], g[1] / DEPTH_SCALE[kind]];
+    const c = depthCenter(ctx, kind);
+    return [c[0] + sx * DEPTH_VIEW * 0.4, c[1] + sy * DEPTH_VIEW * 0.3];
+  };
 
   return {
     id: kind,
@@ -189,8 +236,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
 
       // Silk shockwaves on bass hits.
       if (kind === 'silk' && ctx.bassHits > 0.55 && bassCooldown <= 0 && fade > 0.1) {
-        const c = ctx.camera;
-        const q = c.screenToWorld2D((rng() - 0.5) * 1.4, (rng() - 0.5) * 1.2);
+        const q = toSim(ctx, (rng() - 0.5) * 1.4, (rng() - 0.5) * 1.2);
         shocks.push({ x: q[0], y: q[1], r: 0.02, s: 0.6 * ctx.bassHits, age: 0 });
         if (shocks.length > 4) shocks.shift();
         bassCooldown = 0.18;
@@ -205,16 +251,23 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
 
       // Wisp agents.
       if (kind === 'wisp') {
-        const c = ctx.camera;
+        const depth = depthOf(ctx);
+        const home = depth ? depthCenter(ctx, kind) : [0, 0];
+        const reach = depth ? DEPTH_VIEW * 0.25 : ctx.camera.viewHeight * 0.45;
+        if (wasDepth !== null && wasDepth !== depth) {
+          // Entering / leaving Depth: start the flames around the new view.
+          agents.forEach((a) => { a.x = home[0] + (rng() - 0.5) * reach; a.y = home[1] + (rng() - 0.5) * reach; });
+        }
         agents.forEach((a, i) => {
           a.turn += (simplex2(time * 0.4, i * 13) * 3 - a.turn) * dt * 0.8;
           if (ctx.midHits > 0.6 && rng() < 0.2) a.turn += (rng() - 0.5) * 8;
           const base = 0.12 + 0.45 * ctx.intensitySmoothed;
           a.speed += ((base + ctx.bassHits * 0.6) - a.speed) * (1 - Math.exp(-dt / 0.3));
           a.heading += a.turn * dt;
-          // Stay near the view (Wisp's own fixed centre, see viewOf()).
-          const dx = -a.x, dy = -a.y;
-          if (Math.hypot(dx, dy) > c.viewHeight * 0.45) {
+          // Stay near the view (Wisp's own fixed centre in Flat, see viewOf();
+          // the ground ahead of the camera in Depth).
+          const dx = home[0] - a.x, dy = home[1] - a.y;
+          if (Math.hypot(dx, dy) > reach) {
             const want = Math.atan2(dy, dx);
             let diff = want - a.heading;
             diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -227,7 +280,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         ring.age += dt;
         if (ctx.bassHits > 0.7 && ring.age > 0.6 && fade > 0.1) {
           const a = agents[Math.floor(rng() * agents.length)];
-          ring = { x: a.x, y: a.y, age: 0, s: ctx.bassHits };
+          ring = { x: a.x, y: a.y, age: 0, s: ctx.bassHits, h: agentH(ctx, agents.indexOf(a), time) };
         }
       }
 
@@ -259,9 +312,14 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       ensureAccum(ctx.width, ctx.height);
       const cam = ctx.camera;
       const pal = ctx.palette;
-      const view = cam.viewHeight;
-      const vw = viewOf(ctx, kind);
-      const aspect = ctx.width / ctx.height;
+      const depth = depthOf(ctx);
+      if (wasDepth !== null && wasDepth !== depth) needsInit = true;
+      wasDepth = depth;
+      const prog = depth ? { ...p, ...depthPrograms() } : p;
+      // The simulated region: the 2D view in Flat, the ground ahead in Depth.
+      const view = depth ? DEPTH_VIEW : cam.viewHeight;
+      const vw: View = depth ? { center: depthCenter(ctx, kind), rot: 0 } : viewOf(ctx, kind);
+      const aspect = depth ? DEPTH_ASPECT : ctx.width / ctx.height;
       const count = Math.floor(side * side * cfg.count);
       const rows = Math.ceil(count / side);
       const presence = Math.max(ctx.midPresence, ctx.bassPresence * 0.8);
@@ -271,7 +329,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       // Silk emitters: three segments wandering around the view, or, after a
       // drop, four diameters through the core (an eight-spoke starburst).
       const form = formT < FORM_HOLD ? 1 : Math.max(0, 1 - (formT - FORM_HOLD) / FORM_FADE);
-      const core = cam.center;
+      const core = depth ? vw.center : cam.center;
       const emit: number[] = [];
       let emitCount = 3;
       if (kind === 'silk' && form > 0.3) {
@@ -284,8 +342,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       } else {
         for (let i = 0; i < 3; i++) {
           const t = time * (0.05 + i * 0.013) + i * 2.1;
-          const a = cam.screenToWorld2D(Math.sin(t * 1.3) * 0.9, Math.cos(t * 0.9 + i) * 0.8);
-          const b = cam.screenToWorld2D(Math.sin(t * 0.7 + 2 + i) * 0.9, Math.cos(t * 1.1 + 1) * 0.8);
+          const a = toSim(ctx, Math.sin(t * 1.3) * 0.9, Math.cos(t * 0.9 + i) * 0.8);
+          const b = toSim(ctx, Math.sin(t * 0.7 + 2 + i) * 0.9, Math.cos(t * 1.1 + 1) * 0.8);
           emit.push(a[0], a[1], b[0], b[1]);
         }
         emit.push(0, 0, 0, 0);
@@ -310,8 +368,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       gl.disable(gl.BLEND);
       bindTarget(gl, state.write);
       gl.viewport(0, 0, side, rows);
-      gl.useProgram(p.update.prog);
-      setUniforms(gl, p.update, {
+      gl.useProgram(prog.update.prog);
+      setUniforms(gl, prog.update, {
         ...common,
         u_stateA: state.read.tex[0], u_stateB: state.read.tex[1],
         u_dt: Math.min(ctx.dt, 1 / 30), u_init: needsInit ? 1 : 0, u_intensity: ctx.intensitySmoothed,
@@ -329,15 +387,21 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       bindTarget(gl, accum!);
       gl.enable(gl.BLEND);
       gl.useProgram(fill.prog);
-      const decay = Math.pow(cfg.decay, ctx.dt * 60);
+      const decay = Math.pow(depth && kind === 'wisp' ? WISP_DEPTH_DECAY : cfg.decay, ctx.dt * 60);
       gl.blendFunc(gl.ZERO, gl.CONSTANT_ALPHA);
       gl.blendColor(0, 0, 0, decay);
       setUniforms(gl, fill, { u_color: [0, 0, 0, 0] });
       drawQuad(gl, quadVAO);
 
-      gl.useProgram(p.render.prog);
+      gl.useProgram(prog.render.prog);
       gl.blendFunc(gl.ONE, gl.ONE);
-      setUniforms(gl, p.render, {
+      const depthU: Record<string, UniformValue> = depth ? {
+        u_view_proj: cam.viewProj, u_cam_pos: cam.position,
+        u_fog: [cam.fogNear, cam.fogFar], u_curve_k: cam.curvature, u_hspan: hspan(ctx), u_ring_h: ring.h,
+        u_dscale: DEPTH_SCALE[kind],
+      } : {};
+      setUniforms(gl, prog.render, {
+        ...depthU,
         ...common,
         u_stateA: state.read.tex[0], u_stateB: state.read.tex[1], u_side: side,
         u_point: cfg.point * Math.max(1, ctx.height / 1080), u_gain: cfg.gain * (kind === 'silk' ? 0.6 + 0.8 * ctx.fadeInOut
@@ -358,19 +422,42 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       // ── 3. Display ──
       ctx.bindScene();
       const silkLight = ctx.light !== time < cutUntil; // the cut inverts whatever is current
-      gl.useProgram(p.display.prog);
+      gl.useProgram(prog.display.prog);
       const agentUv: number[] = [];
       const agentDir: number[] = [];
+      const scrAspect = ctx.width / ctx.height;
       for (let i = 0; i < 4; i++) {
         const a = agents[i];
-        const uv = a ? worldToUv(vw, a.x, a.y, view, aspect) : [0, 0];
-        agentUv.push(uv[0], uv[1], a ? (0.45 + 0.55 * ctx.fadeInOut) * a.glow * (0.8 + a.speed) : 0, 0.011 + 0.006 * (a?.glow ?? 1));
-        agentDir.push(a ? Math.cos(a.heading - vw.rot) : 1, a ? Math.sin(a.heading - vw.rot) : 0, a ? a.speed : 0, 0);
+        const bright = a ? (0.45 + 0.55 * ctx.fadeInOut) * a.glow * (0.8 + a.speed) : 0;
+        const size = 0.011 + 0.006 * (a?.glow ?? 1);
+        if (!a) { agentUv.push(0, 0, 0, size); agentDir.push(1, 0, 0, 0); continue; }
+        if (!depth) {
+          const uv = worldToUv(vw, a.x, a.y, view, aspect);
+          agentUv.push(uv[0], uv[1], bright, size);
+          agentDir.push(Math.cos(a.heading - vw.rot), Math.sin(a.heading - vw.rot), a.speed, 0);
+          continue;
+        }
+        // Depth: project the flame (and a point just ahead of it, for its direction).
+        const h = agentH(ctx, i, time);
+        const pr = projectGround(ctx, kind, a.x, a.y, h);
+        const ahead = projectGround(ctx, kind, a.x + Math.cos(a.heading) * 0.03, a.y + Math.sin(a.heading) * 0.03, h);
+        if (!pr) { agentUv.push(-9, -9, 0, size); agentDir.push(1, 0, 0, 0); continue; }
+        let dx = 1, dy = 0;
+        if (ahead) {
+          dx = (ahead.uv[0] - pr.uv[0]) * scrAspect; dy = ahead.uv[1] - pr.uv[1];
+          const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+        }
+        const near = Math.min(DEPTH_FLAME_GROW, Math.max(0.5, 1.4 / pr.w));
+        agentUv.push(pr.uv[0], pr.uv[1], bright * pr.fog / Math.max(1, Math.sqrt(near)), size * near);
+        agentDir.push(dx, dy, a.speed * near, 0);
       }
-      setUniforms(gl, p.display, {
+      // Depth: screen height of the horizon (ignoring roll) for a faint glow.
+      const horizon = 0.5 + 0.5 * Math.tan(-cam.pitch) / Math.tan(cam.fov / 2);
+      setUniforms(gl, prog.display, {
+        u_horizon: horizon,
         u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
         u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
-        u_light: kind === 'silk' ? silkLight : false, u_gain: cfg.display, u_fade: ctx.fadeInOut,
+        u_light: kind === 'silk' ? silkLight : false, u_gain: cfg.display * (depth && kind === 'wisp' ? WISP_DEPTH_SMOKE : 1), u_fade: ctx.fadeInOut,
         u_pulse: ctx.bassHits,
         u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: kind === 'wisp' ? agents.length : 0,
       });
@@ -393,6 +480,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       gl.deleteProgram(p.update.prog);
       gl.deleteProgram(p.render.prog);
       gl.deleteProgram(p.display.prog);
+      if (pd) { gl.deleteProgram(pd.render.prog); gl.deleteProgram(pd.display.prog); }
       gl.deleteProgram(fill.prog);
       gl.deleteVertexArray(emptyVAO);
     },
@@ -418,4 +506,38 @@ function worldToUv(vw: View, x: number, y: number, view: number, aspect: number)
   const c = Math.cos(-vw.rot), s = Math.sin(-vw.rot);
   const rx = dx * c - dy * s, ry = dx * s + dy * c;
   return [0.5 + rx / (view * aspect), 0.5 + ry / view];
+}
+
+/** Ground point (sim units) the Depth view centres its simulation on: just
+ * ahead of where the 3D camera looks. */
+function depthCenter(ctx: StyleContext, kind: StrandsKind): [number, number] {
+  const cam = ctx.camera;
+  // Wisp keeps its flames nearer, in the middle of the picture.
+  const g = cam.screenToGround(0, kind === 'wisp' ? DEPTH_WISP_SY : 0.1, 3);
+  if (g) return [g[0] / DEPTH_SCALE[kind], g[1] / DEPTH_SCALE[kind]];
+  const fx = cam.forward[0], fz = cam.forward[2];
+  const l = Math.hypot(fx, fz) || 1;
+  return [(cam.position[0] + (fx / l) * 1.6) / DEPTH_SCALE[kind], (cam.position[2] + (fz / l) * 1.6) / DEPTH_SCALE[kind]];
+}
+
+/** Project a sim-space point at height h (Depth view) to screen uv, with clip w
+ * and fog visibility; null behind the camera. Mirrors worldAt()/project() in render.vert. */
+function projectGround(ctx: StyleContext, kind: StrandsKind, sx: number, sy: number, h: number): { uv: [number, number]; w: number; fog: number } | null {
+  const cam = ctx.camera;
+  const x = sx * DEPTH_SCALE[kind], z = sy * DEPTH_SCALE[kind];
+  const dx = x - cam.position[0], dz = z - cam.position[2];
+  const y = h - cam.curvature * (dx * dx + dz * dz);
+  const m = cam.viewProj;
+  const cx = m[0] * x + m[4] * y + m[8] * z + m[12];
+  const cy = m[1] * x + m[5] * y + m[9] * z + m[13];
+  const cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+  if (cw < 0.02) return null;
+  const d = Math.hypot(dx, y - cam.position[1], dz);
+  const fog = 1 - smoothstep(cam.fogNear, cam.fogFar, d);
+  return { uv: [0.5 + 0.5 * cx / cw, 0.5 + 0.5 * cy / cw], w: cw, fog };
+}
+
+function smoothstep(a: number, b: number, x: number): number {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
 }

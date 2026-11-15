@@ -29,6 +29,13 @@ const RING_COUNT_MAX = 10;
 const PRESET_MATCH = 0.03;
 
 /** Plain-language descriptions shown under controls. */
+/** View hints per style: [Depth, Flat]. */
+const DEPTH_HINTS: Partial<Record<StyleId, [string, string]>> & { ink: [string, string] } = {
+  ink: ['Fly over the ink as a 3D surface.', 'Look straight down at the ink, like a canvas.'],
+  silk: ['Glide through curtains of silk threads hanging over the ground.', 'Silk threads flowing across a flat canvas.'],
+  wisp: ['Follow the flames as they fly over the ground, trailing smoke.', 'Flames darting across a flat black canvas.'],
+};
+
 const STYLE_HINTS: Partial<Record<StyleId, string>> = {
   ink: 'Liquid ink that splashes on every beat and drifts with the music.',
   silk: 'Millions of light particles drawn into flowing threads that snap to the beat.',
@@ -260,7 +267,7 @@ function render(): void {
       </div>` : ''}
       ${desc.supportsDepth ? `<div class="field"><div class="label">View</div>
         <div class="seg">${segBtn('depth', '1', 'Depth', state.depth)}${segBtn('depth', '0', 'Flat', !state.depth)}</div>
-        ${hint(state.depth ? 'Fly over the ink as a 3D surface.' : 'Look straight down at the ink, like a canvas.')}</div>` : ''}
+        ${hint((DEPTH_HINTS[desc.id] ?? DEPTH_HINTS.ink)[state.depth ? 0 : 1])}</div>` : ''}
       ${variantSupportsLight(desc, state.variant) ? `<div class="field"><div class="label">Background</div>
         <div class="seg">${(['auto', 'dark', 'light'] as LightMode[]).map((m) => segBtn('light', m, m, state.lightMode === m)).join('')}</div>
         ${hint(LIGHT_HINTS[state.lightMode])}</div>` : ''}

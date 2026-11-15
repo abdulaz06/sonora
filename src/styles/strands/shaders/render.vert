@@ -2,7 +2,9 @@
 precision highp float;
 precision highp int;
 // Draws particles. VARIANT 0 (silk), 2 (wisp): points; 4 (warp): instanced
-// velocity-stretched streaks.
+// velocity-stretched streaks. With DEPTH defined (Silk / Wisp Depth views) the
+// 2D simulation lies on the ground plane of the 3D camera and each particle
+// gets a height, drawn in perspective with fog; the Flat path is unchanged.
 uniform sampler2D u_stateA;
 uniform sampler2D u_stateB;
 uniform int u_side;
@@ -22,6 +24,15 @@ uniform float u_roll;
 uniform float u_streak;        // streak length factor
 // Wisp colours: agents 0–2 and the ring smoke.
 uniform vec4 u_wisp_col[4];
+#ifdef DEPTH
+uniform mat4 u_view_proj;
+uniform vec3 u_cam_pos;
+uniform vec2 u_fog;            // near / far
+uniform float u_curve_k;       // planet / bowl curvature, as the Ink surface
+uniform float u_hspan;         // height of the silk volume / wisp flight band
+uniform float u_ring_h;        // wisp: height of the current smoke ring
+uniform float u_dscale;        // ground units per simulation unit
+#endif
 out vec4 v_col;
 out vec2 v_uv;
 flat out float v_seed;
@@ -33,6 +44,35 @@ vec2 toClip(vec2 w) {
   rel = mat2(c, s, -s, c) * rel;
   return rel / (vec2(u_aspect, 1.0) * u_view * 0.5);
 }
+
+#ifdef DEPTH
+vec3 worldAt(vec2 p, float h) {
+  vec3 w = vec3(p.x * u_dscale, h, p.y * u_dscale);
+  float dist = length(w.xz - u_cam_pos.xz);
+  w.y -= u_curve_k * dist * dist;
+  return w;
+}
+// Project; returns the fog/visibility factor (0 behind the camera or beyond fog).
+float project(vec3 w, float basePx) {
+  vec4 clip = u_view_proj * vec4(w, 1.0);
+  if (clip.w < 0.02) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); gl_PointSize = 1.0; return 0.0; }
+  gl_Position = clip;
+  // Nearer = larger, up to a cap; a grown point spreads the same light, so
+  // close threads and smoke don't blow out.
+  float grow = clamp(1.4 / clip.w, 0.7, 2.0);
+  gl_PointSize = basePx * grow;
+  float d = distance(w, u_cam_pos);
+#if VARIANT == 2
+  return (1.0 - smoothstep(u_fog.x, u_fog.y, d)) / max(grow, 1.0);   // soft smoke: half the correction
+#else
+  return (1.0 - smoothstep(u_fog.x, u_fog.y, d)) / max(grow * grow, 1.0);
+#endif
+}
+// Wisp agent heights (mirrored on the CPU for the flames).
+float agentH(float i, float t) {
+  return u_hspan * (0.55 + 0.32 * sin(t * 0.37 + i * 2.1) + 0.13 * sin(t * 1.13 + i * 4.0));
+}
+#endif
 
 void main() {
 #if VARIANT == 0 || VARIANT == 2
@@ -51,17 +91,33 @@ void main() {
 
 #if VARIANT == 0
   // Silk: r = ribbon density, g = dust.
+#ifdef DEPTH
+  // Ribbons float as thin sheets whose height rolls smoothly with position, so
+  // they rise and dip like silk in the air; each thread keeps a small offset of
+  // its own for body. Dust sits higher, like stars over the silk.
+  float roll = 0.5 + 0.5 * snoise(vec3(A.xy * 1.1, u_time * 0.06));
+  float h = kind > 0.5 ? u_hspan * (0.2 + 2.4 * fract(seed * 3.7))
+                       : u_hspan * (0.08 + 1.1 * roll * roll + 0.12 * (fract(seed * 7.31) - 0.5));
+  w *= project(worldAt(A.xy, h), kind > 0.5 ? 1.0 + step(0.985, fract(seed * 97.0)) : u_point);
+#else
   gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
   gl_PointSize = kind > 0.5 ? 1.0 + step(0.985, fract(seed * 97.0)) : u_point;
+#endif
   float speed = length(A.zw);
   v_col = kind > 0.5
     ? vec4(0.0, w * (0.15 + 0.85 * u_sparkle) * pow(fract(seed * 31.0), 3.0) * 1.5, 0.0, 0.0)
     : vec4(w * u_gain * (0.6 + 4.0 * speed), 0.0, 0.0, 0.0);
 #elif VARIANT == 2
   // Wisp: smoke in its agent's colour; ring smoke brighter.
+  int ci = int(clamp(kind, 0.0, 3.0));
+#ifdef DEPTH
+  // Smoke keeps the height its flame had when it was shed (t - age), and rises.
+  float h = (ci == 3 ? u_ring_h : agentH(float(ci), u_time - age)) + age * 0.035;
+  w *= project(worldAt(A.xy, h), u_point);
+#else
   gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
   gl_PointSize = u_point;
-  int ci = int(clamp(kind, 0.0, 3.0));
+#endif
   v_col = vec4(u_wisp_col[ci].rgb * w * u_gain * (ci == 3 ? 1.5 : 1.0), 1.0);
 #elif VARIANT == 4
   // Warp: head at the particle, tail further down the tunnel.
