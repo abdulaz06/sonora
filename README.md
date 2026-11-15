@@ -13,9 +13,9 @@ Built with Rust, TypeScript, raw WebGL 2 and Tauri 2.
 
 ## Styles
 
-- **Ink** (flagship): a real fluid simulation on a world several screens wide. Kicks bloom from a few stable anchor points, so you see the same spots pulse in time; mids feed a drizzle of ink, highs scatter sparkle, drops burst. **Depth** (default) turns the ink into a lit surface with a gliding camera (presets Glide, Horizon, Planet, Valley, Overhead; height, tilt and planet/bowl curvature); **Flat** looks straight down. Looks: **Glow**, **Marble** (two-tone marbling), **Sumi** (black ink on paper).
+- **Ink** (flagship): a real fluid simulation on a world several screens wide. Every kick lands as a solid shape near the centre and lights up the ink around it; the light fades over exactly one beat as the ink streams off in broad sheets, so the picture pulses like a clock with the music. Mids feed a drizzle of ink, highs scatter sparkle, drops bloom big. **Depth** (default) turns the ink into a lit surface with a gliding camera (presets Glide, Horizon, Planet, Valley, Overhead; height, tilt and planet/bowl curvature); **Flat** looks straight down, with its own Zoom. Looks: **Glow**, **Marble** (two-tone marbling), **Sumi** (black ink on paper).
 - **Silk**: millions of particles drawn into flowing threads that light up on every kick; builds gather the threads into a knot and the drop bursts them into a starburst. **Flat** (default) is a canvas; **Depth** lifts the threads into ribbons floating and dipping over the ground under the gliding camera.
-- **Wisp**: three coloured flames darting through the dark, trailing smoke; bass hits blow smoke rings. **Flat** (default) or **Depth**, where the flames fly at changing heights over the ground ahead of the camera and their smoke hangs in 3D.
+- **Wisp**: three coloured flames darting through the dark, trailing smoke; bass hits blow smoke rings. **Flat** (default) or **Depth** with two looks: **Ground** (the flames light a dark plain beneath them like lanterns, embers float around you) and **Tunnel** (a chase camera rides behind the flames down an endless, winding tunnel of smoke and embers; beats send rings of light down it).
 - **Warp**: hyperspace streaks whose speed follows the song: slow motion in breakdowns and quiet intros, regular pace with the beat, accelerating through builds, jumping at the drop.
 - **Voyage**: a flight through a raymarched 3D fractal that breathes and twists on the beat, with three backdrops: **Void** (a dark, star-filled sky in your colours), **City** (a curved world of fields, rivers, mountains and cities that rises around the fractal and hangs overhead) and **Ocean** (a curved sea of huge rolling swells). Calm moments fly out for wide shots; the camera returns as the music picks up, and the drop dives back in with a barrel roll.
 
@@ -59,7 +59,7 @@ The same analysis crate runs in the desktop app and in the browser; a parity che
 | `S` | Next style |
 | `V` | Depth / Flat |
 | `C` | Next camera preset (Depth) |
-| Drag / scroll | Depth: look around / change height. Flat: move / zoom. Double-click resets the camera |
+| Drag / scroll | Depth: look around / change height. Flat: move / zoom (kept apart from Depth; the Zoom slider's middle is the default, double-click it to reset). Double-click the picture resets the Depth camera |
 | `1`–`0` | Palette |
 | `Esc` | Leave fullscreen / clean mode, close panels |
 

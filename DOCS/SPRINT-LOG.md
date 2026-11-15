@@ -1,3 +1,17 @@
+# Feedback round 6 — done (awaiting review)
+
+Notes: Ink doesn't hit like the original Flat Flow Ink (shapes pop and immediately spread, clashing pumps); Silk Depth is good (the dust shows the planet), Planet preset should look further down with full curve; Wisp Depth lacks depth cues; Depth height seemed to carry into Flat. Decided with Abdul after studying a v0.1 recording frame by frame against its audio: kicks in a focus zone near the centre at random spots; all Ink looks and views at once; Wisp Depth gets two looks, Ground (light pools + embers, calm camera) and Tunnel (chase camera, endless tunnel, own camera); Flat zoom kept apart and saved, default marked on the slider.
+
+- [x] Ink: one kick per beat as a solid shape + beat light that streams off with the ink (one-beat fade on the tempo) + brief flow hold; no outward blasts; quasi-steady flow (standing sheets) and v0.1-style ambient drizzle; anchors removed (D43)
+- [x] Flat Zoom slider (saved, default in the middle, double-click resets), wheel drives it; Planet preset 0.6 / 0.75 / 1 (D44)
+- [x] Wisp Depth Ground: flame-lit ground (ray-traced pools), floating embers (D45)
+- [x] Wisp Depth Tunnel: chase camera, stateless lane/ring tunnel, flame-path trails, beat rings, pace follows the song (D45)
+- [x] Flat Wisp and Flat Silk pixel-identical to before
+- [x] `scripts/beat-strip.mjs` (50 ms frame strip across two beats); `snapshots.mjs` takes `SNAP_DEPTH`
+- [x] Verified: Ink sync Glow 96-100% (Flat 100%), Marble 100%, Sumi 100% on all tracks; Wisp Ground and Tunnel 100%; flicker Ink Glow 0.5-0.8, Marble/Sumi 0, Wisp Ground 0.75, Tunnel 1.5 swings/s, blown-out ≤5.3%; frame cost (Low / Medium) Ink Glow 1.6 / 3.0 ms, Marble 1.5 / 2.8, Wisp Ground 1.2 / 1.7, Tunnel 1.05 / 1.4; Planet preset on Ink and Silk; live desktop app (Ink Flat/Depth, Wisp Ground/Tunnel, Punchy, Ocean, dense track)
+
+---
+
 # Phase 2 — Silk and Wisp Depth views — done (awaiting review)
 
 Rules from round 2: Depth/Flat toggle with Flat as the default; the 2D path untouched; Silk and Wisp assessed separately.
