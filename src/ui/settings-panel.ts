@@ -182,6 +182,12 @@ const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeA
 const segBtn = (action: string, value: string, label: string, on: boolean, title = ''): string =>
   `<button data-a="${action}" data-v="${esc(value)}" class="${on ? 'on' : ''}"${title ? ` title="${esc(title)}"` : ''}>${esc(label)}</button>`;
 const hint = (text: string, id = ''): string => `<div class="hint"${id ? ` id="${id}"` : ''}>${esc(text)}</div>`;
+/** Flat zoom ⇄ slider position, with the default (1) exactly in the middle. */
+const zoomToSlider = (z: number): number =>
+  z <= 1 ? 50 * (z - FLAT_ZOOM_MIN) / (1 - FLAT_ZOOM_MIN) : 50 + 50 * (z - 1) / (FLAT_ZOOM_MAX - 1);
+const sliderToZoom = (n: number): number =>
+  n <= 50 ? FLAT_ZOOM_MIN + (1 - FLAT_ZOOM_MIN) * (n / 50) : 1 + (FLAT_ZOOM_MAX - 1) * ((n - 50) / 50);
+
 const ends = (a: string, b: string, c = ''): string =>
   `<div class="ends"><span>${esc(a)}</span>${c ? `<span>${esc(c)}</span>` : ''}<span>${esc(b)}</span></div>`;
 
@@ -231,10 +237,10 @@ function render(): void {
     <div class="sec">
       <div class="title">Camera</div>
       <div class="field"><div class="label">Zoom</div>
-        <input type="range" data-a="flat-zoom" min="0" max="100" value="${Math.round(((state.flatZoom - FLAT_ZOOM_MIN) / (FLAT_ZOOM_MAX - FLAT_ZOOM_MIN)) * 100)}">
-        ${ends('Close', 'Wide')}
+        <input type="range" data-a="flat-zoom" min="0" max="100" value="${Math.round(zoomToSlider(state.flatZoom))}" title="Double-click to reset to the default zoom">
+        ${ends('Close', 'Wide', 'Default')}
       </div>
-      ${hint('Drag on the picture to move around. Scroll to zoom. Flat zoom is kept apart from the Depth camera; switch View to Depth for camera presets.')}
+      ${hint('Drag on the picture to move around. Scroll to zoom; the middle of the Zoom slider is the default, double-click it to snap back. Flat zoom is kept apart from the Depth camera; switch View to Depth for camera presets.')}
     </div>` : '';
 
   const meter = `<div class="meter"><i id="audio-level"></i></div>`;
@@ -399,7 +405,7 @@ function onInput(e: Event): void {
     state.camera = { ...state.camera, [key]: n / 100 };
     cb.onCameraChange(state.camera);
   } else if (a === 'flat-zoom') {
-    state.flatZoom = FLAT_ZOOM_MIN + (FLAT_ZOOM_MAX - FLAT_ZOOM_MIN) * (n / 100);
+    state.flatZoom = Math.abs(n - 50) <= 2 ? 1 : sliderToZoom(n);   // snaps to the default near the middle
     cb.onFlatZoomChange(state.flatZoom);
   } else if (a === 'classic' && el instanceof HTMLInputElement) {
     state.showClassic = el.checked;
@@ -433,6 +439,12 @@ export function initSettingsPanel(callbacks: SettingsCallbacks, initial: Setting
   panel.id = 'settings-panel';
   panel.addEventListener('click', onClick);
   panel.addEventListener('input', onInput);
+  panel.addEventListener('dblclick', (e) => {
+    if ((e.target as HTMLElement).dataset?.a !== 'flat-zoom') return;
+    state.flatZoom = 1;
+    cb.onFlatZoomChange(1);
+    render();
+  });
   panel.addEventListener('change', (e) => {
     const el = e.target as HTMLElement;
     if (el.tagName === 'SELECT' || (el as HTMLInputElement).type === 'checkbox') onInput(e);
