@@ -6,12 +6,19 @@
  * displaced, lit surface with fog (Depth, default).
  *
  * Signal mapping (DOCS/16 §5, tuned with the verify harness):
- *   mid presence  → ink inflow from emitters around the view
- *   intensity     → turbulence (stirring + vorticity) and camera speed
- *   bass hits     → big splats from varied positions incl. off-screen; surface lift
+ *   mid presence  → ink inflow from emitters around the view, and an ambient
+ *                   drizzle the flow stretches into sheets
+ *   intensity     → flow speed and camera speed
+ *   bass hits     → one kick per beat: a solid shape at a random spot in a focus
+ *                   zone near the centre, a beat light that lights the ink and
+ *                   streams off with it (fading over one beat, on the tempo), and
+ *                   a brief hold of the flow under the shape. No outward blast.
+ *   flow          → quasi-steady (Glow / Sumi): ink streams along slowly evolving
+ *                   streamlines into broad sheets that hold for seconds (v0.1's
+ *                   look, without its repetition)
  *   high hits     → fine sparkle dye
  *   beat phase    → gentle surface breathing (Depth)
- *   drop          → burst converging from off-screen + camera lurch + flash
+ *   drop          → a big bloom with three around it, the zone moves; camera lurch
  *   build         → rising turbulence and sparkle
  *   silence       → ink settles and dissipates, camera slows
  *
@@ -56,25 +63,41 @@ const EMITTERS = 4;
 const INFLOW_DYE = 1.7;         // dye per second at full mid presence (a drizzle, not a flood)
 const INFLOW_RADIUS = 0.0045;   // uv
 const INFLOW_SPEED = 0.16;      // uv/s jet
+/** Ambient drizzle (Glow / Sumi, as v0.1): faint dots sprinkled everywhere in
+ * the fluid's dye pass that the steady flow stretches into broad sheets. Dye
+ * per second while a dot is lit, chance per 1/12 s refresh (both at full mid
+ * presence), cells across the domain. */
+const DRIZZLE_DYE = 5;
+const DRIZZLE_CHANCE = 0.012;
+const DRIZZLE_CELLS = 56;
+const DRIZZLE_PAPER = 0.3;
 
-/** Bass splats. */
+/** Bass kicks: one per beat. A kick re-arms once the hit envelope falls back,
+ * so one kick never lands twice at different spots. */
 const BASS_THRESHOLD = 0.4;
-const BASS_COOLDOWN = 0.11;
-const BASS_RADIUS = [0.022, 0.038];   // uv range: big enough to read as one splash
-const BASS_DYE = 1.0;
-/** Energy (fast glow) injected by a bass splat. */
-const BASS_ENERGY = 1.0;
-/** Beat kick: outward ink push on the frame of the hit (uv/s; radius × splat radius). */
-const BASS_KICK_SPEED = 1.1;
-const BASS_KICK_RADIUS = 1.9;
-/** A second, wider kick inside the view so ink already on screen jumps too. */
-const VIEW_KICK_SPEED = 0.55;
-const VIEW_KICK_RADIUS = 0.07;
-const BASS_SWIRL = 0.02;
+const BASS_REARM = 0.25;
+const BASS_COOLDOWN = 0.15;
+/** Kick shape: a solid body (domain uv radius) with a ragged edge that differs each time. */
+const BASS_RADIUS = [0.033, 0.055];
+const BASS_DETAIL = 0.45;
+const BASS_DYE = 1.3;
+const BASS_SWIRL = 0.01;
+/** Beat light (from the v0.1 reference: the centre jumps ~2.8x on the kick and
+ * fades over one beat). It lives in the dye's energy channel, so the glow
+ * lights the ink it lands on and streams off with it. Radius x shape radius;
+ * fade time constant in beats (tempo-tied). */
+const LIGHT_RADIUS = 1.4;
+const LIGHT_TAU_BEATS = 0.42;
+/** How much ink brightens at full beat light, per look (glow, sumi, marble). */
+const LIGHT_GAIN = [2.2, 2.6, 1.0];
+/** Hold: the flow under a fresh shape stays still for the first share of a
+ * beat and is released by the second. */
+const HOLD_BEATS: [number, number] = [0.12, 0.4];
+const HOLD_RADIUS = 1.0;
 /** Frame-accurate brightening of all ink on bass hits, per variant (ink, sumi, marble). */
 /** How much ink brightens (or deepens, on paper) on a hit, per variant. Not
  * scaled by Responsiveness: that drives motion, never brightness. */
-const PULSE_GAIN = [0.35, 1.3, 0.28];
+const PULSE_GAIN = [0.12, 1.7, 0.28];
 /** Black ink on paper reads much heavier than glowing ink: scale Sumi's dye. */
 const SUMI_DYE = 0.5;
 /** Energy channel decay (1/s): ~150 ms glow. */
@@ -88,42 +111,49 @@ const MID_THRESHOLD = 0.55;
 const MID_COOLDOWN = 0.22;
 
 /** Turbulence: stirring (uv/s²) and vorticity (texel units at 256²). */
-const STIR_MIN = 0.02;
+const STIR_MIN = 0.035;
 const STIR_MAX = 0.09;
+/** Quasi-steady flow (Glow / Sumi): strong damping with a matching stir, so the
+ * velocity follows a slowly evolving curl field. Ink then streams along
+ * standing streamlines into broad sheets that hold their shape for seconds
+ * (v0.1's look) while the field keeps evolving. Terminal speed ≈ stir / damping. */
+const STEADY_DAMPING = 3.0;
+const STEADY_STIR: [number, number] = [1.5, 3.75];
+/** Breakdowns flow at this share of the steady speed (calm drifting, not swept clean). */
+const STEADY_BREAKDOWN = 0.35;
 const CURL_MIN = 10;
 const CURL_MAX = 18;
+/** Smooth, large-scale flow so ink stretches into broad sheets (v0.1's look)
+ * instead of shredding: vorticity confinement per view, fine-octave weight. */
+const FLOW_CURL_FLAT = 0.3;
+const FLOW_CURL_DEPTH = 0.6;
+const FLOW_DETAIL = 0.15;
 /** Subtractive decay of faint ink (dye units / s) — keeps negative space. */
 const INK_FLOOR_DECAY = 0.04;
 /** Dye decay (1/s) for Glow/Sumi while playing (quiet → loud) and silent.
  * Each kick's splash should read on its own and fade in ~1–2 s, as v0.1
  * did, instead of piling up into a field that swallows new hits. */
-const INK_DECAY_QUIET = 0.55;
-const INK_DECAY_LOUD = 0.75;
+const INK_DECAY_QUIET = 0.42;
+const INK_DECAY_LOUD = 0.58;
 const INK_DECAY_SILENT = 1.2;
 /** Breakdowns: ink lingers and drifts (calm, not empty), with more inflow. */
 const INK_DECAY_BREAKDOWN = 0.18;
 const INFLOW_BREAKDOWN = 1.8;
 const MARBLE_DECAY = 0.004;
 
-/** Beat anchors: stable compositions (screen coords, x/y in -1..1, +y up).
- * Kicks bloom from these spots so the beat reads as the same places pulsing
- * in time instead of splashes scattered at random. A new layout is chosen on
+/** Focus zone (screen units, +y up): kicks land at random spots inside a zone
+ * near the centre, as v0.1 did, so the beat always lights the same region
+ * without ever stamping the same spot. The zone wanders slowly and jumps on
  * drops and section changes. */
-const ANCHOR_LAYOUTS: [number, number][][] = [
-  [[-0.52, 0.18], [0.46, -0.24], [0.08, 0.56]],
-  [[-0.62, -0.28], [0.02, 0.34], [0.6, -0.12]],
-  [[-0.4, 0.46], [0.56, 0.32], [-0.12, -0.44], [0.42, -0.5]],
-  [[-0.66, 0.06], [0.64, 0.02], [0.0, 0.52], [0.02, -0.48]],
-  [[-0.3, -0.12], [0.36, 0.2], [0.7, -0.4]],
-];
-/** Anchor drift (screen units) and how fast a new layout eases in (s). */
-const ANCHOR_DRIFT = 0.07;
-const ANCHOR_EASE = 1.6;
-/** Every Nth kick (and every big hit) blooms from all anchors at once. */
-const ANCHOR_ALL_EVERY = 4;
-/** Satellite (mid) and sparkle (high) distance from an anchor (screen units). */
-const SATELLITE_R = 0.2;
-const SPARKLE_R = 0.38;
+const ZONE_WANDER = 0.12;
+const ZONE_JUMP: [number, number] = [0.35, 0.22];
+const KICK_DIST: [number, number] = [0.12, 0.42];
+/** Every Nth kick (and big hits) blooms bigger, at the zone's heart. */
+const BIG_EVERY = 4;
+const BIG_SCALE = 1.3;
+/** Satellite (mid) and sparkle (high) distance from the zone (screen units). */
+const SATELLITE_R = 0.3;
+const SPARKLE_R = 0.45;
 
 /** Shader variant index per look (Glow was called "ink" before v1.0). */
 const VARIANT_INDEX: Record<string, number> = { glow: 0, sumi: 1, marble: 2 };
@@ -240,14 +270,17 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   let grid = createGrid(gl, quality.meshResolution);
 
   let variant = 'glow';
-  // Beat anchors
-  let layoutIdx = 0;
-  let anchorRR = 0;
+  // Beat kicks: focus zone, lights and holds
   let kickCount = 0;
   let lastSection = '';
   let clock = 0;
   let lastDropAt = -99;
-  const anchors: [number, number][] = ANCHOR_LAYOUTS[0].map((a) => [a[0], a[1]]);
+  let bassArmed = true;
+  let zoneBase: [number, number] = [0, 0];
+  interface Hold { x: number; y: number; r: number; t0: number; period: number }
+  const holds: Hold[] = [];
+  const MAX_HOLDS = 6;
+  let period = 0.5;
   let breakdownEnv = 0;
   let noiseZ = rng() * 100;
   let bassCooldown = 0, highCooldown = 0, midCooldown = 0;
@@ -265,6 +298,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     curlStrength: CURL_MIN, damping: 0.3, velocityDissipation: 0.15,
     noiseAmp: STIR_MIN, noisePeriod: 5, noiseZ, noiseDetail: 1,
     dyeDissipation: [INK_DECAY_QUIET, INK_DECAY_QUIET, 1.6, 2.5], dyeFloorDecay: [INK_FLOOR_DECAY, INK_FLOOR_DECAY, 0.05, 0],
+    drizzle: [0, 0, DRIZZLE_CELLS],
   };
 
   // ── Placement helpers ─────────────────────────────────────────
@@ -299,64 +333,81 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     push({ x, y, radius, dye: [0, 0, 0, 0], vx: tps(dirX * speed), vy: tps(dirY * speed), radial: 0, swirl: 0, detail: 0 });
   }
 
-  /** Anchor i in screen coords for the current view (Depth keeps them on the ground in view). */
-  function anchorScreen(ctx: StyleContext, i: number): [number, number] {
-    const a = anchors[i % anchors.length];
-    return ctx.depth ? [a[0] * 0.85, -0.1 + a[1] * 0.28] : [a[0], a[1]];
+  /** Screen point for the current view (Depth keeps kicks on the ground in view). */
+  function toView(ctx: StyleContext, sx: number, sy: number): [number, number] {
+    return ctx.depth ? [sx * 0.85, -0.1 + sy * 0.28] : [sx, sy];
   }
 
-  function updateAnchors(ctx: StyleContext, dt: number): void {
+  function zoneScreen(): [number, number] {
+    return [zoneBase[0] + ZONE_WANDER * simplex2(noiseZ * 0.4, 3.3), zoneBase[1] + ZONE_WANDER * 0.8 * simplex2(noiseZ * 0.4, 8.1)];
+  }
+
+  function moveZone(): void {
+    zoneBase = [(rng() * 2 - 1) * ZONE_JUMP[0], (rng() * 2 - 1) * ZONE_JUMP[1]];
+  }
+
+  function updateZone(ctx: StyleContext): void {
     const sec = ctx.eventState.section;
-    if (lastSection && sec !== lastSection && (sec === 'drop' || sec === 'breakdown' || sec === 'build')) nextLayout();
+    if (lastSection && sec !== lastSection && (sec === 'drop' || sec === 'breakdown' || sec === 'build')) moveZone();
     lastSection = sec;
-    const layout = ANCHOR_LAYOUTS[layoutIdx];
-    const k = 1 - Math.exp(-dt / ANCHOR_EASE);
-    while (anchors.length < layout.length) anchors.push([0, 0]);
-    anchors.length = layout.length;
-    for (let i = 0; i < layout.length; i++) {
-      const tx = layout[i][0] + ANCHOR_DRIFT * simplex2(noiseZ * 0.4 + i * 3.1, 1.7);
-      const ty = layout[i][1] + ANCHOR_DRIFT * simplex2(noiseZ * 0.4 + i * 3.1, 5.3);
-      anchors[i][0] += (tx - anchors[i][0]) * k;
-      anchors[i][1] += (ty - anchors[i][1]) * k;
-    }
   }
 
-  function nextLayout(): void {
-    layoutIdx = (layoutIdx + 1 + Math.floor(rng() * (ANCHOR_LAYOUTS.length - 1))) % ANCHOR_LAYOUTS.length;
-    anchorRR = 0;
+  const beatPeriod = (ctx: StyleContext): number =>
+    ctx.beatConfidence > 0.3 ? 60 / Math.max(70, Math.min(180, ctx.frame.beat.bpm || 120)) : 0.5;
+
+  /** One kick: a solid shape, a beat light over it and a hold under it. */
+  function placeKick(ctx: StyleContext, strength: number, big: boolean, sx: number, sy: number): void {
+    const [vx, vy] = toView(ctx, sx, sy);
+    const [x, y] = screenToUv(ctx, vx, vy);
+    const scale = big ? BIG_SCALE : 1;
+    const radius = (BASS_RADIUS[0] + (BASS_RADIUS[1] - BASS_RADIUS[0]) * (0.6 + 0.4 * rng())) * (0.7 + 0.3 * strength) * scale;
+    const ch = (rng() < 0.7 ? 0 : 1) as 0 | 1;
+    const amt = BASS_DYE * (0.6 + 0.6 * strength) * (variant === 'marble' ? 0.3 : 1);
+    push({
+      x, y, radius,
+      dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, 0],
+      vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (rng() < 0.5 ? -1 : 1)), detail: BASS_DETAIL,
+    });
+    // The beat light: a soft energy glow over the shape and the ink around it.
+    push({
+      x, y, radius: radius * LIGHT_RADIUS,
+      dye: [0, 0, 0, (0.75 + 0.25 * strength) * (big ? 1.15 : 1)],
+      vx: 0, vy: 0, radial: 0, swirl: 0, detail: 0,
+    });
+    period = beatPeriod(ctx);
+    holds.push({ x, y, r: radius * HOLD_RADIUS, t0: clock, period });
+    while (holds.length > MAX_HOLDS) holds.shift();
   }
 
-  /** A kick: blooms from the next anchor in turn, or from every anchor at once. */
+  /** A kick lands at a random spot in the focus zone; every 4th blooms bigger at its heart. */
   function bassSplat(ctx: StyleContext, strength: number, all = false): void {
     kickCount++;
-    const every = all || (ctx.beatConfidence > 0.3 && kickCount % ANCHOR_ALL_EVERY === 0 && clock - lastDropAt > 1.5);
-    const list = every ? anchors.map((_, i) => i) : [anchorRR++ % anchors.length];
-    const snap = 0.45 + 1.1 * ctx.responsiveness;
-    for (const i of list) {
-      const [ax, ay] = anchorScreen(ctx, i);
-      const [x, y] = screenToUv(ctx, ax + (rng() - 0.5) * 0.04, ay + (rng() - 0.5) * 0.04);
-      const radius = (BASS_RADIUS[0] + (BASS_RADIUS[1] - BASS_RADIUS[0]) * (0.75 + 0.25 * rng()))
-        * (0.6 + 0.4 * strength) * (every && !all ? 0.85 : 1);
-      // Each anchor keeps its own ink colour and spin, so it has an identity.
-      const ch = (i % 2) as 0 | 1;
-      const amt = BASS_DYE * (0.6 + 0.6 * strength) * (variant === 'marble' ? 0.3 : 1);
-      push({
-        x, y, radius,
-        dye: [ch === 0 ? amt : amt * 0.12, ch === 1 ? amt : amt * 0.08, 0, BASS_ENERGY * strength],
-        vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * (i % 2 ? -1 : 1)), detail: 0.8,
-      });
-      // Outward bloom on the frame of the hit, and ink around it jumps too.
-      sim.kick(x, y, radius * BASS_KICK_RADIUS, BASS_KICK_SPEED * strength * snap);
-      sim.kick(x, y, VIEW_KICK_RADIUS, VIEW_KICK_SPEED * strength * snap * 0.6);
+    const big = all || (ctx.beatConfidence > 0.3 && kickCount % BIG_EVERY === 0 && clock - lastDropAt > 1.5);
+    let [sx, sy] = zoneScreen();
+    if (!big) {
+      const a = rng() * Math.PI * 2, d = KICK_DIST[0] + (KICK_DIST[1] - KICK_DIST[0]) * rng();
+      sx += Math.cos(a) * d * 1.25;
+      sy += Math.sin(a) * d;
     }
+    placeKick(ctx, strength, big, sx, sy);
+  }
+
+  /** Holds release over a beat (on the song's tempo). */
+  function updateBeats(): void {
+    for (let i = holds.length - 1; i >= 0; i--) if ((clock - holds[i].t0) / holds[i].period > HOLD_BEATS[1]) holds.splice(i, 1);
+    sim.setHolds(holds.map((h) => {
+      const u = (clock - h.t0) / h.period;
+      return { x: h.x, y: h.y, r: h.r, s: 1 - smoothstep(HOLD_BEATS[0], HOLD_BEATS[1], u) };
+    }));
   }
 
   function sparkle(ctx: StyleContext, strength: number, count: number): void {
     for (let i = 0; i < count; i++) {
-      // Around the anchors: the composition stays readable.
-      const [ax, ay] = anchorScreen(ctx, Math.floor(rng() * anchors.length));
+      // Around the focus zone: the composition stays readable.
+      const [zx, zy] = zoneScreen();
       const a = rng() * Math.PI * 2, r = SPARKLE_R * Math.sqrt(rng());
-      const [x, y] = screenToUv(ctx, ax + Math.cos(a) * r, ay + Math.sin(a) * r * 0.8);
+      const [vx, vy] = toView(ctx, zx + Math.cos(a) * r * 1.25, zy + Math.sin(a) * r * 0.8);
+      const [x, y] = screenToUv(ctx, vx, vy);
       push({
         x, y, radius: SPARK_RADIUS[0] + rng() * (SPARK_RADIUS[1] - SPARK_RADIUS[0]),
         dye: [0.05 * strength, 0, 0.5 + 0.7 * strength, 0],
@@ -366,23 +417,15 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   }
 
   function dropBurst(ctx: StyleContext, strength: number): void {
-    // Every anchor blooms big at once, then the composition moves on.
-    const snap = 0.45 + 1.1 * ctx.responsiveness;
-    anchors.forEach((_, i) => {
-      const [ax, ay] = anchorScreen(ctx, i);
-      const [x, y] = screenToUv(ctx, ax, ay);
-      const amt = (0.8 + 0.4 * strength) * (variant === 'marble' ? 0.35 : 1);
-      const radius = BASS_RADIUS[1] * (0.85 + 0.15 * strength);
-      const ch = (i % 2) as 0 | 1;
-      push({
-        x, y, radius,
-        dye: [ch === 0 ? amt : amt * 0.15, ch === 1 ? amt : amt * 0.1, 0.25, 1.1],
-        vx: 0, vy: 0, radial: 0, swirl: tps(BASS_SWIRL * 1.5 * (i % 2 ? -1 : 1)), detail: 1,
-      });
-      sim.kick(x, y, radius * BASS_KICK_RADIUS * 1.3, BASS_KICK_SPEED * 1.4 * strength * snap);
-    });
+    // A big bloom at the zone's heart with three around it, then the zone moves on.
+    const [zx, zy] = zoneScreen();
+    placeKick(ctx, Math.max(strength, 0.8), true, zx, zy);
+    for (let i = 0; i < 3; i++) {
+      const a = rng() * 0.6 + (i * Math.PI * 2) / 3;
+      placeKick(ctx, 0.8 * strength, false, zx + Math.cos(a) * 0.42, zy + Math.sin(a) * 0.34);
+    }
     sparkle(ctx, 0.8, 24);
-    nextLayout();
+    moveZone();
   }
 
   function seedField(ctx: StyleContext | null, marble: boolean): void {
@@ -445,8 +488,10 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     bassCooldown -= dt; highCooldown -= dt; midCooldown -= dt;
     if (fade < 0.05) return;
 
-    if (ctx.bassHits > BASS_THRESHOLD && bassCooldown <= 0) {
+    if (ctx.bassHits < BASS_REARM) bassArmed = true;
+    if (bassArmed && ctx.bassHits > BASS_THRESHOLD && bassCooldown <= 0) {
       bassSplat(ctx, clamp01(ctx.bassHits) * fade);
+      bassArmed = false;
       bassCooldown = BASS_COOLDOWN * (ctx.eventState.section === 'breakdown' ? 2 : 1);
     }
     if (ctx.highHits > HIGH_THRESHOLD && highCooldown <= 0) {
@@ -455,18 +500,19 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       highCooldown = HIGH_COOLDOWN;
     }
     if (ctx.midHits > MID_THRESHOLD && midCooldown <= 0) {
-      // Satellites: a small splash orbiting one of the anchors.
-      const [ax, ay] = anchorScreen(ctx, Math.floor(rng() * anchors.length));
-      const sa = rng() * Math.PI * 2;
-      const [x, y] = screenToUv(ctx, ax + Math.cos(sa) * SATELLITE_R, ay + Math.sin(sa) * SATELLITE_R * 0.8);
+      // Satellites: a small splash around the focus zone.
+      const [zx, zy] = zoneScreen();
+      const sa = rng() * Math.PI * 2, sr = SATELLITE_R * (0.8 + 0.6 * rng());
+      const [vx, vy] = toView(ctx, zx + Math.cos(sa) * sr * 1.25, zy + Math.sin(sa) * sr * 0.8);
+      const [x, y] = screenToUv(ctx, vx, vy);
       push({
         x, y, radius: 0.016 + rng() * 0.012,
-        dye: [0.05, 0.6 * ctx.midHits * fade * (variant === 'marble' ? 0.4 : 1), 0.1, 0.7 * ctx.midHits],
+        dye: [0.05, 0.6 * ctx.midHits * fade * (variant === 'marble' ? 0.4 : 1), 0.1, 0.3 * ctx.midHits],
         vx: 0, vy: 0, radial: 0, swirl: 0, detail: 0.8,
       });
-      sim.kick(x, y, 0.03, 0.5 * ctx.midHits);
+      // A gentle nudge only: big pushes clash with the beat shapes.
       const a = rng() * Math.PI * 2;
-      jet(x, y, Math.cos(a), Math.sin(a), 0.3 * ctx.midHits, 0.008);
+      jet(x, y, Math.cos(a), Math.sin(a), 0.15 * ctx.midHits, 0.008);
       midCooldown = MID_COOLDOWN;
     }
   }
@@ -492,12 +538,14 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
 
       noiseZ += dt * (0.05 + 0.18 * turbulence) * (marble ? 0.7 : 1);
       params.noiseZ = noiseZ;
-      params.noiseAmp = tps(STIR_MIN + (STIR_MAX - STIR_MIN) * turbulence) * (marble ? 1.2 : 1) * (0.35 + 0.65 * fade);
+      const stir = marble ? STIR_MIN + (STIR_MAX - STIR_MIN) * turbulence
+        : (STEADY_STIR[0] + (STEADY_STIR[1] - STEADY_STIR[0]) * turbulence) * (1 - (1 - STEADY_BREAKDOWN) * breakdownEnv);
+      params.noiseAmp = tps(stir) * (marble ? 1.2 : 1) * (0.35 + 0.65 * fade);
       // Flat shows the sim at higher magnification; less confinement avoids a crumpled look.
-      params.curlStrength = (CURL_MIN + (CURL_MAX - CURL_MIN) * turbulence) * (ctx.depth ? 1 : 0.55);
-      params.damping = 0.25 + silence * 1.2;
+      params.curlStrength = (CURL_MIN + (CURL_MAX - CURL_MIN) * turbulence) * (ctx.depth ? FLOW_CURL_DEPTH : FLOW_CURL_FLAT);
+      params.damping = (marble ? 0.25 : STEADY_DAMPING) + silence * 1.2;
       params.noisePeriod = marble ? 2 : 4;
-      params.noiseDetail = marble ? 0.15 : 0.8;
+      params.noiseDetail = marble ? 0.15 : FLOW_DETAIL;
       params.curlStrength *= marble ? 0.4 : 1;
       const floor = marble ? 0 : INK_FLOOR_DECAY * (1 + 2 * smoothstep(0.3, 1, silence));
       params.dyeFloorDecay[0] = floor;
@@ -509,12 +557,18 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       params.dyeDissipation[0] = inkDecay;
       params.dyeDissipation[1] = inkDecay;
       params.dyeDissipation[2] = 1.4;
-      params.dyeDissipation[3] = ENERGY_DECAY;
+      // The beat light fades over one beat at the song's tempo.
+      params.dyeDissipation[3] = marble ? ENERGY_DECAY : 1 / (LIGHT_TAU_BEATS * period);
+      // Flecks read as dirt on paper: much lighter drizzle there.
+      const drizzleRate = marble ? 0 : ctx.midPresence * fade * (1 + 0.5 * breakdownEnv) * (ctx.light ? DRIZZLE_PAPER : 1);
+      params.drizzle[0] = DRIZZLE_DYE * drizzleRate * (variant === 'sumi' ? SUMI_DYE : 1);
+      params.drizzle[1] = DRIZZLE_CHANCE * drizzleRate;
 
       clock += dt;
-      updateAnchors(ctx, dt);
+      updateZone(ctx);
       emit(ctx, dt);
       mapAudio(ctx);
+      updateBeats();
     },
 
     render(ctx: StyleContext): void {
@@ -569,6 +623,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
         gl.uniform1f(u.u_glow, 1.0);
         gl.uniform1f(u.u_pulse, pulse);
         gl.uniform1f(u.u_pulse_gain, PULSE_GAIN[vIdx] ?? 0.4);
+        gl.uniform1f(u.u_light_gain, (LIGHT_GAIN[vIdx] ?? 1) * ctx.fadeInOut);
       };
 
       if (!ctx.depth) {

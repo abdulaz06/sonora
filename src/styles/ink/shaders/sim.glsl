@@ -28,6 +28,12 @@ uniform float u_noise_amp;     // texels/s^2
 uniform float u_noise_period;  // lattice cells across the domain
 uniform float u_noise_z;
 uniform float u_noise_detail;  // weight of the finer octaves
+// Holds: circles (uv x, y, radius, strength 0-1) where the flow is kept still,
+// so a fresh beat shape stays solid before it is released into the flow.
+const int MAX_HOLDS = 6;
+uniform vec4 u_holds[MAX_HOLDS];
+uniform int u_hold_count;
+uniform float u_hold_rate;     // 1/s at full strength
 //#include common
 float potential(vec2 uv) {
   return pnoise(vec3(uv * u_noise_period, u_noise_z), vec2(u_noise_period))
@@ -54,6 +60,13 @@ void main() {
   vec2 v = texture(u_vel, uv).xy;
   v += (force + stir * u_noise_amp) * u_dt;
   v *= exp(-u_damping * u_dt);
+  float hold = 0.0;
+  for (int i = 0; i < MAX_HOLDS; i++) {
+    if (i >= u_hold_count) break;
+    vec2 d = fract(uv - u_holds[i].xy + 0.5) - 0.5;
+    hold = max(hold, u_holds[i].w * exp(-dot(d, d) / (u_holds[i].z * u_holds[i].z)));
+  }
+  v *= exp(-u_hold_rate * hold * u_dt);
   frag = vec4(v, 0.0, 1.0);
 }
 
@@ -133,6 +146,16 @@ uniform int u_pass;
 const int MAX_KICKS = 8;
 uniform vec4 u_kicks[MAX_KICKS];
 uniform int u_kick_count;
+// Ambient drizzle (v0.1): faint dots sprinkled in hashed cells, refreshed 12x a
+// second, which the flow stretches into sheets. x = dye per second while a dot
+// is lit, y = chance a cell lights per refresh, z = cells across the domain.
+uniform vec3 u_drizzle;
+uniform float u_drizzle_t;
+float dhash(vec2 p) {
+  p = fract(p * vec2(123.34, 456.21));
+  p += dot(p, p + 45.32);
+  return fract(p.x * p.y);
+}
 vec2 kickVelocity(vec2 uv) {
   vec2 v = vec2(0.0);
   for (int i = 0; i < MAX_KICKS; i++) {
@@ -170,7 +193,18 @@ void main() {
   vec4 d = texture(u_dye, c + vec2(0.0, u_dye_texel.y));
   vec4 e = texture(u_dye, c + u_dye_texel);
   res = clamp(res, min(min(a, b), min(d, e)), max(max(a, b), max(d, e)));
-  frag = max(res * exp(-u_dissipation * u_dt) - u_floor_decay * u_dt, 0.0);
+  res = max(res * exp(-u_dissipation * u_dt) - u_floor_decay * u_dt, 0.0);
+  if (u_drizzle.y > 0.0) {
+    vec2 cell = floor(uv * u_drizzle.z);
+    float tick = floor(u_drizzle_t * 12.0);
+    if (dhash(cell + tick * 0.618) > 1.0 - u_drizzle.y) {
+      vec2 q = fract(uv * u_drizzle.z) - 0.5;
+      float dot_ = exp(-dot(q, q) * 22.0);
+      float amt = u_drizzle.x * u_dt * dot_;
+      res.xy += dhash(cell * 1.7 + tick) < 0.6 ? vec2(amt, 0.0) : vec2(0.0, amt);
+    }
+  }
+  frag = res;
 }
 
 //#program height

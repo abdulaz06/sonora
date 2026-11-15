@@ -22,6 +22,8 @@ uniform float u_sharpen;
 uniform float u_glow;
 uniform float u_pulse;        // bass-hit envelope × fade: frame-accurate beat response
 uniform float u_pulse_gain;   // how much ink brightens on a hit
+uniform float u_light_gain;   // brightening at full beat light (dye energy), per look
+const float LIGHT_KNEE = 0.85;   // ink luminance above which the beat light compresses
 
 struct InkSample {
   vec4 d;      // sharpened dye
@@ -132,12 +134,22 @@ vec3 shadeInk(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
   float e = min(s.d.a, 2.0);
   vec3 inkCol = u_variant == 1 ? (u_light == 1 ? vec3(0.02) : u_paper)
               : mix(u_ink_a, u_ink_b, s.d.g / (s.d.r + s.d.g + 1e-3));
+  // Beat light: kicks put energy into the dye; it lights the ink it lands on
+  // and streams off with it, fading over one beat.
+  float L = min(e, 1.5);
   if (u_light == 1) {
-    float deepen = clamp((0.45 * u_pulse * u_pulse_gain + 0.35 * e) * max(cover, 0.25 * e), 0.0, 0.7);
+    float deepen = clamp((0.45 * u_pulse * u_pulse_gain + 0.3 * u_light_gain * L) * max(cover, 0.8 * L), 0.0, 0.7);
     return col * (1.0 - deepen) + inkCol * deepen * 0.15;
   }
   vec3 base = darkBackground(world);
-  col = base + (col - base) * (1.0 + u_pulse_gain * u_pulse);
-  col += inkCol * min(e, 1.2) * 0.55 * (0.3 + 0.7 * cover);
+  // Dim ink brightens most; already-bright ink gets less, so cores don't blow out.
+  float lum = dot(max(col - base, 0.0), vec3(0.3, 0.5, 0.2));
+  float boost = 1.0 + u_pulse_gain * u_pulse + u_light_gain * L / (1.0 + 4.0 * lum);
+  // Soft ceiling: the light lifts ink toward white but compresses above it.
+  float lumB = lum * boost;
+  if (lumB > LIGHT_KNEE) boost *= (LIGHT_KNEE + (lumB - LIGHT_KNEE) * 0.3) / lumB;
+  col = base + (col - base) * boost;
+  // A soft glow of the ink's colour where the light falls, strongest on ink.
+  col += inkCol * L * 0.1 * u_light_gain * (0.04 + 0.96 * cover) / (1.0 + 4.0 * lum);
   return col;
 }

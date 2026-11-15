@@ -34,6 +34,9 @@ const INSTANCE_FLOATS = 13;
 /** Concurrent beat kicks and how fast each fades (s). */
 const MAX_KICKS = 8;
 const KICK_TAU = 0.09;
+/** Holds: most circles, and how fast a full-strength hold stills the flow (1/s). */
+const MAX_HOLDS = 6;
+const HOLD_RATE = 28;
 
 export interface Splat {
   /** Domain uv (wrapped automatically). */
@@ -73,6 +76,8 @@ export interface FluidParams {
   dyeDissipation: [number, number, number, number];
   /** Per-channel subtractive decay (dye units / s): removes faint haze. */
   dyeFloorDecay: [number, number, number, number];
+  /** Ambient drizzle: dye per second while a dot is lit, chance per refresh, cells across the domain (0 chance = off). */
+  drizzle: [number, number, number];
 }
 
 interface Tex {
@@ -116,6 +121,9 @@ export class FluidSim {
   private instanceCount = 0;
   private kicks: { x: number; y: number; r: number; s: number }[] = [];
   private kickData = new Float32Array(MAX_KICKS * 4);
+  private holdData = new Float32Array(MAX_HOLDS * 4);
+  private holdCount = 0;
+  private clock = 0;
 
   private vel!: Double;
   private pressure!: Double;
@@ -214,6 +222,16 @@ export class FluidSim {
    * Beat kick: pushes ink outward from (x, y) immediately, fading over ~0.1 s.
    * `radius` in uv, `speed` in uv/s at the start.
    */
+  /** Circles where the flow is held still this frame (uv x, y, radius, strength 0-1). */
+  setHolds(holds: readonly { x: number; y: number; r: number; s: number }[]): void {
+    this.holdData.fill(0);
+    this.holdCount = Math.min(holds.length, MAX_HOLDS);
+    for (let i = 0; i < this.holdCount; i++) {
+      const h = holds[i];
+      this.holdData.set([((h.x % 1) + 1) % 1, ((h.y % 1) + 1) % 1, h.r, h.s], i * 4);
+    }
+  }
+
   kick(x: number, y: number, radius: number, speed: number): void {
     if (this.kicks.length >= MAX_KICKS) this.kicks.shift();
     this.kicks.push({ x: ((x % 1) + 1) % 1, y: ((y % 1) + 1) % 1, r: radius, s: speed });
@@ -224,6 +242,7 @@ export class FluidSim {
     const dt = Math.min(rawDt, MAX_SIM_DT);
     const simTexel = 1 / this.simRes;
     const dyeTexel = 1 / this.dyeRes;
+    this.clock += dt;
     gl.disable(gl.BLEND);
     gl.disable(gl.DEPTH_TEST);
 
@@ -251,6 +270,11 @@ export class FluidSim {
 
     // ── Curl + forces ──
     this.pass('curl', this.curl, { u_vel: this.vel.read }, { u_texel: [simTexel, simTexel] });
+    const fp = this.progs.forces;
+    gl.useProgram(fp.prog);
+    gl.uniform4fv(fp.u.u_holds, this.holdData);
+    gl.uniform1i(fp.u.u_hold_count, this.holdCount);
+    gl.uniform1f(fp.u.u_hold_rate, HOLD_RATE);
     this.pass('forces', this.vel.write, { u_vel: this.vel.read, u_curl: this.curl }, {
       u_texel: [simTexel, simTexel], u_dt: dt, u_curl_strength: p.curlStrength, u_damping: p.damping,
       u_noise_amp: p.noiseAmp, u_noise_period: p.noisePeriod, u_noise_z: p.noiseZ, u_noise_detail: p.noiseDetail,
@@ -281,6 +305,7 @@ export class FluidSim {
     const dyeU = {
       u_dye_texel: [dyeTexel, dyeTexel], u_sim_res: this.simRes, u_dt: dt,
       u_dissipation: p.dyeDissipation as number[], u_floor_decay: p.dyeFloorDecay as number[],
+      u_drizzle: p.drizzle as number[], u_drizzle_t: this.clock,
     };
     const ap = this.progs.advectDye;
     gl.useProgram(ap.prog);
@@ -385,6 +410,7 @@ export class FluidSim {
         if (k === 'u_pass') gl.uniform1i(loc, v);
         else gl.uniform1f(loc, v);
       } else if (v.length === 2) gl.uniform2f(loc, v[0], v[1]);
+      else if (v.length === 3) gl.uniform3f(loc, v[0], v[1], v[2]);
       else if (v.length === 4) gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
     }
     gl.drawArrays(gl.TRIANGLES, 0, 6);
