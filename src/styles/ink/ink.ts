@@ -87,6 +87,8 @@ const BASS_SWIRL = 0.01;
  * lights the ink it lands on and streams off with it. Radius x shape radius;
  * fade time constant in beats (tempo-tied). */
 const LIGHT_RADIUS = 1.4;
+/** Sumi on paper: the kick shades a wider area (darkening needs more area to read than glowing). */
+const LIGHT_RADIUS_PAPER = 1.6;
 const LIGHT_TAU_BEATS = 0.42;
 /** How much ink brightens at full beat light, per look (glow, sumi, marble). */
 const LIGHT_GAIN = [2.2, 2.6, 1.0];
@@ -370,7 +372,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     });
     // The beat light: a soft energy glow over the shape and the ink around it.
     push({
-      x, y, radius: radius * LIGHT_RADIUS,
+      x, y, radius: radius * LIGHT_RADIUS * (variant === 'sumi' && ctx.light ? LIGHT_RADIUS_PAPER : 1),
       dye: [0, 0, 0, (0.75 + 0.25 * strength) * (big ? 1.15 : 1)],
       vx: 0, vy: 0, radial: 0, swirl: 0, detail: 0,
     });
