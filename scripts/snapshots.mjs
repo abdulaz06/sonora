@@ -12,7 +12,7 @@ try {
   const p = await b.newPage({ viewport: { width: Number(process.env.SNAP_W || 960), height: Number(process.env.SNAP_H || 540) } });
   await p.goto('http://localhost:5199/web.html?harness=1');
   await p.waitForFunction(() => window.__sonora?.ready === true);
-  await p.evaluate(([s, v]) => window.__sonora.configure({ style: s, variant: v || undefined, drift: false }), [style, process.env.SNAP_LOOK || '']);
+  await p.evaluate(([s, v, d]) => window.__sonora.configure({ style: s, variant: v || undefined, depth: d === '' ? undefined : d === '1', drift: false }), [style, process.env.SNAP_LOOK || '', process.env.SNAP_DEPTH ?? '']);
   await p.evaluate((n) => window.__sonora.loadTrack(n), track);
   let now = 0;
   for (const ts of times) {

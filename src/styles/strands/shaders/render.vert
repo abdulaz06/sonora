@@ -32,6 +32,7 @@ uniform float u_curve_k;       // planet / bowl curvature, as the Ink surface
 uniform float u_hspan;         // height of the silk volume / wisp flight band
 uniform float u_ring_h;        // wisp: height of the current smoke ring
 uniform float u_dscale;        // ground units per simulation unit
+uniform vec4 u_flame_w[3];     // wisp: flame world position (xyz) and brightness
 #endif
 out vec4 v_col;
 out vec2 v_uv;
@@ -111,6 +112,19 @@ void main() {
   // Wisp: smoke in its agent's colour; ring smoke brighter.
   int ci = int(clamp(kind, 0.0, 3.0));
 #ifdef DEPTH
+  if (kind > 3.5) {
+    // Ember: a mote floating at its own height; glows as a flame passes near.
+    float eh = u_hspan * (0.15 + 3.2 * fract(seed * 5.13)) + 0.03 * sin(u_time * 0.7 + seed * 40.0);
+    vec3 ew = worldAt(A.xy, eh);
+    w *= project(ew, u_point * 1.3);
+    vec3 glow = u_wisp_col[3].rgb * 0.3;
+    for (int i = 0; i < 3; i++) {
+      vec3 d = ew - u_flame_w[i].xyz;
+      glow += u_wisp_col[i].rgb * u_flame_w[i].w * 0.02 / (dot(d, d) + 0.012);
+    }
+    v_col = vec4(glow * w * u_gain * 3.0, 1.0);
+    return;
+  }
   // Smoke keeps the height its flame had when it was shed (t - age), and rises.
   float h = (ci == 3 ? u_ring_h : agentH(float(ci), u_time - age)) + age * 0.035;
   w *= project(worldAt(A.xy, h), u_point);

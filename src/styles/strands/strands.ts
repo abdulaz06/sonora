@@ -31,6 +31,8 @@ import updateFrag from './shaders/update.frag?raw';
 import renderVert from './shaders/render.vert?raw';
 import renderFrag from './shaders/render.frag?raw';
 import displayFrag from './shaders/display.frag?raw';
+import tunnelVert from './shaders/tunnel.vert?raw';
+import { HIST, TRAIL_LIFE, TUNNEL_FOG, TUNNEL_PATH, TUNNEL_PATH_Y, TUNNEL_RADIUS, TUNNEL_SPAN, Tunnel, tunnelCentre } from './tunnel';
 import fullscreenVert from '../../engine/shaders/fullscreen.vert?raw';
 
 // ── Tuning ──────────────────────────────────────────────────────
@@ -105,6 +107,15 @@ const WISP_DEPTH_DECAY = 0.955;
 const DEPTH_FLAME_GROW = 1.6;
 /** Wisp Depth: smoke tone-map gain (smoke spreads over more screen and fades faster). */
 const WISP_DEPTH_SMOKE = 1.8;
+/** Wisp Depth Ground: share of particles that float as embers. */
+const WISP_EMBERS = 0.14;
+/** Wisp Depth Tunnel: accumulation decay (short streaks), share of particles in
+ * the walls (the rest are trails), point gain, kick threshold / re-arm. */
+const TUNNEL_DECAY = 0.82;
+const TUNNEL_WALL_SHARE = 0.6;
+const TUNNEL_GAIN = 0.05;
+const TUNNEL_WALL_GAIN = 4;
+const TUNNEL_KICK = [0.5, 0.3];
 
 interface Shock { x: number; y: number; r: number; s: number; age: number }
 interface Agent { x: number; y: number; heading: number; speed: number; turn: number; glow: number }
@@ -148,6 +159,13 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     return pd;
   };
   let wasDepth: boolean | null = null;
+  // Wisp looks (Depth only): 'ground' or 'tunnel'.
+  let variant = kind === 'wisp' ? 'ground' : kind;
+  const tunnel = kind === 'wisp' ? new Tunnel(deps.seed) : null;
+  let tunnelProg: Program | null = null;
+  let histTex: WebGLTexture | null = null;
+  let wasTunnel = false;
+  let tunnelArmed = true;
 
   // ── State ─────────────────────────────────────────────────────
   let time = 0;
@@ -192,6 +210,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
   }
 
   const depthOf = (ctx: StyleContext): boolean => ctx.depth && kind !== 'warp';
+  const tunnelOn = (ctx: StyleContext): boolean => kind === 'wisp' && variant === 'tunnel' && depthOf(ctx);
   const hspan = (ctx: StyleContext): number => DEPTH_HSPAN[0] + DEPTH_HSPAN[1] * ctx.camera.position[1];
   /** Wisp flame height (matches agentH() in render.vert). */
   const agentH = (ctx: StyleContext, i: number, t: number): number =>
@@ -208,6 +227,89 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     return [c[0] + sx * DEPTH_VIEW * 0.4, c[1] + sy * DEPTH_VIEW * 0.3];
   };
 
+  /** Wisp Depth Tunnel: stateless tunnel particles into the accumulation buffer, then flames on top. */
+  function renderTunnel(ctx: StyleContext, tn: Tunnel): void {
+    const pal = ctx.palette;
+    const dprog = depthPrograms();
+    tunnelProg ??= makeProgram(gl, inc(tunnelVert), inc(renderFrag), `${def}\n#define TUNNEL 1`);
+    if (!histTex) {
+      histTex = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, histTex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, HIST, 3, 0, gl.RGBA, gl.FLOAT, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    gl.bindTexture(gl.TEXTURE_2D, histTex);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, HIST, 3, gl.RGBA, gl.FLOAT, tn.hist);
+
+    const count = Math.floor(side * side * cfg.count);
+    const flames: number[] = [];
+    tn.flames.forEach((f) => flames.push(f.pos[0], f.pos[1], f.pos[2], f.glow * (0.4 + 0.6 * ctx.fadeInOut)));
+    const rings: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const g = tn.rings[i];
+      rings.push(g ? g.s : -1e4, g ? g.str * (1 - g.age / 1.2) : 0, 0, 0);
+    }
+
+    bindTarget(gl, accum!);
+    gl.enable(gl.BLEND);
+    gl.useProgram(fill.prog);
+    gl.blendFunc(gl.ZERO, gl.CONSTANT_ALPHA);
+    gl.blendColor(0, 0, 0, Math.pow(TUNNEL_DECAY, ctx.dt * 60));
+    setUniforms(gl, fill, { u_color: [0, 0, 0, 0] });
+    drawQuad(gl, quadVAO);
+    gl.useProgram(tunnelProg.prog);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    setUniforms(gl, tunnelProg, {
+      u_view_proj: tn.viewProj, u_cam_pos: tn.camPos, u_s: tn.s, u_time: tn.time,
+      u_wall_count: Math.floor(count * TUNNEL_WALL_SHARE), u_point: Math.max(1, ctx.height / 1080),
+      u_gain: TUNNEL_GAIN * (0.5 + 0.5 * ctx.fadeInOut), u_wall_gain: TUNNEL_WALL_GAIN, u_radius: TUNNEL_RADIUS, u_span: TUNNEL_SPAN,
+      u_path: TUNNEL_PATH, u_path_y: TUNNEL_PATH_Y, u_fog: TUNNEL_FOG,
+      u_wisp_col: [...pal.primary, 1, ...pal.accent, 1, ...pal.highlight, 1, ...mixRgb(pal.highlight, [1, 1, 1], 0.5), 1],
+      u_flames: flames, u_rings: rings, u_ring_count: tn.rings.length,
+      u_hist: histTex, u_hist_head: tn.histHead, u_hist_len: tn.histLen, u_trail_life: TRAIL_LIFE,
+    });
+    gl.bindVertexArray(emptyVAO);
+    gl.drawArrays(gl.POINTS, 0, count);
+    gl.bindVertexArray(null);
+    gl.disable(gl.BLEND);
+
+    // Flames, projected through the tunnel camera.
+    ctx.bindScene();
+    gl.useProgram(dprog.display.prog);
+    const scrAspect = ctx.width / ctx.height;
+    const agentUv: number[] = [];
+    const agentDir: number[] = [];
+    tn.flames.forEach((f, i) => {
+      const pr = tn.project(f.pos);
+      const ah = tn.project(tn.aheadOf(i));
+      const size = 0.012 + 0.006 * f.glow;
+      if (!pr) { agentUv.push(-9, -9, 0, size); agentDir.push(1, 0, 0, 0); return; }
+      let dx = 0, dy = 1;
+      if (ah) {
+        dx = (ah.uv[0] - pr.uv[0]) * scrAspect; dy = ah.uv[1] - pr.uv[1];
+        const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
+      }
+      const near = Math.min(1.8, Math.max(0.6, 1.3 / pr.w));
+      agentUv.push(pr.uv[0], pr.uv[1], (0.5 + 0.5 * ctx.fadeInOut) * f.glow * 1.3 / Math.max(1, Math.sqrt(near)), size * near);
+      agentDir.push(dx, dy, 0.6 * near, 0);
+    });
+    agentUv.push(0, 0, 0, 0.01); agentDir.push(1, 0, 0, 0);
+    const far = tn.project(tunnelCentre(tn.s + 24));
+    setUniforms(gl, dprog.display, {
+      u_scene: 1, u_vanish: far ? far.uv : [0.5, 0.5], u_horizon: -9,
+      u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
+      u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
+      u_light: false, u_gain: cfg.display * WISP_DEPTH_SMOKE, u_fade: ctx.fadeInOut, u_pulse: ctx.bassHits,
+      u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: 3,
+    });
+    drawQuad(gl, quadVAO);
+    const post = ctx.post;
+    post.bloom = 0.9; post.bloomThreshold = 0.8; post.vignette = 0.45;
+  }
+
   return {
     id: kind,
 
@@ -219,6 +321,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         warpJump = 1;
       } else if (kind === 'wisp' && e.type === 'drop') {
         agents.forEach((a) => { a.speed += 1.2; a.glow = 2; });
+        if (tunnelOn(ctx)) tunnel?.drop();
       }
       if (e.type === 'trackChange') fieldT += 50;
     },
@@ -248,6 +351,14 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       }
       for (const s of shocks) { s.age += dt; s.r += SHOCK_SPEED * dt; s.s *= Math.exp(-dt / 0.5); }
       while (shocks.length && shocks[0].age > SHOCK_LIFE) shocks.shift();
+
+      // Wisp Tunnel: pace, flames, camera; a ring of light on each kick.
+      if (tunnel && tunnelOn(ctx)) {
+        tunnel.update(ctx);
+        if (ctx.bassHits < TUNNEL_KICK[1]) tunnelArmed = true;
+        if (tunnelArmed && ctx.bassHits > TUNNEL_KICK[0] && fade > 0.1) { tunnel.kick(ctx.bassHits); tunnelArmed = false; }
+        if (ctx.midHits > 0.6 && rng() < 0.2) tunnel.swerve(Math.floor(rng() * 3), (rng() - 0.5) * 3);
+      }
 
       // Wisp agents.
       if (kind === 'wisp') {
@@ -315,6 +426,13 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       const depth = depthOf(ctx);
       if (wasDepth !== null && wasDepth !== depth) needsInit = true;
       wasDepth = depth;
+      if (tunnel && tunnelOn(ctx)) {
+        if (!wasTunnel) tunnel.reset();
+        wasTunnel = true;
+        renderTunnel(ctx, tunnel);
+        return;
+      }
+      if (wasTunnel) { wasTunnel = false; needsInit = true; }
       const prog = depth ? { ...p, ...depthPrograms() } : p;
       // The simulated region: the 2D view in Flat, the ground ahead in Depth.
       const view = depth ? DEPTH_VIEW : cam.viewHeight;
@@ -378,6 +496,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_core: [core[0], core[1]], u_gather: kind === 'silk' ? Math.pow(Math.max(0, (ctx.eventState.buildProgress - 0.3) / 0.7), 2) * ctx.fadeInOut : 0,
         u_burst: burst, u_form: kind === 'silk' ? form : 0,
         u_agents: agentData, u_agent_count: agents.length, u_ring: [ring.x, ring.y, ring.age, ring.s],
+        u_embers: depth && kind === 'wisp' ? WISP_EMBERS : 0,
       });
       drawQuad(gl, quadVAO);
       state.swap();
@@ -393,12 +512,23 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       setUniforms(gl, fill, { u_color: [0, 0, 0, 0] });
       drawQuad(gl, quadVAO);
 
+      // Wisp Depth Ground: flame world positions (embers glow near them, the ground is lit under them).
+      const flameW: number[] = [];
+      for (let i = 0; i < 3; i++) {
+        const a = agents[i];
+        const S = DEPTH_SCALE[kind];
+        const wx = a.x * S, wz = a.y * S;
+        const dx = wx - cam.position[0], dz = wz - cam.position[2];
+        const bright = (0.45 + 0.55 * ctx.fadeInOut) * a.glow * (0.8 + a.speed);
+        flameW.push(wx, agentH(ctx, i, time) - cam.curvature * (dx * dx + dz * dz), wz, bright);
+      }
+
       gl.useProgram(prog.render.prog);
       gl.blendFunc(gl.ONE, gl.ONE);
       const depthU: Record<string, UniformValue> = depth ? {
         u_view_proj: cam.viewProj, u_cam_pos: cam.position,
         u_fog: [cam.fogNear, cam.fogFar], u_curve_k: cam.curvature, u_hspan: hspan(ctx), u_ring_h: ring.h,
-        u_dscale: DEPTH_SCALE[kind],
+        u_dscale: DEPTH_SCALE[kind], u_flame_w: flameW,
       } : {};
       setUniforms(gl, prog.render, {
         ...depthU,
@@ -453,7 +583,12 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       }
       // Depth: screen height of the horizon (ignoring roll) for a faint glow.
       const horizon = 0.5 + 0.5 * Math.tan(-cam.pitch) / Math.tan(cam.fov / 2);
+      const groundU: Record<string, UniformValue> = depth ? {
+        u_scene: 0, u_cam_pos: cam.position, u_cam_fwd: cam.forward, u_cam_right: cam.right, u_cam_up: cam.up,
+        u_tan_half: Math.tan(cam.fov / 2), u_curve_k: cam.curvature, u_fog: [cam.fogNear, cam.fogFar], u_flame_w: flameW,
+      } : {};
       setUniforms(gl, prog.display, {
+        ...groundU,
         u_horizon: horizon,
         u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
         u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
@@ -474,6 +609,14 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       quality = q;
     },
 
+    setVariant(id: string): void {
+      if (kind === 'wisp') variant = id === 'tunnel' ? 'tunnel' : 'ground';
+    },
+
+    getVariant(): string {
+      return variant;
+    },
+
     dispose(): void {
       state.dispose();
       deleteTarget(gl, accum);
@@ -481,6 +624,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       gl.deleteProgram(p.render.prog);
       gl.deleteProgram(p.display.prog);
       if (pd) { gl.deleteProgram(pd.render.prog); gl.deleteProgram(pd.display.prog); }
+      if (tunnelProg) gl.deleteProgram(tunnelProg.prog);
+      if (histTex) gl.deleteTexture(histTex);
       gl.deleteProgram(fill.prog);
       gl.deleteVertexArray(emptyVAO);
     },

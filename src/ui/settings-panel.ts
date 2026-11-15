@@ -33,7 +33,7 @@ const PRESET_MATCH = 0.03;
 const DEPTH_HINTS: Partial<Record<StyleId, [string, string]>> & { ink: [string, string] } = {
   ink: ['Fly over the ink as a 3D surface.', 'Look straight down at the ink, like a canvas.'],
   silk: ['Glide through curtains of silk threads hanging over the ground.', 'Silk threads flowing across a flat canvas.'],
-  wisp: ['Follow the flames as they fly over the ground, trailing smoke.', 'Flames darting across a flat black canvas.'],
+  wisp: ['The flames in 3D: over a dark plain (Ground) or down an endless tunnel (Tunnel).', 'Flames darting across a flat black canvas.'],
 };
 
 const STYLE_HINTS: Partial<Record<StyleId, string>> = {
@@ -54,6 +54,8 @@ const VARIANT_HINTS: Record<string, string> = {
   void: 'The fractal floats in a dark, star-filled sky tinted by your colours.',
   city: 'A curved world of fields, rivers and cities rises around the fractal and hangs overhead.',
   ocean: 'The curved world is a single ocean with huge swells rolling toward the horizon.',
+  ground: 'Hover over a dark plain at night: each flame lights the ground beneath it, and embers float around you.',
+  tunnel: 'Ride right behind the flames as they race down an endless, winding tunnel of smoke and embers.',
 };
 const QUALITY_HINTS: Record<QualityPreset, string> = {
   low: 'Smaller simulation and render size. Use on laptops or integrated graphics.',
@@ -212,8 +214,15 @@ function render(): void {
   const preset = activePreset(state.camera);
   const presetHint = CAMERA_PRESETS.find((p) => p.id === preset)?.hint ?? 'Custom view.';
   const depthOn = desc.supportsDepth && state.depth;
+  // Wisp's looks are Depth-only; its Tunnel has its own chase camera (no presets).
+  const looksShown = desc.variants.length > 1 && (desc.id !== 'wisp' || depthOn);
+  const ownCamera = desc.id === 'wisp' && depthOn && state.variant === 'tunnel';
 
-  const camera = depthOn ? `
+  const camera = ownCamera ? `
+    <div class="sec">
+      <div class="title">Camera</div>
+      ${hint('The tunnel has its own camera that rides behind the flames. Switch Look to Ground for camera presets.')}
+    </div>` : depthOn ? `
     <div class="sec">
       <div class="title">Camera</div>
       <div class="field"><div class="label">View preset</div>
@@ -273,7 +282,7 @@ function render(): void {
         <div class="seg">${styles.map((s) => segBtn('style', s.id, s.label, s.id === state.style)).join('')}</div>
         ${hint(STYLE_HINTS[state.style] ?? '')}
       </div>
-      ${desc.variants.length > 1 ? `<div class="field"><div class="label">Look</div>
+      ${looksShown ? `<div class="field"><div class="label">Look</div>
         <div class="seg">${desc.variants.map((v) => segBtn('variant', v.id, v.label, v.id === state.variant)).join('')}</div>
         ${hint(VARIANT_HINTS[state.variant] ?? '')}
       </div>` : ''}

@@ -25,7 +25,7 @@ export const STYLES: StyleDescriptor[] = [
   },
   {
     id: 'wisp', label: 'Wisp', category: 'art',
-    variants: STYLE_VARIANTS.wisp, defaultVariant: 'wisp',
+    variants: STYLE_VARIANTS.wisp, defaultVariant: 'ground',
     supportsLight: false, supportsDepth: true, defaultDepth: false,
     create: createWispStyle,
   },

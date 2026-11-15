@@ -31,6 +31,7 @@ uniform int u_agent_count;
 uniform vec4 u_ring;           // wisp ring burst: centre.xy, age, strength
 // Silk drop arc: core (world), gather (build), burst (drop), formation weight
 uniform vec2 u_core;
+uniform float u_embers;        // Wisp Depth Ground: share of particles that are floating embers (0 = off)
 uniform float u_gather;
 uniform float u_burst;
 uniform float u_form;
@@ -91,7 +92,13 @@ void main() {
     // Wisp: smoke shed by an agent, or a ring around it after a bass hit.
     int a = int(floor(r.z * float(max(u_agent_count, 1))));
     vec4 ag = u_agents[min(a, 3)];
-    if (u_ring.w > 0.01 && u_ring.z < 0.35 && r.w < 0.75) {
+    if (seed < u_embers) {
+      // Ember: floats anywhere in the region (Depth gives it a height).
+      A.xy = u_center + (r.xy * 2.0 - 1.0) * half_ * 1.6;
+      A.zw = vec2(0.0);
+      kind = 4.0;
+      life = 8.0 + r.y * 10.0;
+    } else if (u_ring.w > 0.01 && u_ring.z < 0.35 && r.w < 0.75) {
       float ang = r.x * 6.2832;
       vec2 dir = vec2(cos(ang), sin(ang));
       A.xy = u_ring.xy + dir * (0.02 + r.y * 0.01);
@@ -132,8 +139,12 @@ void main() {
     v += d / max(rr, 1e-4) * u_shock[i].w * ring * dt * 9.0;
   }
 #elif VARIANT == 2
-  v += curl2(p * 4.0, u_field_t) * 0.05 * dt;
-  v *= exp(-dt * (kind > 2.5 ? 1.6 : 0.7));
+  if (kind > 3.5) {
+    v = curl2(p * 1.5, u_field_t) * 0.025;   // embers drift slowly
+  } else {
+    v += curl2(p * 4.0, u_field_t) * 0.05 * dt;
+    v *= exp(-dt * (kind > 2.5 ? 1.6 : 0.7));
+  }
 #endif
   p += v * dt;
 

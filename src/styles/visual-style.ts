@@ -48,7 +48,11 @@ export const STYLE_VARIANTS: Record<StyleId, VariantOption[]> = {
     { id: 'sumi', label: 'Sumi', defaultLight: true },
   ],
   silk: [{ id: 'silk', label: 'Silk' }],
-  wisp: [{ id: 'wisp', label: 'Wisp', lightCapable: false }],
+  // Wisp's looks apply to its Depth view only (Flat is one look).
+  wisp: [
+    { id: 'ground', label: 'Ground', lightCapable: false },
+    { id: 'tunnel', label: 'Tunnel', lightCapable: false },
+  ],
   warp: [{ id: 'warp', label: 'Warp', lightCapable: false }],
   voyage: [
     { id: 'void', label: 'Void' },
