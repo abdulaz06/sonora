@@ -6,7 +6,7 @@ Rules from round 2: Depth/Flat toggle with Flat as the default; the 2D path unto
 - [x] Wisp Depth: flames at changing heights circling a point near the camera; smoke keeps its shedding height and rises; projected flames (D42)
 - [x] Flat unchanged: Flat renders pixel-identical to before on house-124
 - [x] Close-up particles spread the same light as they grow (Silk blown-out max 6.8% → 2.0%, Wisp 10.2% → 5.2%)
-- [x] Verified: both views × five tracks; sync Silk Depth 91–100%, Wisp Depth 100% (Flat unchanged); flicker 0.83 / 1.0 swings/s; Silk 1.8 / 4.6 ms, Wisp 1.1–1.7 ms Low/Medium; presets Planet and Overhead; Silk paper look
+- [x] Verified: both views × five tracks; sync Silk Depth 91–100%, Wisp Depth 100% (Flat unchanged); flicker 0.83 / 1.0 swings/s; Silk 1.8 / 4.6 ms, Wisp 1.1–1.7 ms Low/Medium; presets Planet and Overhead; Silk paper look; live desktop app (Depth and Flat, Punchy, Ocean, dense track)
 
 ---
 
