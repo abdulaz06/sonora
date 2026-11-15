@@ -13,7 +13,7 @@
  * labels, square corners, 1 px Bone/12% dividers.
  */
 
-import { CAMERA_PRESETS, type CameraView } from '../engine/camera';
+import { CAMERA_PRESETS, FLAT_ZOOM_MAX, FLAT_ZOOM_MIN, type CameraView } from '../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
 import { FPS_CAPS } from '../ipc/settings';
@@ -75,6 +75,7 @@ export interface SettingsCallbacks {
   onShowClassicChange: (on: boolean) => void;
   onRingCountChange: (n: number) => void;
   onCameraChange: (view: CameraView) => void;
+  onFlatZoomChange: (zoom: number) => void;
   /** -1 means custom (use the custom hue). */
   onPaletteChange: (paletteIndex: number) => void;
   onCustomHueChange: (hue: number) => void;
@@ -97,6 +98,7 @@ export interface SettingsState {
   showClassic: boolean;
   ringCount: number;
   camera: CameraView;
+  flatZoom: number;
   paletteIndex: number;
   customHue: number;
   autoDrift: boolean;
@@ -228,7 +230,11 @@ function render(): void {
     </div>` : desc.supportsDepth ? `
     <div class="sec">
       <div class="title">Camera</div>
-      ${hint('Drag on the picture to move around. Scroll to zoom in and out. Switch View to Depth for camera presets.')}
+      <div class="field"><div class="label">Zoom</div>
+        <input type="range" data-a="flat-zoom" min="0" max="100" value="${Math.round(((state.flatZoom - FLAT_ZOOM_MIN) / (FLAT_ZOOM_MAX - FLAT_ZOOM_MIN)) * 100)}">
+        ${ends('Close', 'Wide')}
+      </div>
+      ${hint('Drag on the picture to move around. Scroll to zoom. Flat zoom is kept apart from the Depth camera; switch View to Depth for camera presets.')}
     </div>` : '';
 
   const meter = `<div class="meter"><i id="audio-level"></i></div>`;
@@ -392,6 +398,9 @@ function onInput(e: Event): void {
     const key = a === 'cam-height' ? 'height' : a === 'cam-tilt' ? 'tilt' : 'curve';
     state.camera = { ...state.camera, [key]: n / 100 };
     cb.onCameraChange(state.camera);
+  } else if (a === 'flat-zoom') {
+    state.flatZoom = FLAT_ZOOM_MIN + (FLAT_ZOOM_MAX - FLAT_ZOOM_MIN) * (n / 100);
+    cb.onFlatZoomChange(state.flatZoom);
   } else if (a === 'classic' && el instanceof HTMLInputElement) {
     state.showClassic = el.checked;
     cb.onShowClassicChange(el.checked);

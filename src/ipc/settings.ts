@@ -7,7 +7,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-import { DEFAULT_CAMERA_VIEW, type CameraView } from '../engine/camera';
+import { DEFAULT_CAMERA_VIEW, FLAT_ZOOM_MAX, FLAT_ZOOM_MIN, type CameraView } from '../engine/camera';
 import { DEFAULT_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
 import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
@@ -45,6 +45,8 @@ export interface PersistedSettings {
   depth: Partial<Record<StyleId, boolean>>;
   /** Depth-view camera: height, tilt, curvature. */
   camera: CameraView;
+  /** Flat-view zoom (1 = normal); kept apart from the Depth camera. */
+  flatZoom: number;
   /** Concentric shape count (Aura mode). */
   ringCount: number;
   /** Capture source: `'default'` follows the system default and auto-switches
@@ -79,6 +81,7 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   lightModes: {},
   depth: {},
   camera: { ...DEFAULT_CAMERA_VIEW },
+  flatZoom: 1,
   ringCount: 3,
   audioDevice: 'default',
   window: {
@@ -225,6 +228,7 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
       curve: num(c.curve, -1, 1, DEFAULT_CAMERA_VIEW.curve),
     };
   }
+  if (typeof r.flatZoom === 'number' && Number.isFinite(r.flatZoom)) out.flatZoom = clamp(r.flatZoom, FLAT_ZOOM_MIN, FLAT_ZOOM_MAX);
   // Classic styles stay selectable only while the classic group is shown.
   const desc = STYLES.find((d) => d.id === out.mode);
   if (desc?.category === 'classic' && !out.showClassic) out.mode = DEFAULT_STYLE;

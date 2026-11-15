@@ -71,8 +71,9 @@ const DRAG_YAW = 0.004;
 const DRAG_TILT = 0.0022;
 const WHEEL_HEIGHT = 0.05;
 /** Flat view: zoom range from the wheel, and pan per pixel (view heights). */
-const FLAT_ZOOM_MIN = 0.5;
-const FLAT_ZOOM_MAX = 2.5;
+/** Flat zoom range (wheel / Zoom slider). */
+export const FLAT_ZOOM_MIN = 0.6;
+export const FLAT_ZOOM_MAX = 1.6;
 
 /** User-facing camera view for depth styles. */
 export interface CameraView {
@@ -94,7 +95,7 @@ export interface CameraPreset {
 export const CAMERA_PRESETS: CameraPreset[] = [
   { id: 'glide', label: 'Glide', hint: 'Low over the surface, looking ahead', view: { height: 0.22, tilt: 0.18, curve: 0 } },
   { id: 'horizon', label: 'Horizon', hint: 'Skimming the surface toward a curved horizon', view: { height: 0.04, tilt: 0.04, curve: 0.25 } },
-  { id: 'planet', label: 'Planet', hint: 'High up; the surface curves away like a planet', view: { height: 0.6, tilt: 0.55, curve: 0.6 } },
+  { id: 'planet', label: 'Planet', hint: 'High up, looking down at the surface curving away like a planet', view: { height: 0.6, tilt: 0.75, curve: 1 } },
   { id: 'valley', label: 'Valley', hint: 'The surface rises around you like a bowl', view: { height: 0.3, tilt: 0.2, curve: -0.7 } },
   { id: 'overhead', label: 'Overhead', hint: 'Looking straight down from above', view: { height: 0.55, tilt: 1, curve: 0 } },
 ];
@@ -131,6 +132,7 @@ export class WorldCamera {
   /** Flat-view zoom from the wheel. */
   private flatZoom = 1;
   private onViewChange: ((v: CameraView) => void) | null = null;
+  private onFlatZoomChange: ((z: number) => void) | null = null;
   readonly view: Mat4 = mat4();
   readonly proj: Mat4 = mat4();
   readonly viewProj: Mat4 = mat4();
@@ -175,6 +177,11 @@ export class WorldCamera {
 
   getView(): CameraView { return { ...this.viewTarget }; }
 
+  /** Flat-view zoom (1 = normal, below 1 = closer, above 1 = wider); separate from Depth's height. */
+  setFlatZoom(z: number): void { this.flatZoom = clamp(z, FLAT_ZOOM_MIN, FLAT_ZOOM_MAX); }
+  getFlatZoom(): number { return this.flatZoom; }
+  setFlatZoomListener(cb: ((z: number) => void) | null): void { this.onFlatZoomChange = cb; }
+
   /** Called when the user changes the view with the mouse (for persistence). */
   setViewListener(cb: ((v: CameraView) => void) | null): void { this.onViewChange = cb; }
 
@@ -200,6 +207,7 @@ export class WorldCamera {
       this.onViewChange?.(this.getView());
     } else {
       this.flatZoom = clamp(this.flatZoom * Math.pow(1.1, notches), FLAT_ZOOM_MIN, FLAT_ZOOM_MAX);
+      this.onFlatZoomChange?.(this.flatZoom);
     }
   }
 

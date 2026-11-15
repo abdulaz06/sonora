@@ -68,6 +68,7 @@ export function initController(opts: ControllerOptions): Controller {
   renderer.setResponsiveness(settings.responsiveness);
   renderer.setRingCount(settings.ringCount);
   renderer.camera.setView(settings.camera);
+  renderer.camera.setFlatZoom(settings.flatZoom);
 
   const panelState = () => ({
     style: settings.mode,
@@ -113,9 +114,17 @@ export function initController(opts: ControllerOptions): Controller {
     cameraSyncTimer = window.setTimeout(() => { syncSettings({ camera: v }); persist(); }, 150);
   });
 
+  let zoomSyncTimer = 0;
+  renderer.camera.setFlatZoomListener((z) => {
+    settings.flatZoom = z;
+    window.clearTimeout(zoomSyncTimer);
+    zoomSyncTimer = window.setTimeout(() => { syncSettings({ flatZoom: z }); persist(); }, 150);
+  });
+
   initSettingsPanel({
     onStyleChange: setStyle,
     onCameraChange: setCamera,
+    onFlatZoomChange: (z) => { renderer.camera.setFlatZoom(z); settings.flatZoom = renderer.camera.getFlatZoom(); persist(); },
     onVariantChange: (v) => {
       renderer.setVariant(v);
       settings.variants = { ...settings.variants, [settings.mode]: v };
@@ -169,6 +178,7 @@ export function initController(opts: ControllerOptions): Controller {
     ...panelState(),
     ringCount: settings.ringCount,
     camera: settings.camera,
+    flatZoom: settings.flatZoom,
     paletteIndex: settings.paletteIndex,
     customHue: settings.customHue,
     autoDrift: settings.autoDrift,
