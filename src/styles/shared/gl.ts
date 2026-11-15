@@ -124,7 +124,8 @@ export type UniformValue = number | boolean | number[] | Float32Array | WebGLTex
 /**
  * Set uniforms by name, using each uniform's declared GL type: scalars and
  * booleans go to float or int uniforms as declared, arrays of 2/3/4 → vecN
- * (longer arrays → vec4 arrays), textures bind to consecutive units.
+ * (longer arrays → vec4 arrays; mat4 uniforms take 16 values), textures bind
+ * to consecutive units.
  * `ints` is kept for call-site readability; the declared type wins.
  */
 export function setUniforms(
@@ -148,7 +149,8 @@ export function setUniforms(
       const t = p.types[k];
       if (t === gl.INT || t === gl.BOOL || t === gl.UNSIGNED_INT) gl.uniform1i(loc, Math.round(x));
       else gl.uniform1f(loc, x);
-    } else if (v.length === 2) gl.uniform2fv(loc, v);
+    } else if (p.types[k] === gl.FLOAT_MAT4) gl.uniformMatrix4fv(loc, false, v);
+    else if (v.length === 2) gl.uniform2fv(loc, v);
     else if (v.length === 3) gl.uniform3fv(loc, v);
     else if (v.length % 4 === 0) gl.uniform4fv(loc, v);
   }
