@@ -106,9 +106,19 @@ const WISP_DEPTH_DECAY = 0.955;
 /** Wisp Depth: largest a close flame grows (its brightness is eased as it grows). */
 const DEPTH_FLAME_GROW = 1.6;
 /** Wisp Depth: smoke tone-map gain (smoke spreads over more screen and fades faster). */
-const WISP_DEPTH_SMOKE = 1.8;
+const WISP_DEPTH_SMOKE = 1.5;
+/** Wisp Depth: flame flare on the drop (Flat flares to 2). */
+const WISP_DEPTH_DROP_GLOW = 1.2;
 /** Wisp Depth Ground: share of particles that float as embers. */
-const WISP_EMBERS = 0.14;
+const WISP_EMBERS = 0.1;
+/** Embers' beat envelope decay (s). */
+const EMBER_KICK_TAU = 0.25;
+/** Wisp Depth: keeping the flames in view. Off screen (or past this many
+ * orbit radii) they turn hard for home and speed up; past the second value
+ * they are pulled straight back. */
+const FLAME_KEEP: [number, number] = [1.6, 3];
+const FLAME_KEEP_TURN = 7;
+const FLAME_KEEP_BOOST = 0.7;
 /** Wisp Depth Tunnel: accumulation decay (short streaks), share of particles in
  * the walls (the rest are trails), point gain, kick threshold / re-arm. */
 const TUNNEL_DECAY = 0.82;
@@ -182,6 +192,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     x: (rng() - 0.5) * 0.6, y: (rng() - 0.5) * 0.4, heading: rng() * 6.28, speed: 0.2, turn: (i % 2 ? 1 : -1) * 1.2, glow: 1,
   }));
   let ring: Ring = { x: 0, y: 0, age: 9, s: 0, h: 0 };
+  let emberKick = 0;
   // Warp
   let warpJump = 0;
   let warpSpeed = 6;
@@ -320,7 +331,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       } else if (kind === 'warp' && e.type === 'drop') {
         warpJump = 1;
       } else if (kind === 'wisp' && e.type === 'drop') {
-        agents.forEach((a) => { a.speed += 1.2; a.glow = 2; });
+        // Depth puts the flames near the camera: a gentler flare there.
+        agents.forEach((a) => { a.speed += 1.2; a.glow = depthOf(ctx) ? WISP_DEPTH_DROP_GLOW : 2; });
         if (tunnelOn(ctx)) tunnel?.drop();
       }
       if (e.type === 'trackChange') fieldT += 50;
@@ -378,7 +390,24 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
           // Stay near the view (Wisp's own fixed centre in Flat, see viewOf();
           // the ground ahead of the camera in Depth).
           const dx = home[0] - a.x, dy = home[1] - a.y;
-          if (Math.hypot(dx, dy) > reach) {
+          const dist = Math.hypot(dx, dy);
+          if (depth) {
+            // Depth: never leave the flames off screen for long.
+            const pr = projectGround(ctx, kind, a.x, a.y, agentH(ctx, i, time));
+            const off = !pr || pr.uv[0] < 0.04 || pr.uv[0] > 0.96 || pr.uv[1] < 0.04 || pr.uv[1] > 0.96;
+            if (off || dist > reach * FLAME_KEEP[0]) {
+              const want = Math.atan2(dy, dx);
+              let diff = want - a.heading;
+              diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+              a.heading += diff * Math.min(1, dt * FLAME_KEEP_TURN);
+              a.speed += FLAME_KEEP_BOOST * dt * 4;
+            }
+            if (dist > reach * FLAME_KEEP[1]) {
+              const k = 1 - Math.exp(-dt / 0.35);
+              a.x += dx * k; a.y += dy * k;
+            }
+          }
+          if (dist > reach) {
             const want = Math.atan2(dy, dx);
             let diff = want - a.heading;
             diff = Math.atan2(Math.sin(diff), Math.cos(diff));
@@ -389,6 +418,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
           a.glow += (1 - a.glow) * dt * 2;
         });
         ring.age += dt;
+        emberKick = Math.max(emberKick * Math.exp(-dt / EMBER_KICK_TAU), depth ? ctx.bassHits * ctx.fadeInOut : 0);
         if (ctx.bassHits > 0.7 && ring.age > 0.6 && fade > 0.1) {
           const a = agents[Math.floor(rng() * agents.length)];
           ring = { x: a.x, y: a.y, age: 0, s: ctx.bassHits, h: agentH(ctx, agents.indexOf(a), time) };
@@ -496,7 +526,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_core: [core[0], core[1]], u_gather: kind === 'silk' ? Math.pow(Math.max(0, (ctx.eventState.buildProgress - 0.3) / 0.7), 2) * ctx.fadeInOut : 0,
         u_burst: burst, u_form: kind === 'silk' ? form : 0,
         u_agents: agentData, u_agent_count: agents.length, u_ring: [ring.x, ring.y, ring.age, ring.s],
-        u_embers: depth && kind === 'wisp' ? WISP_EMBERS : 0,
+        u_embers: depth && kind === 'wisp' ? WISP_EMBERS : 0, u_ember_kick: emberKick,
       });
       drawQuad(gl, quadVAO);
       state.swap();
@@ -528,7 +558,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       const depthU: Record<string, UniformValue> = depth ? {
         u_view_proj: cam.viewProj, u_cam_pos: cam.position,
         u_fog: [cam.fogNear, cam.fogFar], u_curve_k: cam.curvature, u_hspan: hspan(ctx), u_ring_h: ring.h,
-        u_dscale: DEPTH_SCALE[kind], u_flame_w: flameW,
+        u_dscale: DEPTH_SCALE[kind], u_flame_w: flameW, u_ember_kick: emberKick,
       } : {};
       setUniforms(gl, prog.render, {
         ...depthU,

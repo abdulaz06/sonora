@@ -32,6 +32,7 @@ uniform vec4 u_ring;           // wisp ring burst: centre.xy, age, strength
 // Silk drop arc: core (world), gather (build), burst (drop), formation weight
 uniform vec2 u_core;
 uniform float u_embers;        // Wisp Depth Ground: share of particles that are floating embers (0 = off)
+uniform float u_ember_kick;    // Wisp Depth Ground: beat envelope that stirs the embers
 uniform float u_gather;
 uniform float u_burst;
 uniform float u_form;
@@ -140,7 +141,28 @@ void main() {
   }
 #elif VARIANT == 2
   if (kind > 3.5) {
-    v = curl2(p * 1.5, u_field_t) * 0.025;   // embers drift slowly
+    // Embers: each drifts on its own (own phase of the field and its own
+    // heading), so they never trace one shared pattern; the flames sweep them
+    // into swirling wakes; bass rings blow them outward; beats stir them.
+    float ph = fract(seed * 13.7) * 40.0;
+    vec2 own = vec2(cos(seed * 91.0), sin(seed * 91.0)) * (0.006 + 0.01 * fract(seed * 7.3));
+    vec2 target = curl2(p * (1.1 + fract(seed * 3.1)) + ph, u_field_t * (0.7 + 0.6 * fract(seed * 5.9)) + ph) * 0.03 + own;
+    for (int i = 0; i < 4; i++) {
+      if (i >= u_agent_count) break;
+      vec2 d = p - u_agents[i].xy;
+      float r2 = dot(d, d);
+      float near = exp(-r2 / 0.012);
+      // Dragged along behind the flame and spun around its path.
+      target += (u_agents[i].zw * 0.8 + vec2(-d.y, d.x) * 2.2) * near;
+    }
+    if (u_ring.w > 0.01 && u_ring.z < 1.2) {
+      vec2 d = p - u_ring.xy;
+      float rr = length(d);
+      float front = 0.05 + u_ring.z * 0.35;
+      target += d / max(rr, 1e-4) * u_ring.w * 0.35 * exp(-pow((rr - front) / 0.05, 2.0));
+    }
+    target *= 1.0 + 1.5 * u_ember_kick;
+    v = mix(v, target, 1.0 - exp(-dt * 4.0));
   } else {
     v += curl2(p * 4.0, u_field_t) * 0.05 * dt;
     v *= exp(-dt * (kind > 2.5 ? 1.6 : 0.7));

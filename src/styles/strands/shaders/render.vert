@@ -33,6 +33,7 @@ uniform float u_hspan;         // height of the silk volume / wisp flight band
 uniform float u_ring_h;        // wisp: height of the current smoke ring
 uniform float u_dscale;        // ground units per simulation unit
 uniform vec4 u_flame_w[3];     // wisp: flame world position (xyz) and brightness
+uniform float u_ember_kick;    // wisp: beat envelope (embers brighten a little)
 #endif
 out vec4 v_col;
 out vec2 v_uv;
@@ -120,9 +121,9 @@ void main() {
     vec3 glow = u_wisp_col[3].rgb * 0.3;
     for (int i = 0; i < 3; i++) {
       vec3 d = ew - u_flame_w[i].xyz;
-      glow += u_wisp_col[i].rgb * u_flame_w[i].w * 0.02 / (dot(d, d) + 0.012);
+      glow += u_wisp_col[i].rgb * u_flame_w[i].w * 0.012 / (dot(d, d) + 0.02);
     }
-    v_col = vec4(glow * w * u_gain * 3.0, 1.0);
+    v_col = vec4(glow * w * u_gain * 3.0 * (1.0 + 0.2 * u_ember_kick), 1.0);
     return;
   }
   // Smoke keeps the height its flame had when it was shed (t - age), and rises.
@@ -132,7 +133,12 @@ void main() {
   gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
   gl_PointSize = u_point;
 #endif
-  v_col = vec4(u_wisp_col[ci].rgb * w * u_gain * (ci == 3 ? 1.5 : 1.0), 1.0);
+#ifdef DEPTH
+  float ringGain = 0.9;   // ring smoke passes close to the camera in Depth
+#else
+  float ringGain = 1.5;
+#endif
+  v_col = vec4(u_wisp_col[ci].rgb * w * u_gain * (ci == 3 ? ringGain : 1.0), 1.0);
 #elif VARIANT == 4
   // Warp: head at the particle, tail further down the tunnel.
   int corner = gl_VertexID;
