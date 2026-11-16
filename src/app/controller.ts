@@ -5,11 +5,11 @@
  * supplies its own persistence and (optionally) audio-device hooks.
  */
 
-import { CAMERA_PRESETS, type CameraView } from '../engine/camera';
+import type { CameraView } from '../engine/camera';
 import type { Renderer } from '../engine/renderer';
-import type { PersistedSettings } from '../ipc/settings';
+import { defaultStylePrefs, type PersistedSettings, type StylePrefs } from '../ipc/settings';
 import type { DeviceInfo } from '../ipc/audio-device';
-import { getStyle, visibleStyles } from '../styles/registry';
+import { getStyle, presetsFor, visibleStyles } from '../styles/registry';
 import type { StyleId } from '../styles/visual-style';
 import { toggleDebugOverlay, updateDebugOverlay } from '../ui/debug-overlay';
 import { initHoverUI } from '../ui/hover-ui';
@@ -49,12 +49,45 @@ export function initController(opts: ControllerOptions): Controller {
   const depthActive = (): boolean => getStyle(settings.mode).supportsDepth && depthFor(settings.mode);
   const lightFor = (id: StyleId) => settings.lightModes[id] ?? 'auto';
 
+  // ── Per-style preferences ──
+  const prefsOf = (id: StyleId): StylePrefs => (settings.styles[id] ??= defaultStylePrefs());
+  type Colours = Pick<StylePrefs, 'paletteIndex' | 'customHue' | 'autoDrift' | 'driftPeriod'>;
+  /** Colour changes go to the active style, or to the shared set when colours are matched. */
+  function setColours(c: Partial<Colours>): void {
+    Object.assign(settings, c);
+    if (!settings.matchColours) Object.assign(prefsOf(settings.mode), c);
+  }
+  /** Load a style's own settings into the engine, the mirrored fields and the UI. */
+  function applyPrefs(id: StyleId): void {
+    const p = prefsOf(id);
+    if (!settings.matchColours) {
+      settings.paletteIndex = p.paletteIndex; settings.customHue = p.customHue;
+      settings.autoDrift = p.autoDrift; settings.driftPeriod = p.driftPeriod;
+    }
+    settings.responsiveness = p.responsiveness;
+    settings.camera = { ...p.camera };
+    settings.flatZoom = p.flatZoom;
+    if (settings.paletteIndex < 0) renderer.colorEngine.setCustomHue(settings.customHue);
+    else renderer.colorEngine.setPalette(settings.paletteIndex);
+    renderer.colorEngine.setAutoDrift(settings.autoDrift);
+    renderer.colorEngine.setDriftPeriod(settings.driftPeriod);
+    renderer.setResponsiveness(settings.responsiveness);
+    renderer.camera.setView(settings.camera);
+    renderer.camera.setFlatZoom(settings.flatZoom);
+    syncPalettePicker(settings.paletteIndex, settings.customHue);
+    syncSettings({
+      paletteIndex: settings.paletteIndex, customHue: settings.customHue, autoDrift: settings.autoDrift,
+      driftPeriod: settings.driftPeriod, responsiveness: settings.responsiveness, camera: settings.camera, flatZoom: settings.flatZoom,
+    });
+  }
+
   function applyStyle(id: StyleId, immediate = false): void {
     renderer.setStyle(id, immediate);
     renderer.setVariant(variantFor(id));
     renderer.setDepth(depthFor(id));
     renderer.setLightMode(lightFor(id));
     settings.mode = id;
+    applyPrefs(id);
   }
 
   // ── Initial engine state ──
@@ -104,12 +137,14 @@ export function initController(opts: ControllerOptions): Controller {
   const setCamera = (v: CameraView): void => {
     renderer.camera.setView(v);
     settings.camera = { ...v };
+    prefsOf(settings.mode).camera = { ...v };
     persist();
   };
   // Mouse changes come from the camera itself; mirror them into settings/UI.
   let cameraSyncTimer = 0;
   renderer.camera.setViewListener((v) => {
     settings.camera = v;
+    prefsOf(settings.mode).camera = { ...v };
     window.clearTimeout(cameraSyncTimer);
     cameraSyncTimer = window.setTimeout(() => { syncSettings({ camera: v }); persist(); }, 150);
   });
@@ -117,6 +152,7 @@ export function initController(opts: ControllerOptions): Controller {
   let zoomSyncTimer = 0;
   renderer.camera.setFlatZoomListener((z) => {
     settings.flatZoom = z;
+    prefsOf(settings.mode).flatZoom = z;
     window.clearTimeout(zoomSyncTimer);
     zoomSyncTimer = window.setTimeout(() => { syncSettings({ flatZoom: z }); persist(); }, 150);
   });
@@ -124,7 +160,18 @@ export function initController(opts: ControllerOptions): Controller {
   initSettingsPanel({
     onStyleChange: setStyle,
     onCameraChange: setCamera,
-    onFlatZoomChange: (z) => { renderer.camera.setFlatZoom(z); settings.flatZoom = renderer.camera.getFlatZoom(); persist(); },
+    onFlatZoomChange: (z) => {
+      renderer.camera.setFlatZoom(z);
+      settings.flatZoom = renderer.camera.getFlatZoom();
+      prefsOf(settings.mode).flatZoom = settings.flatZoom;
+      persist();
+    },
+    onMatchColoursChange: (on) => {
+      settings.matchColours = on;
+      // Turning it off: this style keeps the colours on screen now.
+      if (!on) Object.assign(prefsOf(settings.mode), { paletteIndex: settings.paletteIndex, customHue: settings.customHue, autoDrift: settings.autoDrift, driftPeriod: settings.driftPeriod });
+      persist();
+    },
     onVariantChange: (v) => {
       renderer.setVariant(v);
       settings.variants = { ...settings.variants, [settings.mode]: v };
@@ -149,20 +196,24 @@ export function initController(opts: ControllerOptions): Controller {
     onPaletteChange: (idx) => {
       if (idx < 0) renderer.colorEngine.setCustomHue(settings.customHue);
       else renderer.colorEngine.setPalette(idx);
-      settings.paletteIndex = idx;
+      setColours({ paletteIndex: idx });
       syncPalettePicker(idx, settings.customHue);
       persist();
     },
     onCustomHueChange: (hue) => {
       renderer.colorEngine.setCustomHue(hue);
-      settings.paletteIndex = -1;
-      settings.customHue = hue;
+      setColours({ paletteIndex: -1, customHue: hue });
       syncPalettePicker(-1, hue);
       persist();
     },
-    onAutoDriftChange: (on) => { renderer.colorEngine.setAutoDrift(on); settings.autoDrift = on; persist(); },
-    onDriftPeriodChange: (s) => { renderer.colorEngine.setDriftPeriod(s); settings.driftPeriod = s; persist(); },
-    onResponsivenessChange: (t) => { renderer.setResponsiveness(t); settings.responsiveness = t; persist(); },
+    onAutoDriftChange: (on) => { renderer.colorEngine.setAutoDrift(on); setColours({ autoDrift: on }); persist(); },
+    onDriftPeriodChange: (s) => { renderer.colorEngine.setDriftPeriod(s); setColours({ driftPeriod: s }); persist(); },
+    onResponsivenessChange: (t) => {
+      renderer.setResponsiveness(t);
+      settings.responsiveness = t;
+      prefsOf(settings.mode).responsiveness = t;
+      persist();
+    },
     onQualityChange: (q) => { renderer.setQuality(q); settings.quality = q; persist(); },
     onFpsCapChange: (n) => { renderer.setFpsCap(n); settings.fpsCap = n; persist(); },
     onAudioDeviceChange: opts.audio
@@ -179,6 +230,7 @@ export function initController(opts: ControllerOptions): Controller {
     ringCount: settings.ringCount,
     camera: settings.camera,
     flatZoom: settings.flatZoom,
+    matchColours: settings.matchColours,
     paletteIndex: settings.paletteIndex,
     customHue: settings.customHue,
     autoDrift: settings.autoDrift,
@@ -201,9 +253,10 @@ export function initController(opts: ControllerOptions): Controller {
       const i = list.findIndex((s) => s.id === settings.mode);
       setStyle(list[(i + 1) % list.length].id);
     } else if (k === 'c' && depthActive()) {
-      const i = CAMERA_PRESETS.findIndex((p) => Math.abs(p.view.height - settings.camera.height) < 0.03
+      const i = presetsFor(settings.mode).findIndex((p) => Math.abs(p.view.height - settings.camera.height) < 0.03
         && Math.abs(p.view.tilt - settings.camera.tilt) < 0.03 && Math.abs(p.view.curve - settings.camera.curve) < 0.03);
-      const next = CAMERA_PRESETS[(i + 1) % CAMERA_PRESETS.length];
+      const list = presetsFor(settings.mode);
+      const next = list[(i + 1) % list.length];
       setCamera({ ...next.view });
       syncSettings({ camera: settings.camera });
     } else if (k === 'v' && getStyle(settings.mode).supportsDepth) {
@@ -241,8 +294,9 @@ export function initController(opts: ControllerOptions): Controller {
   }, { passive: false });
   canvas.addEventListener('dblclick', () => {
     if (!depthActive()) return;
-    let best = CAMERA_PRESETS[0], bestD = Infinity;
-    for (const p of CAMERA_PRESETS) {
+    const list = presetsFor(settings.mode);
+    let best = list[0], bestD = Infinity;
+    for (const p of list) {
       const d = Math.abs(p.view.height - settings.camera.height) + Math.abs(p.view.tilt - settings.camera.tilt)
         + Math.abs(p.view.curve - settings.camera.curve);
       if (d < bestD) { bestD = d; best = p; }

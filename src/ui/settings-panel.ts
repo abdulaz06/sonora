@@ -13,11 +13,11 @@
  * labels, square corners, 1 px Bone/12% dividers.
  */
 
-import { CAMERA_PRESETS, FLAT_ZOOM_MAX, FLAT_ZOOM_MIN, type CameraView } from '../engine/camera';
+import { FLAT_ZOOM_MAX, FLAT_ZOOM_MIN, type CameraView } from '../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
 import { FPS_CAPS } from '../ipc/settings';
-import { getStyle, visibleStyles } from '../styles/registry';
+import { getStyle, presetsFor, visibleStyles } from '../styles/registry';
 import { variantSupportsLight, type LightMode, type StyleId } from '../styles/visual-style';
 import type { DeviceInfo } from '../ipc/audio-device';
 
@@ -78,6 +78,7 @@ export interface SettingsCallbacks {
   onRingCountChange: (n: number) => void;
   onCameraChange: (view: CameraView) => void;
   onFlatZoomChange: (zoom: number) => void;
+  onMatchColoursChange: (on: boolean) => void;
   /** -1 means custom (use the custom hue). */
   onPaletteChange: (paletteIndex: number) => void;
   onCustomHueChange: (hue: number) => void;
@@ -101,6 +102,7 @@ export interface SettingsState {
   ringCount: number;
   camera: CameraView;
   flatZoom: number;
+  matchColours: boolean;
   paletteIndex: number;
   customHue: number;
   autoDrift: boolean;
@@ -193,8 +195,8 @@ const sliderToZoom = (n: number): number =>
 const ends = (a: string, b: string, c = ''): string =>
   `<div class="ends"><span>${esc(a)}</span>${c ? `<span>${esc(c)}</span>` : ''}<span>${esc(b)}</span></div>`;
 
-function activePreset(v: CameraView): string | null {
-  for (const p of CAMERA_PRESETS) {
+function activePreset(v: CameraView, style: StyleId): string | null {
+  for (const p of presetsFor(style)) {
     if (Math.abs(p.view.height - v.height) < PRESET_MATCH && Math.abs(p.view.tilt - v.tilt) < PRESET_MATCH
       && Math.abs(p.view.curve - v.curve) < PRESET_MATCH) return p.id;
   }
@@ -211,8 +213,9 @@ function render(): void {
   const desc = getStyle(state.style);
   const styles = visibleStyles(state.showClassic);
   const palName = state.paletteIndex >= 0 ? PALETTES[state.paletteIndex]?.name ?? '' : 'Custom';
-  const preset = activePreset(state.camera);
-  const presetHint = CAMERA_PRESETS.find((p) => p.id === preset)?.hint ?? 'Custom view.';
+  const presets = presetsFor(state.style);
+  const preset = activePreset(state.camera, state.style);
+  const presetHint = presets.find((p) => p.id === preset)?.hint ?? 'Custom view.';
   const depthOn = desc.supportsDepth && state.depth;
   // Wisp's looks are Depth-only; its Tunnel has its own chase camera (no presets).
   const looksShown = desc.variants.length > 1 && (desc.id !== 'wisp' || depthOn);
@@ -226,7 +229,7 @@ function render(): void {
     <div class="sec">
       <div class="title">Camera</div>
       <div class="field"><div class="label">View preset</div>
-        <div class="seg">${CAMERA_PRESETS.map((p) => segBtn('preset', p.id, p.label, p.id === preset, p.hint)).join('')}</div>
+        <div class="seg">${presets.map((p) => segBtn('preset', p.id, p.label, p.id === preset, p.hint)).join('')}</div>
         ${hint(presetHint)}
       </div>
       <div class="field"><div class="label">Height</div>
@@ -318,6 +321,8 @@ function render(): void {
         <input type="range" data-a="period" min="${MIN_DRIFT_PERIOD_S}" max="${MAX_DRIFT_PERIOD_S}" step="10" value="${MAX_DRIFT_PERIOD_S + MIN_DRIFT_PERIOD_S - state.driftPeriod}">
         ${ends('Slow', 'Fast')}
         ${hint(cycleText(state.driftPeriod), 'drift-val')}</div>` : ''}
+      <label class="check mono"><input type="checkbox" data-a="match-colours" ${state.matchColours ? 'checked' : ''}> Same colours for every style</label>
+      ${hint(state.matchColours ? 'Palette and colour drift are shared by all styles.' : 'Each style keeps its own colours, like its other settings.')}
     </div>
     <div class="sec">
       <div class="title">Feel</div>
@@ -374,7 +379,7 @@ function onClick(e: MouseEvent): void {
     case 'depth': state.depth = v === '1'; cb.onDepthChange(state.depth); break;
     case 'light': state.lightMode = v as LightMode; cb.onLightModeChange(state.lightMode); break;
     case 'preset': {
-      const p = CAMERA_PRESETS.find((x) => x.id === v);
+      const p = presetsFor(state.style).find((x) => x.id === v);
       if (!p) return;
       state.camera = { ...p.view };
       cb.onCameraChange(state.camera);
@@ -416,6 +421,10 @@ function onInput(e: Event): void {
   } else if (a === 'flat-zoom') {
     state.flatZoom = Math.abs(n - 50) <= 2 ? 1 : sliderToZoom(n);   // snaps to the default near the middle
     cb.onFlatZoomChange(state.flatZoom);
+  } else if (a === 'match-colours' && el instanceof HTMLInputElement) {
+    state.matchColours = el.checked;
+    cb.onMatchColoursChange(el.checked);
+    render();
   } else if (a === 'classic' && el instanceof HTMLInputElement) {
     state.showClassic = el.checked;
     cb.onShowClassicChange(el.checked);

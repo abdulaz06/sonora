@@ -183,6 +183,8 @@ export interface StyleDescriptor {
   supportsDepth: boolean;
   /** Depth on by default when supported. */
   defaultDepth: boolean;
+  /** Per-style views for camera presets (by preset id), e.g. Silk's Planet. */
+  cameraPresets?: Partial<Record<string, { height: number; tilt: number; curve: number }>>;
   create(deps: StyleDeps): VisualStyle;
 }
 

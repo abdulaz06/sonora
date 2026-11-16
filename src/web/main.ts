@@ -12,6 +12,7 @@ import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
 import { createSourceUi, type SourceUi } from './source-ui';
 import { CAMERA_PRESETS } from '../engine/camera';
+import { presetsFor } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
 import { DEFAULT_SETTINGS, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
 import type { QualityPreset } from '../engine/quality';
@@ -235,7 +236,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       if (o.palette !== undefined) renderer.colorEngine.setPalette(o.palette, true);
       if (o.drift !== undefined) renderer.colorEngine.setAutoDrift(o.drift);
       if (o.responsiveness !== undefined) renderer.setResponsiveness(o.responsiveness);
-      const preset = CAMERA_PRESETS.find((p) => p.id === o.camera);
+      const preset = (o.style ? presetsFor(o.style) : CAMERA_PRESETS).find((p) => p.id === o.camera);
       if (preset) renderer.camera.setView(preset.view);
     },
     lumaTrace(seconds: number, dt: number): number[] {

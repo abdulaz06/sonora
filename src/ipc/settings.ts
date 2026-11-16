@@ -14,7 +14,19 @@ import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
 /** Bump when a default changes in a way saved settings must not override. */
-export const SETTINGS_VERSION = 4;
+export const SETTINGS_VERSION = 5;
+
+/** Settings each style keeps for itself (v5): changing one style never
+ * changes another. Colours can be shared with `matchColours`. */
+export interface StylePrefs {
+  paletteIndex: number;
+  customHue: number;
+  autoDrift: boolean;
+  driftPeriod: number;
+  responsiveness: number;
+  camera: CameraView;
+  flatZoom: number;
+}
 
 export interface PersistedSettings {
   /** Schema version (see SETTINGS_VERSION). */
@@ -47,6 +59,10 @@ export interface PersistedSettings {
   camera: CameraView;
   /** Flat-view zoom (1 = normal); kept apart from the Depth camera. */
   flatZoom: number;
+  /** Per-style settings (the fields above mirror the active style's). */
+  styles: Partial<Record<StyleId, StylePrefs>>;
+  /** Use one set of colours (palette, custom hue, drift) for every style. */
+  matchColours: boolean;
   /** Concentric shape count (Aura mode). */
   ringCount: number;
   /** Capture source: `'default'` follows the system default and auto-switches
@@ -82,6 +98,8 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   depth: {},
   camera: { ...DEFAULT_CAMERA_VIEW },
   flatZoom: 1,
+  styles: {},
+  matchColours: false,
   ringCount: 3,
   audioDevice: 'default',
   window: {
@@ -262,9 +280,53 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
   if (typeof r.fullscreen === 'boolean') {
     out.fullscreen = r.fullscreen;
   }
+  if (typeof r.matchColours === 'boolean') out.matchColours = r.matchColours;
+  const styles: Partial<Record<StyleId, StylePrefs>> = {};
+  const rs = (r.styles && typeof r.styles === 'object' ? r.styles : null) as Record<string, unknown> | null;
+  for (const id of ids) {
+    const p = rs?.[id];
+    // v5: before per-style settings, every style shared one set: start each
+    // style from it so nobody loses their choices.
+    styles[id] = parseStylePrefs(p, stylePrefsOf(out));
+  }
+  out.styles = styles;
   return out;
 }
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
+}
+
+/** The active-style fields of a settings object, as style preferences. */
+export function stylePrefsOf(s: PersistedSettings): StylePrefs {
+  return {
+    paletteIndex: s.paletteIndex, customHue: s.customHue, autoDrift: s.autoDrift, driftPeriod: s.driftPeriod,
+    responsiveness: s.responsiveness, camera: { ...s.camera }, flatZoom: s.flatZoom,
+  };
+}
+
+/** Defaults for a style nobody has configured yet. */
+export function defaultStylePrefs(): StylePrefs {
+  return stylePrefsOf(DEFAULT_SETTINGS);
+}
+
+function parseStylePrefs(raw: unknown, fallback: StylePrefs): StylePrefs {
+  if (!raw || typeof raw !== 'object') return { ...fallback, camera: { ...fallback.camera } };
+  const p = raw as Record<string, unknown>;
+  const num = (v: unknown, lo: number, hi: number, d: number): number =>
+    (typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : d);
+  const c = (p.camera && typeof p.camera === 'object' ? p.camera : {}) as Record<string, unknown>;
+  return {
+    paletteIndex: typeof p.paletteIndex === 'number' && Number.isInteger(p.paletteIndex) ? p.paletteIndex : fallback.paletteIndex,
+    customHue: num(p.customHue, 0, 360, fallback.customHue),
+    autoDrift: typeof p.autoDrift === 'boolean' ? p.autoDrift : fallback.autoDrift,
+    driftPeriod: num(p.driftPeriod, MIN_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, fallback.driftPeriod),
+    responsiveness: num(p.responsiveness, 0, 1, fallback.responsiveness),
+    camera: {
+      height: num(c.height, 0, 1, fallback.camera.height),
+      tilt: num(c.tilt, 0, 1, fallback.camera.tilt),
+      curve: num(c.curve, -1, 1, fallback.camera.curve),
+    },
+    flatZoom: num(p.flatZoom, FLAT_ZOOM_MIN, FLAT_ZOOM_MAX, fallback.flatZoom),
+  };
 }

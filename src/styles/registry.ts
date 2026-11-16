@@ -1,3 +1,4 @@
+import { CAMERA_PRESETS, type CameraPreset } from '../engine/camera';
 /**
  * Style registry — the single list of every style Sonora ships. Add a new
  * style by writing its module and appending a descriptor here.
@@ -21,6 +22,8 @@ export const STYLES: StyleDescriptor[] = [
     id: 'silk', label: 'Silk', category: 'art',
     variants: STYLE_VARIANTS.silk, defaultVariant: 'silk',
     supportsLight: true, supportsDepth: true, defaultDepth: false,
+    // Silk's threads reach well past the frame: its Planet looks from higher up.
+    cameraPresets: { planet: { height: 0.9, tilt: 0.73, curve: 1 } },
     create: createSilkStyle,
   },
   {
@@ -68,4 +71,10 @@ export function isStyleId(v: unknown): v is StyleId {
 /** Styles visible in pickers (classic hidden unless enabled). */
 export function visibleStyles(showClassic: boolean, category?: StyleCategory): StyleDescriptor[] {
   return STYLES.filter((s) => (showClassic || s.category !== 'classic') && (!category || s.category === category));
+}
+
+/** Camera presets for a style (its own views where it has them). */
+export function presetsFor(id: StyleId): CameraPreset[] {
+  const own = getStyle(id).cameraPresets ?? {};
+  return CAMERA_PRESETS.map((p) => ({ ...p, view: { ...(own[p.id] ?? p.view) } }));
 }
