@@ -96,7 +96,7 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 
 | Style | Engine | Body / intensity | Beat | Hits | Drop |
 |-------|--------|------------------|------|------|------|
-| **Ink** (Glow, Marble, Sumi) | Stable fluids on a periodic world; quasi-steady flow (Glow/Sumi) so ink streams into standing sheets; Depth surface or Flat | Mid presence → inflow + ambient drizzle; intensity → flow speed, camera speed | Beat light fades over one beat (tempo-tied); every 4th kick blooms bigger | Bass → one solid shape per beat at a random spot in a focus zone near the centre + beat light carried in the dye (lights the ink, streams off with it) + brief flow hold; mids → satellites; highs → sparkle | Big bloom with three around it, zone moves; camera lurch |
+| **Ink** (Glow, Marble, Sumi) | v0.1 Flow Ink motion on a periodic world: a curl-noise velocity field (no momentum), soft advection; Depth surface or Flat | Intensity → flow speed (motion) and how long ink lingers (glow follower); camera speed | — | Bass → a big soft blob near the centre at a random angle with a one-frame push (lands over three frames); mids / highs → smaller blobs anywhere. Sumi: round ink drops; Marble: blobs mix into its marbled field, gentle beat brightening | New flow pattern + bigger blob (six-frame build); camera lurch |
 | **Silk** | GPU particles, density accumulation; Flat (default) or Depth (ribbons floating over the ground) | Presence → active threads; intensity → flow speed | — | Bass → shockwave, thread brightening | Build gathers a knot → drop bursts into an eight-spoke starburst; inversion cut |
 | **Wisp** (Depth looks: Ground, Tunnel) | GPU particles + three CPU agents; Flat (default, fixed view, zoom only); Depth Ground (flames light the ground beneath them, floating embers); Depth Tunnel (stateless tunnel particles on lanes and rings, chase camera, trails from a flame-path history) | Intensity → agent speed; Tunnel pace follows the song like Warp | Tunnel: a ring of light races down the walls, camera roll sway | Bass → smoke rings, flame flare; mids → swerves | Agents surge; Tunnel bursts forward |
 | **Warp** | GPU particle streaks | Slow intensity → cruise speed; slow-motion in breakdowns and quiet intros, regular pace with the beat, builds accelerate | Speed surge | Bass → streak glow | Hyperspace jump |
@@ -106,15 +106,15 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 
 | Style | Low | Medium |
 |-------|-----|--------|
-| Ink · Glow | 1.6 ms | 3.0 ms |
+| Ink · Glow | 1.3 ms | 1.6 ms |
 | Ink · Marble | 1.5 ms | 2.8 ms |
 | Silk (Flat / Depth) | 1.5 / 1.8 ms | 4.6 / 4.6 ms |
 | Wisp (Flat / Ground / Tunnel) | 1.1 / 1.2 / 1.05 ms | 1.6 / 1.7 / 1.4 ms |
 | Warp | 1.1 ms | 1.4 ms |
 | Voyage · Void / City / Ocean | 2.0 / 2.3 / 2.1 ms | 3.4 / 3.5 / 3.3 ms (wide shots 3.5–5.8 ms at 1080p) |
 
-**Beat sync** (`--sync`, house-124): Ink Glow 96–100% (Flat 100%), Marble 100%, Sumi 100%, Silk 91% (92% on dense-128; Depth 91–100%), Wisp 100% (Ground and Tunnel 100%), Warp 100%, Voyage 100% of kicks.
+**Beat sync** (`--sync`, house-124): Ink Glow 96–100%, Marble 96–100%, Sumi 100% by region (`regional seen`; a drop on paper barely moves the screen mean), Silk 91% (92% on dense-128; Depth 91–100%), Wisp 100% (Ground and Tunnel 100%), Warp 100%, Voyage 100% of kicks.
 
-**Flicker / exposure** (`--flicker`, dense-128, Punchy, Ocean): Ink Glow 0.5–0.8, Voyage 0.58, Silk 1.17 (Depth 0.83), Wisp 1.25 (Ground 0.75, Tunnel 1.5), Ink Marble/Sumi 0, Warp 1.42 brightness swings per second; at most ~5% blown-out pixels at peak.
+**Flicker / exposure** (`--flicker`, dense-128, Punchy, Ocean): Voyage 0.58, Silk 1.17 (Depth 0.83), Wisp 1.25 (Ground 0.83, Tunnel 1.5), Ink Glow 1.9–2.4 (v0.1 itself 3.1), Marble 0.1–1.0, Sumi 0, Warp 1.42 brightness swings per second; at most ~5% blown-out pixels at peak. Gates (D47): swings either way ≤2.5/s, largest one-frame change ≤0.12, blown-out ≤6%; `scripts/motion-check.py`: fine-detail share of motion ≤45% (v0.1 34%), background step ≤0.02.
 
 **Frame rate.** Settings › Quality › Frame rate caps rendering at 30, 60 (default), 90, 120, 144 fps or the display rate.

@@ -1,3 +1,17 @@
+# Feedback round 7 — done (awaiting review)
+
+Notes: Ink still did not hit like v0.1: the background "wave" movement constantly moves and pushes hits away; shapes were blobs; Sumi lost its black-on-bone look and flickered; Marble's hits teleported. Abdul recorded current Ink on the same song as his v0.1 clip. Also: Silk's Planet preset; settings per style with an option to share colours; Wisp Depth flames going off screen; embers not reactive and always the same pattern.
+
+- [x] Measured both recordings aligned by audio: fine-detail share of motion 73% (round 6) vs 34% (v0.1); difference images show v0.1's change in big areas
+- [x] Harness: `motion-check.py` (fine share, background step), flicker gates both directions, regional sync, frame sequences, private local tracks (your song) (D47)
+- [x] Engine: flash guard counts darkening; exposure hold smoothed and bounded (it rang white/grey on paper) (D47)
+- [x] Ink: v0.1 motion model for all looks; per-look drops; Glow fine share 42% (D46)
+- [x] Settings per style + same-colours option; Silk Planet preset (D48)
+- [x] Wisp Depth: flames kept in view; embers drift on their own, swirl in wakes, ride rings (D49)
+- [x] Verified: Ink sync 96-100% (Glow, Marble), Sumi 100% regional; flicker gates pass for all Ink looks and Wisp Ground/Tunnel; Flat Wisp and Flat Silk pixel-identical; frame cost Ink Glow 1.3 / 1.6 ms, Wisp Ground 1.75 ms, Tunnel 1.4 ms (Low / Medium); live desktop app with your song (all Ink looks, Wisp Ground/Tunnel, per-style palettes)
+
+---
+
 # Feedback round 6 — done (awaiting review)
 
 Notes: Ink doesn't hit like the original Flat Flow Ink (shapes pop and immediately spread, clashing pumps); Silk Depth is good (the dust shows the planet), Planet preset should look further down with full curve; Wisp Depth lacks depth cues; Depth height seemed to carry into Flat. Decided with Abdul after studying a v0.1 recording frame by frame against its audio: kicks in a focus zone near the centre at random spots; all Ink looks and views at once; Wisp Depth gets two looks, Ground (light pools + embers, calm camera) and Tunnel (chase camera, endless tunnel, own camera); Flat zoom kept apart and saved, default marked on the slider.
