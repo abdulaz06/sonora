@@ -16,9 +16,10 @@
 const FLASHES_PER_SECOND = 3;
 /** Minimum time between granted deliberate flashes (s). */
 const MIN_GAP_S = 0.25;
-/** A luminance rise of at least this much (0–1) counts as a flash. */
+/** A luminance change of at least this much (0–1), brighter or darker, counts
+ * as a flash: on paper looks a hit that darkens the picture is a flash too. */
 const FLASH_DELTA = 0.1;
-/** Window used to find the trough before a rise (s). */
+/** Window used to find the trough / peak before a change (s). */
 const TROUGH_WINDOW_S = 0.3;
 /** How long damping stays engaged after the limit is hit (s). */
 const DAMP_HOLD_S = 1.2;
@@ -78,14 +79,16 @@ export class FlashGuard {
     this.history.push({ t, l: luma });
     while (this.history.length && t - this.history[0].t > TROUGH_WINDOW_S) this.history.shift();
     this.measured = this.measured.filter((m) => t - m < 1);
-    let trough = Infinity;
-    for (const h of this.history) trough = Math.min(trough, h.l);
-    // Count each rise once; re-arm after the level comes back down.
-    if (this.armed && luma - trough >= FLASH_DELTA) {
+    let trough = Infinity, peak = -Infinity;
+    for (const h of this.history) { trough = Math.min(trough, h.l); peak = Math.max(peak, h.l); }
+    // Count each change once (a rise from the trough or a drop from the peak);
+    // re-arm once the level is back near the recent range.
+    const change = Math.max(luma - trough, peak - luma);
+    if (this.armed && change >= FLASH_DELTA) {
       this.measured.push(t);
       this.armed = false;
       if (this.measured.length >= FLASHES_PER_SECOND) this.dampUntil = t + DAMP_HOLD_S;
-    } else if (!this.armed && luma - trough < FLASH_DELTA * 0.5) {
+    } else if (!this.armed && change < FLASH_DELTA * 0.5) {
       this.armed = true;
     }
   }

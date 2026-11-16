@@ -50,6 +50,12 @@ const AE_LUMA_TARGET = 0.2;
 const AE_MIN = 0.5;
 const AE_DOWN_TAU = 0.8;
 const AE_UP_TAU = 4;
+/** Flash-guard hold: while damping, exposure leans toward the running
+ * luminance. The measurement is a frame late, so an instant correction
+ * oscillates (frame-to-frame white/grey flicker on paper looks); the hold is
+ * smoothed and kept within a gentle range so the loop can never ring. */
+const HOLD_RANGE: [number, number] = [0.8, 1.25];
+const HOLD_TAU = 0.25;
 
 // ── Tuning ──────────────────────────────────────────────────────
 /** Style swap: fade out, swap, fade in (total seconds). */
@@ -176,6 +182,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   // Auto exposure (filmic scenes): pulls exposure down when the measured
   // frame is too bright or too much of it is blown out; recovers slowly.
   let autoExposure = 1;
+  let holdSmooth = 1;
   let aeTarget = 1;
   const post: PostControls = { ...POST_DEFAULTS };
   const flash = new FlashGuard();
@@ -329,8 +336,9 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
         autoExposure += (aeTarget - autoExposure) * (1 - Math.exp(-dt / (aeTarget < autoExposure ? AE_DOWN_TAU : AE_UP_TAU)));
         post.exposure *= autoExposure;
       }
-      const hold = flash.current > 0.002 ? Math.min(1.6, Math.max(0.4, flash.target / flash.current)) : 1;
-      artPost.apply(quadVAO, post, time, fadeAlpha, 1 + (hold - 1) * flash.damping);
+      const holdWant = flash.current > 0.002 ? Math.min(HOLD_RANGE[1], Math.max(HOLD_RANGE[0], flash.target / flash.current)) : 1;
+      holdSmooth += (1 + (holdWant - 1) * flash.damping - holdSmooth) * (1 - Math.exp(-dt / HOLD_TAU));
+      artPost.apply(quadVAO, post, time, fadeAlpha, holdSmooth);
     }
   }
 
