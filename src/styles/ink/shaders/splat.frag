@@ -27,6 +27,12 @@ void main() {
   float n2 = pnoise(vec3(v_d * 4.5, v_seed * 3.0 + 5.0), vec2(64.0));
   float body = g * (0.8 + 0.45 * n + 0.2 * n2);
   float ragged = smoothstep(0.08, 0.55, body) * (0.75 + 0.25 * n2);
-  float mask = mix(g, ragged, v_detail);
+  float mask = mix(g, ragged, max(v_detail, 0.0));
+  if (v_detail < 0.0) {
+    // Ink drop: a solid round body with a soft, slightly uneven rim and no
+    // wide faint skirt (a soft gaussian greys the whole page on paper).
+    float rr = r * (1.0 + 0.1 * n);
+    mask = smoothstep(1.1, 0.65, rr);
+  }
   frag = v_dye * max(mask, 0.0);
 }

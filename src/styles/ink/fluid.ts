@@ -58,6 +58,28 @@ export interface Splat {
   seed: number;
 }
 
+/** v0.1-style motion (`stepFlow`): the velocity is a curl-noise field. */
+export interface FlowParams {
+  /** Noise cells across the domain: large layer (x, y), fine layer (x, y). */
+  period: [number, number, number, number];
+  /** Fine-layer weight. */
+  detail: number;
+  /** Field drift (large-layer cells) and evolution. */
+  offset: [number, number];
+  z: number;
+  /** Velocity: domain uv per second per unit of curl. */
+  speed: number;
+  /** Per-channel dye decay (1/s) and subtractive decay (units/s). */
+  dyeDissipation: [number, number, number, number];
+  dyeFloorDecay: [number, number, number, number];
+  /** Ambient drizzle: dye per second while lit, chance per refresh, cells across the domain. */
+  drizzle: [number, number, number];
+  /** Soft caps per channel. */
+  cap: [number, number, number, number];
+  /** Soft single-step advection (v0.1) instead of MacCormack. */
+  soft: boolean;
+}
+
 export interface FluidParams {
   curlStrength: number;
   /** Velocity damping (1/s). */
@@ -235,6 +257,70 @@ export class FluidSim {
   kick(x: number, y: number, radius: number, speed: number): void {
     if (this.kicks.length >= MAX_KICKS) this.kicks.shift();
     this.kicks.push({ x: ((x % 1) + 1) % 1, y: ((y % 1) + 1) % 1, r: radius, s: speed });
+  }
+
+  /**
+   * v0.1 Flow Ink motion: velocity = curl-noise field (overwritten each frame),
+   * splats add ink and a one-frame push on top, then the ink is advected.
+   */
+  stepFlow(rawDt: number, p: FlowParams): void {
+    const gl = this.gl;
+    const dt = Math.min(rawDt, MAX_SIM_DT);
+    const simTexel = 1 / this.simRes;
+    const dyeTexel = 1 / this.dyeRes;
+    this.clock += dt;
+    gl.disable(gl.BLEND);
+    gl.disable(gl.DEPTH_TEST);
+    gl.bindVertexArray(this.quadVAO);
+    this.pass('flowVel', this.vel.write, {}, {
+      u_texel: [simTexel, simTexel], u_period: p.period, u_detail: p.detail, u_offset: p.offset, u_z: p.z,
+      u_speed: p.speed * this.simRes,
+    });
+    this.swap(this.vel);
+    this.applySplats();
+    gl.bindVertexArray(this.quadVAO);
+    this.kicks.length = 0;
+    this.kickData.fill(0);
+    const ap = this.progs.advectDye;
+    gl.useProgram(ap.prog);
+    gl.uniform4fv(ap.u.u_kicks, this.kickData);
+    gl.uniform1i(ap.u.u_kick_count, 0);
+    const dyeU = {
+      u_dye_texel: [dyeTexel, dyeTexel], u_sim_res: this.simRes, u_dt: dt,
+      u_dissipation: p.dyeDissipation as number[], u_floor_decay: p.dyeFloorDecay as number[],
+      u_drizzle: p.drizzle as number[], u_drizzle_t: this.clock, u_cap: p.cap as number[],
+    };
+    if (p.soft) {
+      this.pass('advectDye', this.dye.write, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.dye.read }, { ...dyeU, u_pass: 2 });
+    } else {
+      this.pass('advectDye', this.tmp, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.dye.read }, { ...dyeU, u_pass: 0 });
+      this.pass('advectDye', this.dye.write, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.tmp }, { ...dyeU, u_pass: 1 });
+    }
+    this.swap(this.dye);
+    this.pass('height', this.heightTex, { u_dye: this.dye.read }, { u_texel: [simTexel, simTexel] });
+    gl.bindVertexArray(null);
+  }
+
+  /** Blend queued splats into the velocity and dye fields (additive). */
+  private applySplats(): void {
+    const gl = this.gl;
+    if (this.instanceCount === 0) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.instanceBuf);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.instances, 0, this.instanceCount * INSTANCE_FLOATS);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    const sp = this.splatProg;
+    gl.useProgram(sp.prog);
+    gl.uniform1f(sp.u.u_extent, SPLAT_EXTENT);
+    gl.bindVertexArray(this.splatVAO);
+    this.target(this.vel.read);
+    gl.uniform1i(sp.u.u_mode, 1);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.instanceCount);
+    this.target(this.dye.read);
+    gl.uniform1i(sp.u.u_mode, 0);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, this.instanceCount);
+    gl.disable(gl.BLEND);
+    this.instanceCount = 0;
   }
 
   step(rawDt: number, p: FluidParams): void {

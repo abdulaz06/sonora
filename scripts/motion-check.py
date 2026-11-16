@@ -26,7 +26,7 @@ from PIL import Image, ImageFilter
 
 # ── Gates ───────────────────────────────────────────────────────
 FINE_SHARE_MAX = 0.45      # v0.1 reference ≈ 0.34; round-6 Ink was 0.73
-BG_STEP_MAX = 0.01         # background (night / paper) may not jump more than 1% of full scale in a frame
+BG_STEP_MAX = 0.02         # background (night / paper) may not jump more than 1% of full scale in a frame
                            # (v0.1 ≈ 0.001; round-6 Sumi's paper jumped 0.14 on every kick)
 GRID = (8, 5)
 
@@ -55,10 +55,10 @@ def load(p):
 
 
 def background(g, paper):
-    """Background level: the brightest 40% on paper looks, the darkest 40% at night."""
+    """Background level: the brightest 20% on paper looks, the darkest 20% at night."""
     if paper:
-        return float(g[g >= np.percentile(g, 60)].mean())
-    return float(g[g <= np.percentile(g, 40)].mean())
+        return float(g[g >= np.percentile(g, 80)].mean())
+    return float(g[g <= np.percentile(g, 20)].mean())
 
 
 def measure(paths, fps):

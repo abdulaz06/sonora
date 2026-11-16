@@ -22,8 +22,8 @@ uniform float u_sharpen;
 uniform float u_glow;
 uniform float u_pulse;        // bass-hit envelope × fade: frame-accurate beat response
 uniform float u_pulse_gain;   // how much ink brightens on a hit
-uniform float u_light_gain;   // brightening at full beat light (dye energy), per look
-const float LIGHT_KNEE = 0.85;   // ink luminance above which the beat light compresses
+uniform float u_grain_amt;    // paper / pigment grain (0 = none)
+uniform int u_linear;         // Glow: v0.1 linear density → brightness
 
 struct InkSample {
   vec4 d;      // sharpened dye
@@ -33,7 +33,7 @@ struct InkSample {
 
 InkSample sampleInk(vec2 uv, float lod) {
   InkSample s;
-  vec4 raw = lod < 0.5 ? sampleBicubic(u_dye, uv, vec2(u_dye_res)) : texture(u_dye, uv);
+  vec4 raw = lod < 0.5 && u_linear == 0 ? sampleBicubic(u_dye, uv, vec2(u_dye_res)) : texture(u_dye, uv);
   s.blur = texture(u_height, uv);
   // Unsharp mask with a clamped negative lobe: crisper filaments, no halos.
   s.d = max(raw + u_sharpen * clamp(raw - s.blur, -0.2 * raw, vec4(8.0)), 0.0);
@@ -48,7 +48,8 @@ float inkHeight(vec4 blur) {
 }
 
 float grainAt(vec2 world) {
-  return texture(u_grain, world * 1.7).r * 0.6 + texture(u_grain, world * 6.3 + 0.37).r * 0.4;
+  float g = texture(u_grain, world * 1.7).r * 0.6 + texture(u_grain, world * 6.3 + 0.37).r * 0.4;
+  return mix(0.5, g, u_grain_amt);
 }
 
 vec3 darkBackground(vec2 world) {
@@ -71,7 +72,9 @@ vec3 shadeInkBase(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
     float veins = 0.5 + 0.5 * sin((ratio * 9.0 + (s.blur.r - s.blur.g) * 4.0) * 6.2832);
     veins = smoothstep(0.86, 1.0, veins) * cov;
     float n = hash12(fragCoord) - 0.5;
-    float stip = smoothstep(0.5 - 0.14, 0.5 + 0.14, field + n * 0.42 + (g - 0.5) * 0.12);
+    // Dither a little softer than before: with the faster flow a strong
+    // dither sparkles where colours mix.
+    float stip = smoothstep(0.5 - 0.16, 0.5 + 0.16, field + n * 0.3 + (g - 0.5) * 0.12);
     vec3 bright = light ? mix(u_paper, u_ink_a * 0.9, 0.08) : u_ink_a;
     vec3 dark = light ? u_ink_a * 0.55 : u_bg * 0.6;
     vec3 col = mix(dark, bright, stip);
@@ -114,6 +117,13 @@ vec3 shadeInkBase(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
     col = mix(col, col * 0.4, clamp(sp * 0.5, 0.0, 0.6));
     return col;
   }
+  if (u_linear == 1) {
+    // v0.1: brightness follows density (faint wisps stay dim, so old
+    // stretched ink never turns into busy texture), with a gentle shoulder.
+    vec3 c = (u_ink_a * a + u_ink_b * b + u_spark * sp) * 1.1;
+    float dens = a + b + sp;
+    return darkBackground(world) + c / (1.0 + 0.25 * dens);
+  }
   vec3 col = darkBackground(world);
   col = mix(col, u_ink_a * (0.85 + 0.25 * g), ca);
   col = mix(col, u_ink_b * (0.85 + 0.25 * g), cb * (1.0 - 0.35 * ca));
@@ -134,22 +144,12 @@ vec3 shadeInk(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
   float e = min(s.d.a, 2.0);
   vec3 inkCol = u_variant == 1 ? (u_light == 1 ? vec3(0.02) : u_paper)
               : mix(u_ink_a, u_ink_b, s.d.g / (s.d.r + s.d.g + 1e-3));
-  // Beat light: kicks put energy into the dye; it lights the ink it lands on
-  // and streams off with it, fading over one beat.
-  float L = min(e, 1.5);
   if (u_light == 1) {
-    float deepen = clamp((0.45 * u_pulse * u_pulse_gain + 0.3 * u_light_gain * L) * max(cover, 0.8 * L), 0.0, 0.7);
+    float deepen = clamp((0.45 * u_pulse * u_pulse_gain + 0.35 * e) * max(cover, 0.25 * e), 0.0, 0.7);
     return col * (1.0 - deepen) + inkCol * deepen * 0.15;
   }
   vec3 base = darkBackground(world);
-  // Dim ink brightens most; already-bright ink gets less, so cores don't blow out.
-  float lum = dot(max(col - base, 0.0), vec3(0.3, 0.5, 0.2));
-  float boost = 1.0 + u_pulse_gain * u_pulse + u_light_gain * L / (1.0 + 4.0 * lum);
-  // Soft ceiling: the light lifts ink toward white but compresses above it.
-  float lumB = lum * boost;
-  if (lumB > LIGHT_KNEE) boost *= (LIGHT_KNEE + (lumB - LIGHT_KNEE) * 0.3) / lumB;
-  col = base + (col - base) * boost;
-  // A soft glow of the ink's colour where the light falls, strongest on ink.
-  col += inkCol * L * 0.1 * u_light_gain * (0.04 + 0.96 * cover) / (1.0 + 4.0 * lum);
+  col = base + (col - base) * (1.0 + u_pulse_gain * u_pulse);
+  col += inkCol * min(e, 1.2) * 0.55 * (0.3 + 0.7 * cover);
   return col;
 }

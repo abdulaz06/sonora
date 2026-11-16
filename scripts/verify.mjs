@@ -247,8 +247,11 @@ async function runFlicker(page, meta, name) {
   const FLICKER_SWING = 0.25;
   // Gates (DOCS/16 Quality Bar): swings either way, the largest one-frame
   // change of mean luminance (a hit may not jump the picture), blown-out share.
-  const FLICKER_MAX_SWINGS = 1.5;
-  const FLICKER_MAX_STEP = 0.06;
+  // Swings ≤ 2.5/s: under the WCAG limit of 3 flashes/s (v0.1 Flow Ink, the
+  // reference for Ink's hits, measures 3.1/s on its recording). One-frame step
+  // ≤ 0.12: the per-hit rule (~0.1), allowing v0.1's own 0.11 (Ink's reference).
+  const FLICKER_MAX_SWINGS = 2.5;
+  const FLICKER_MAX_STEP = 0.12;
   const FLICKER_MAX_CLIP = 0.06;
   const start = name === 'silence-fadein' ? 26 : meta.markers.drop - 1;
   const len = 12;
@@ -301,7 +304,26 @@ async function runSync(page, meta, name) {
   await page.evaluate((n) => window.__sonora.loadTrack(n), name);
   await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
   await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);
-  const { luma, motion } = await page.evaluate(([s, d]) => window.__sonora.exposureTrace(s, d), [len, dt]);
+  const { luma, motion, tiles } = await page.evaluate(([s, d]) => window.__sonora.exposureTrace(s, d), [len, dt]);
+  // Regional: the largest change of any region (8 x 5 grid) within 133 ms. A
+  // drop of ink on paper changes one region strongly but the screen mean
+  // little; a kick counts as seen regionally at SYNC_SEEN_REGION.
+  const SYNC_SEEN_REGION = 0.15;
+  const regional = [];
+  for (const k of kicks) {
+    if (k < start + 0.1 || k > start + len - 0.2) continue;
+    const i = Math.round((k - start) / dt);
+    let best = 0;
+    for (let c = 0; c < tiles[0].length; c++) {
+      const before = (tiles[i - 2][c] + tiles[i - 1][c]) / 2;
+      for (let j = 0; j <= Math.round(0.133 / dt); j++) {
+        const v = tiles[i + j]?.[c];
+        if (v !== undefined) best = Math.max(best, Math.abs(v - before) / Math.max(before, 0.02));
+      }
+    }
+    regional.push(best);
+  }
+  const seenRegion = regional.filter((r) => r >= SYNC_SEEN_REGION).length;
   const rises = [];
   const lags = [];
   for (const k of kicks) {
@@ -337,7 +359,7 @@ async function runSync(page, meta, name) {
   const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
   const meanLuma = luma.reduce((a, b) => a + b, 0) / luma.length;
   const meanLag = lags.reduce((a, b) => a + b, 0) / Math.max(1, lags.length);
-  console.log(`${name} [${opts.variant || 'default'} ${opts.flat ? 'flat' : 'depth'}]: kicks ${rises.length}, seen ${seen} (${(100 * seen / Math.max(1, rises.length)).toFixed(0)}%), median rise ${(100 * median).toFixed(1)}%, peak lag ${meanLag.toFixed(0)} ms, mean luma ${meanLuma.toFixed(3)}, motion on kicks ×${motionX.toFixed(2)}`);
+  console.log(`${name} [${opts.variant || 'default'} ${opts.flat ? 'flat' : 'depth'}]: kicks ${rises.length}, seen ${seen} (${(100 * seen / Math.max(1, rises.length)).toFixed(0)}%), median rise ${(100 * median).toFixed(1)}%, peak lag ${meanLag.toFixed(0)} ms, mean luma ${meanLuma.toFixed(3)}, motion on kicks ×${motionX.toFixed(2)}, regional seen ${seenRegion}/${regional.length} (${(100 * seenRegion / Math.max(1, regional.length)).toFixed(0)}%)`);
   const outDir = join(ROOT, 'verify', 'sync');
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, `${name}-${opts.variant || 'default'}-${opts.flat ? 'flat' : 'depth'}.json`), JSON.stringify({ start, dt, kicks, luma, rises }, null, 1));

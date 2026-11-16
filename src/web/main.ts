@@ -49,7 +49,7 @@ export interface HarnessApi {
   /** Advance in steps of `dt` and return the mean screen luminance after each step. */
   lumaTrace(seconds: number, dt: number): number[];
   /** Like lumaTrace, plus the fraction of blown-out pixels (any channel ≥ 250) per step. */
-  exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[]; motion: number[] };
+  exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[]; motion: number[]; tiles: number[][] };
 }
 
 declare global {
@@ -241,14 +241,19 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
     lumaTrace(seconds: number, dt: number): number[] {
       return this.exposureTrace(seconds, dt).luma;
     },
-    exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[]; motion: number[] } {
-      if (!gl) return { luma: [], clip: [], motion: [] };
+    exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[]; motion: number[]; tiles: number[][] } {
+      if (!gl) return { luma: [], clip: [], motion: [], tiles: [] };
       const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
       const buf = new Uint8Array(w * h * 4);
       const luma: number[] = [];
       const clip: number[] = [];
       // Motion: mean absolute per-pixel luminance change from the last frame.
       const motion: number[] = [];
+      // Mean luminance per region (8 x 5 grid), so a hit that changes one part
+      // of the picture (an ink drop on paper) is measured too.
+      const tiles: number[][] = [];
+      const GX = 8, GY = 5;
+      const tSum = new Float64Array(GX * GY), tN = new Uint32Array(GX * GY);
       let prev: Float32Array | null = null;
       const cur = new Float32Array(Math.ceil(buf.length / (4 * 7)));
       for (let t = 0; t < seconds - 1e-9; t += dt) {
@@ -256,8 +261,11 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
         renderer.step(dt);
         gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
         let sum = 0, n = 0, hot = 0, diff = 0;
+        tSum.fill(0); tN.fill(0);
         for (let i = 0; i < buf.length; i += 4 * 7) {
           const l = 0.2126 * buf[i] + 0.7152 * buf[i + 1] + 0.0722 * buf[i + 2];
+          const px = i >> 2, cx = Math.min(GX - 1, Math.floor(((px % w) * GX) / w)), cy = Math.min(GY - 1, Math.floor((Math.floor(px / w) * GY) / h));
+          tSum[cy * GX + cx] += l; tN[cy * GX + cx]++;
           if (prev) diff += Math.abs(l - prev[n]);
           cur[n] = l;
           sum += l;
@@ -265,12 +273,13 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
           n++;
         }
         luma.push(sum / n / 255);
+        tiles.push(Array.from(tSum, (v, k) => v / Math.max(1, tN[k]) / 255));
         clip.push(hot / n);
         motion.push(prev ? diff / n / 255 : 0);
         prev = prev ?? new Float32Array(cur.length);
         prev.set(cur);
       }
-      return { luma, clip, motion };
+      return { luma, clip, motion, tiles };
     },
     frameCost(frames: number, dt: number): number {
       if (!gl) return 0;

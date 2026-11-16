@@ -70,6 +70,34 @@ void main() {
   frag = vec4(v, 0.0, 1.0);
 }
 
+//#program flowVel
+// v0.1 Flow Ink's motion: the velocity IS a curl-noise field (no momentum, no
+// pressure, no vorticity), a slow large layer plus a finer layer that grows
+// with intensity. Written in sim texels per second. Periodic noise keeps the
+// domain seamless; z evolves slowly so the field never repeats.
+uniform vec2 u_texel;
+uniform vec4 u_period;     // noise cells across the domain (x, y): large layer xy, fine layer zw.
+                           // Fewer cells across x: v0.1's square sim was stretched over a wide screen.
+uniform float u_detail;    // fine-layer weight (v0.1: 0.4 x intensity)
+uniform vec2 u_offset;     // drift of the field (cells of the large layer)
+uniform float u_z;         // evolution
+uniform float u_speed;     // texels per second per unit of curl
+//#include common
+vec2 curlAt(vec2 q, float z, vec2 period) {
+  float e = 0.05;
+  float n1 = pnoise(vec3(q + vec2(0.0, e), z), period);
+  float n2 = pnoise(vec3(q - vec2(0.0, e), z), period);
+  float n3 = pnoise(vec3(q + vec2(e, 0.0), z), period);
+  float n4 = pnoise(vec3(q - vec2(e, 0.0), z), period);
+  return vec2(n1 - n2, -(n3 - n4)) / (2.0 * e);
+}
+void main() {
+  vec2 uv = gl_FragCoord.xy * u_texel;
+  vec2 v = curlAt(uv * u_period.xy + u_offset, u_z, u_period.xy);
+  v += u_detail * curlAt(uv * u_period.zw + u_offset * 1.8, u_z * 1.4 + 7.0, u_period.zw);
+  frag = vec4(v * u_speed, 0.0, 1.0);
+}
+
 //#program divergence
 uniform sampler2D u_vel;
 uniform vec2 u_texel;
@@ -139,7 +167,8 @@ uniform float u_sim_res;
 uniform float u_dt;
 uniform vec4 u_dissipation;  // per-channel decay, 1/s
 uniform vec4 u_floor_decay;  // per-channel subtractive decay, units/s (clears faint haze)
-uniform int u_pass;
+uniform int u_pass;           // 0 forward step, 1 MacCormack, 2 soft single step (v0.1)
+uniform vec4 u_cap;           // soft caps per channel (0 = none)
 // Beat kicks: a divergent push applied to the ink only (not the velocity
 // field, where the pressure solve would cancel it), so ink bursts outward on
 // the frame of the hit. xy = centre (uv), z = radius (uv), w = speed (uv/s).
@@ -182,28 +211,34 @@ void main() {
     frag = texture(u_dye, back);
     return;
   }
-  vec4 fwd = texture(u_tmp, uv);
-  vec4 hatN = texture(u_tmp, uv + u_dt * v);
-  vec4 phiN = texture(u_dye, uv);
-  vec4 res = fwd + 0.5 * (phiN - hatN);
-  vec2 px = back / u_dye_texel - 0.5;
-  vec2 c = (floor(px) + 0.5) * u_dye_texel;
-  vec4 a = texture(u_dye, c);
-  vec4 b = texture(u_dye, c + vec2(u_dye_texel.x, 0.0));
-  vec4 d = texture(u_dye, c + vec2(0.0, u_dye_texel.y));
-  vec4 e = texture(u_dye, c + u_dye_texel);
-  res = clamp(res, min(min(a, b), min(d, e)), max(max(a, b), max(d, e)));
+  vec4 res;
+  if (u_pass == 2) {
+    // Soft semi-Lagrangian step (bilinear): smooth sheets, no fine shimmer.
+    res = texture(u_dye, back);
+  } else {
+    vec4 fwd = texture(u_tmp, uv);
+    vec4 hatN = texture(u_tmp, uv + u_dt * v);
+    vec4 phiN = texture(u_dye, uv);
+    res = fwd + 0.5 * (phiN - hatN);
+    vec2 px = back / u_dye_texel - 0.5;
+    vec2 c = (floor(px) + 0.5) * u_dye_texel;
+    vec4 a = texture(u_dye, c);
+    vec4 b = texture(u_dye, c + vec2(u_dye_texel.x, 0.0));
+    vec4 d = texture(u_dye, c + vec2(0.0, u_dye_texel.y));
+    vec4 e = texture(u_dye, c + u_dye_texel);
+    res = clamp(res, min(min(a, b), min(d, e)), max(max(a, b), max(d, e)));
+  }
   res = max(res * exp(-u_dissipation * u_dt) - u_floor_decay * u_dt, 0.0);
   if (u_drizzle.y > 0.0) {
     vec2 cell = floor(uv * u_drizzle.z);
     float tick = floor(u_drizzle_t * 12.0);
     if (dhash(cell + tick * 0.618) > 1.0 - u_drizzle.y) {
-      vec2 q = fract(uv * u_drizzle.z) - 0.5;
-      float dot_ = exp(-dot(q, q) * 22.0);
-      float amt = u_drizzle.x * u_dt * dot_;
-      res.xy += dhash(cell * 1.7 + tick) < 0.6 ? vec2(amt, 0.0) : vec2(0.0, amt);
+      // v0.1: the whole cell gets ink (in the second ink colour); the flow and
+      // the soft step merge these into broad sheets, the cap flattens them.
+      res.y += u_drizzle.x * u_dt;
     }
   }
+  if (u_cap.x > 0.0) res = min(res, u_cap);
   frag = res;
 }
 
