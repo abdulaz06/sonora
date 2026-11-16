@@ -107,9 +107,15 @@ async function main(): Promise<void> {
   const source = await WasmFrameSource.create();
   source.subscribe((f) => controller.onFrame(f));
 
-  const tracks: Record<string, TrackMeta> = await fetch('/test-audio/tracks.json')
+  const loadTracks = (url: string): Promise<Record<string, TrackMeta>> => fetch(url)
     .then((r) => (r.ok ? r.json() as Promise<Record<string, TrackMeta>> : {}))
     .catch(() => ({}));
+  // Optional private tracks (e.g. a real song for like-for-like comparisons),
+  // kept in the git-ignored test-audio/local/ folder; see scripts/add-local-track.py.
+  const tracks: Record<string, TrackMeta> = {
+    ...await loadTracks('/test-audio/tracks.json'),
+    ...await loadTracks('/test-audio/local/tracks.json'),
+  };
 
   if (harness) {
     exposeHarness(renderer, source, tracks);

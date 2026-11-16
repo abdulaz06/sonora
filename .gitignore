@@ -48,6 +48,7 @@ src/audio/wasm-pkg/
 
 # Generated test audio and harness output
 test-audio/*.wav
+test-audio/local/
 verify/
 
 # Large media (reference reels stay local)

@@ -245,6 +245,11 @@ try {
 //   clip      mean / max fraction of blown-out pixels (any channel ≥ 250)
 async function runFlicker(page, meta, name) {
   const FLICKER_SWING = 0.25;
+  // Gates (DOCS/16 Quality Bar): swings either way, the largest one-frame
+  // change of mean luminance (a hit may not jump the picture), blown-out share.
+  const FLICKER_MAX_SWINGS = 1.5;
+  const FLICKER_MAX_STEP = 0.06;
+  const FLICKER_MAX_CLIP = 0.06;
   const start = name === 'silence-fadein' ? 26 : meta.markers.drop - 1;
   const len = 12;
   const dt = 1 / opts.fps;
@@ -255,18 +260,27 @@ async function runFlicker(page, meta, name) {
   await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
   await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);
   const { luma, clip } = await page.evaluate(([s, d]) => window.__sonora.exposureTrace(s, d), [len, dt]);
-  let ema = luma[0], above = false, swings = 0, jit = 0;
+  // Swings count both ways: a paper look that darkens on each hit flickers
+  // just as much as one that brightens.
+  let ema = luma[0], above = false, swings = 0, jit = 0, maxStep = 0;
   const k = 1 - Math.exp(-dt / 0.4);
   for (let i = 1; i < luma.length; i++) {
-    const d = (luma[i] - ema) / Math.max(ema, 0.03);
+    const d = Math.abs(luma[i] - ema) / Math.max(ema, 0.03);
     if (!above && d >= FLICKER_SWING) { swings++; above = true; } else if (d < FLICKER_SWING * 0.5) above = false;
     jit += Math.abs(luma[i] - luma[i - 1]);
+    maxStep = Math.max(maxStep, Math.abs(luma[i] - luma[i - 1]));
     ema += (luma[i] - ema) * k;
   }
   const meanL = luma.reduce((a, b) => a + b, 0) / luma.length;
   const meanC = clip.reduce((a, b) => a + b, 0) / clip.length;
   const maxC = Math.max(...clip);
-  console.log(`${name} [${opts.style}/${opts.variant || 'default'} p${opts.palette} r${opts.resp ?? 'def'}]: swings ${(swings / len).toFixed(2)}/s, jitter ${(100 * jit / Math.max(1, luma.length - 1) / Math.max(meanL, 0.01)).toFixed(1)}%, clip mean ${(100 * meanC).toFixed(1)}% max ${(100 * maxC).toFixed(1)}%, mean luma ${meanL.toFixed(3)}`);
+  console.log(`${name} [${opts.style}/${opts.variant || 'default'} p${opts.palette} r${opts.resp ?? 'def'}]: swings ${(swings / len).toFixed(2)}/s, jitter ${(100 * jit / Math.max(1, luma.length - 1) / Math.max(meanL, 0.01)).toFixed(1)}%, clip mean ${(100 * meanC).toFixed(1)}% max ${(100 * maxC).toFixed(1)}%, mean luma ${meanL.toFixed(3)}, max 1-frame step ${maxStep.toFixed(3)}`);
+  const fails = [];
+  if (swings / len > FLICKER_MAX_SWINGS) fails.push(`swings > ${FLICKER_MAX_SWINGS}/s`);
+  if (maxStep > FLICKER_MAX_STEP) fails.push(`1-frame step > ${FLICKER_MAX_STEP}`);
+  if (maxC > FLICKER_MAX_CLIP) fails.push(`blown-out > ${FLICKER_MAX_CLIP * 100}%`);
+  console.log(fails.length ? `  FLICKER FAIL: ${fails.join(', ')}` : '  flicker PASS');
+  if (fails.length) process.exitCode = 1;
 }
 
 // ── Beat-sync measurement ───────────────────────────────────────────
