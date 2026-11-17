@@ -36,7 +36,7 @@
 ## Checklist
 
 ### 0. Ground rules
-- [x] 0.1 Caught up (CLAUDE.md, sprint log, decisions, DOCS/16, brand, registry, UI, controller, settings, scripts); commit attribution disabled in `.claude/settings.json`
+- [x] 0.1 Caught up (local working notes, sprint log, decisions, DOCS/16, brand, registry, UI, controller, settings, scripts); commit attribution disabled in the local tool settings
 
 ### 1. Design system
 - [x] 1.1 Fonts bundled locally (Inter, Inter Display, IBM Plex Mono) with OFL licences
