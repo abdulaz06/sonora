@@ -6,7 +6,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Public-facing description of an output device for the device picker UI.
-/// `id` is currently the device name — cpal doesn't expose stable IDs.
+/// `id` is the stable Windows endpoint id (survives renames and reordering);
+/// cpal opens devices by display name, so the id is resolved to the current
+/// name when capture starts.
 #[derive(Clone, Debug, Serialize)]
 pub struct DeviceInfo {
     pub id: String,
@@ -37,8 +39,16 @@ pub fn find_output_device_by_name(name: &str) -> Option<(cpal::Device, String)> 
     None
 }
 
-/// Enumerate all output devices for the device picker.
+/// Enumerate all output devices for the device picker: endpoint ids from the
+/// Windows device API, falling back to display names if that fails.
 pub fn list_output_devices() -> Vec<DeviceInfo> {
+    #[cfg(windows)]
+    {
+        let list = endpoints::list();
+        if !list.is_empty() {
+            return list;
+        }
+    }
     let host = cpal::default_host();
     let mut out = Vec::new();
     if let Ok(devices) = host.output_devices() {
@@ -96,4 +106,52 @@ pub fn start_capture_on(
         .map_err(|e| format!("Failed to start stream: {e}"))?;
 
     Ok((stream, sample_rate))
+}
+
+/// Resolve a pinned device: by endpoint id first (its current display name),
+/// then by the saved display name (settings from before v6, or an id that
+/// changed).
+pub fn find_pinned_device(id: &str, name: &str) -> Option<(cpal::Device, String)> {
+    #[cfg(windows)]
+    {
+        if let Some(current) = endpoints::list().into_iter().find(|d| d.id == id) {
+            if let Some(found) = find_output_device_by_name(&current.name) {
+                return Some(found);
+            }
+        }
+    }
+    find_output_device_by_name(if name.is_empty() { id } else { name })
+}
+
+#[cfg(windows)]
+mod endpoints {
+    use super::DeviceInfo;
+    use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+    use windows::Win32::Media::Audio::{eRender, IMMDeviceEnumerator, MMDeviceEnumerator, DEVICE_STATE_ACTIVE};
+    use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ};
+
+    /// Active render endpoints (id + friendly name). Empty on any COM error.
+    pub fn list() -> Vec<DeviceInfo> {
+        unsafe { list_inner().unwrap_or_default() }
+    }
+
+    unsafe fn list_inner() -> windows::core::Result<Vec<DeviceInfo>> {
+        // Already initialised on this thread (any mode) is fine.
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let en: IMMDeviceEnumerator = CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL)?;
+        let coll = en.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)?;
+        let mut out = Vec::new();
+        for i in 0..coll.GetCount()? {
+            let dev = coll.Item(i)?;
+            let pid = dev.GetId()?;
+            let id = pid.to_string().unwrap_or_default();
+            CoTaskMemFree(Some(pid.0 as *const _));
+            let store = dev.OpenPropertyStore(STGM_READ)?;
+            let name = store.GetValue(&PKEY_Device_FriendlyName)?.to_string();
+            if !id.is_empty() && !name.is_empty() {
+                out.push(DeviceInfo { id, name });
+            }
+        }
+        Ok(out)
+    }
 }

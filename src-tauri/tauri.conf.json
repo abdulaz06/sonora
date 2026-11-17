@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Sonora",
+  "productName": "sonora",
   "version": "0.2.0",
   "identifier": "com.abdul.sonora",
   "build": {
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Sonora",
+        "title": "sonora",
         "width": 1280,
         "height": 800,
         "minWidth": 640,
@@ -22,21 +22,39 @@
         "fullscreen": false,
         "decorations": true,
         "transparent": false,
-        "center": true
+        "center": true,
+        "label": "main",
+        "backgroundColor": "#08080A"
       }
     ],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob:",
+        "media-src": "'self' blob:",
+        "font-src": "'self'",
+        "connect-src": "'self' ipc: http://ipc.localhost",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'"
+      },
+      "freezePrototype": true
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["msi", "nsis"],
+    "targets": [
+      "msi",
+      "nsis"
+    ],
     "publisher": "Abdul",
     "category": "Music",
     "copyright": "Copyright © 2026 Abdul. All rights reserved.",
-    "shortDescription": "Real-time generative music visualizer",
-    "longDescription": "Sonora captures your system audio and renders responsive, generative visuals. It listens to kicks, bass, vocals, and overall energy — producing abstract visuals that evolve with whatever music is playing.",
+    "shortDescription": "a visual instrument for whatever’s playing",
+    "longDescription": "sonora listens to whatever your PC is playing and turns it into moving pictures, in time with every beat. Audio is analysed on your computer only.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -51,11 +69,25 @@
       "nsis": {
         "installMode": "perMachine",
         "displayLanguageSelector": false,
-        "languages": ["English"],
+        "languages": [
+          "English"
+        ],
         "installerIcon": "icons/icon.ico"
       },
       "wix": {
         "language": "en-US"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVCMTZEODYwMEIxMDhBMjEKUldRaGloQUxZTmdXNjZRUFlyTFBEcnhwYU5IcVVMTUYwSjA1TUIySFV6N2tWM1gvakk3K0crazUK",
+      "endpoints": [
+        "https://github.com/abdulaz06/sonora/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

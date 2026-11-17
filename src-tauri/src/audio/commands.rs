@@ -35,7 +35,7 @@ pub fn get_current_audio_device(state: tauri::State<Arc<DeviceState>>) -> Curren
     let pref = state.preference();
     let (pinned, pinned_id) = match pref {
         DevicePreference::Default => (false, None),
-        DevicePreference::Pinned(id) => (true, Some(id)),
+        DevicePreference::Pinned { id, .. } => (true, Some(id)),
     };
     CurrentDevice {
         name: state.current(),
@@ -45,13 +45,14 @@ pub fn get_current_audio_device(state: tauri::State<Arc<DeviceState>>) -> Curren
 }
 
 /// Set the user's device preference. Pass `None` (or `"default"`) to follow
-/// the system default; pass a device id to pin to that device.
+/// the system default; pass an endpoint id (with its display name as the
+/// fallback) to pin to that device.
 #[tauri::command]
-pub fn set_audio_device(state: tauri::State<Arc<DeviceState>>, id: Option<String>) {
+pub fn set_audio_device(state: tauri::State<Arc<DeviceState>>, id: Option<String>, name: Option<String>) {
     let pref = match id {
         None => DevicePreference::Default,
         Some(s) if s == "default" || s.is_empty() => DevicePreference::Default,
-        Some(s) => DevicePreference::Pinned(s),
+        Some(s) => DevicePreference::Pinned { id: s, name: name.unwrap_or_default() },
     };
     state.set_preference(pref);
 }

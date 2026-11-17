@@ -15,10 +15,9 @@ use std::sync::Arc;
 pub enum DevicePreference {
     /// Follow the system default — auto-switch when it changes.
     Default,
-    /// Stay on this specific device regardless of the system default.
-    /// The string is the device's display name (cpal doesn't expose
-    /// stable IDs, so name is our id).
-    Pinned(String),
+    /// Stay on this specific device regardless of the system default:
+    /// its endpoint id, and its display name as the fallback.
+    Pinned { id: String, name: String },
 }
 
 pub struct DeviceState {

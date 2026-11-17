@@ -1,75 +1,79 @@
-//! System tray icon with right-click menu.
-//! Left-click toggles window visibility. Right-click shows menu.
+//! System tray: Show, Menu, Set Mode (checkable), Fullscreen, Quit.
+//! Left-click toggles the window. Actions the web side owns (menu, Set Mode,
+//! fullscreen) are sent to it as `tray` events; `set_tray_set_mode` keeps the
+//! Set Mode check in sync when it changes in the app.
 
+use parking_lot::Mutex;
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem},
+    image::Image,
+    menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager,
+    AppHandle, Emitter, Manager, Wry,
 };
 
+/// The 32 px brand tile (hand-tuned small optical weight).
+const TRAY_ICON: &[u8] = include_bytes!("../icons/tray-32.png");
+
+pub struct TrayState {
+    set_mode: Mutex<Option<CheckMenuItem<Wry>>>,
+}
+
+pub fn state() -> TrayState {
+    TrayState { set_mode: Mutex::new(None) }
+}
+
+fn show(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
-    let show_i = MenuItem::with_id(app, "show", "Show Sonora", true, None::<&str>)?;
-    let hide_i = MenuItem::with_id(app, "hide", "Hide", true, None::<&str>)?;
-    let fs_i = MenuItem::with_id(app, "fullscreen", "Toggle Fullscreen", true, None::<&str>)?;
+    let show_i = MenuItem::with_id(app, "show", "Show sonora", true, None::<&str>)?;
+    let menu_i = MenuItem::with_id(app, "menu", "Menu", true, None::<&str>)?;
+    let set_i = CheckMenuItem::with_id(app, "setmode", "Set Mode", true, false, None::<&str>)?;
+    let fs_i = MenuItem::with_id(app, "fullscreen", "Fullscreen", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_i, &hide_i, &fs_i, &sep, &quit_i])?;
+    let menu = Menu::with_items(app, &[&show_i, &menu_i, &set_i, &fs_i, &sep, &quit_i])?;
+    *app.state::<TrayState>().set_mode.lock() = Some(set_i);
 
-    let _tray = TrayIconBuilder::with_id("sonora-tray")
-        .icon(app.default_window_icon().cloned().ok_or_else(|| {
-            tauri::Error::AssetNotFound("default window icon missing".into())
-        })?)
-        .tooltip("Sonora")
+    TrayIconBuilder::with_id("sonora-tray")
+        .icon(Image::from_bytes(TRAY_ICON)?)
+        .tooltip("sonora")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| match event.id.as_ref() {
-            "show" => {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
+            "show" => show(app),
+            "menu" | "setmode" | "fullscreen" => {
+                show(app);
+                let _ = app.emit("tray", event.id.as_ref());
             }
-            "hide" => {
-                if let Some(w) = app.get_webview_window("main") {
-                    let _ = w.hide();
-                }
-            }
-            "fullscreen" => {
-                if let Some(w) = app.get_webview_window("main") {
-                    if let Ok(fs) = w.is_fullscreen() {
-                        let _ = w.set_fullscreen(!fs);
-                    }
-                    let _ = w.show();
-                    let _ = w.set_focus();
-                }
-            }
-            "quit" => {
-                app.exit(0);
-            }
+            "quit" => app.exit(0),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
                 let app = tray.app_handle();
                 if let Some(w) = app.get_webview_window("main") {
-                    match w.is_visible() {
-                        Ok(true) => {
-                            let _ = w.hide();
-                        }
-                        _ => {
-                            let _ = w.show();
-                            let _ = w.set_focus();
-                        }
+                    if w.is_visible().unwrap_or(false) {
+                        let _ = w.hide();
+                    } else {
+                        show(app);
                     }
                 }
             }
         })
         .build(app)?;
-
     Ok(())
+}
+
+/// Keep the tray's Set Mode check in sync with the app.
+#[tauri::command]
+pub fn set_tray_set_mode(state: tauri::State<TrayState>, on: bool) {
+    if let Some(item) = state.set_mode.lock().as_ref() {
+        let _ = item.set_checked(on);
+    }
 }

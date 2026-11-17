@@ -2,7 +2,7 @@ pub mod capture;
 pub mod commands;
 pub mod devices;
 
-use capture::{default_output_device, find_output_device_by_name, start_capture_on};
+use capture::{default_output_device, find_pinned_device, start_capture_on};
 use devices::{DevicePreference, DeviceState};
 use parking_lot::Mutex;
 use sonora_dsp::{hop_size, Analyzer, AudioBuffer};
@@ -141,7 +141,7 @@ fn try_apply_device(
 
     let target = match &preference {
         DevicePreference::Default => default_output_device(),
-        DevicePreference::Pinned(name) => find_output_device_by_name(name),
+        DevicePreference::Pinned { id, name } => find_pinned_device(id, name),
     };
 
     let target_name = target.as_ref().map(|(_, n)| n.clone());
@@ -218,7 +218,7 @@ fn reopen(
     let prev_name = prev.device_name.clone();
     let target = match device_state.preference() {
         DevicePreference::Default => default_output_device(),
-        DevicePreference::Pinned(name) => find_output_device_by_name(&name),
+        DevicePreference::Pinned { id, name } => find_pinned_device(&id, &name),
     };
     let Some(target) = target else {
         // Nothing to capture from; the poll loop reports it and retries.
