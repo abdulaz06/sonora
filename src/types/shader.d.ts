@@ -17,3 +17,8 @@ declare module '*?url' {
   const url: string;
   export default url;
 }
+
+declare module '*.svg?raw' {
+  const src: string;
+  export default src;
+}

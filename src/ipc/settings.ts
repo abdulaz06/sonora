@@ -14,7 +14,7 @@ import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
 /** Bump when a default changes in a way saved settings must not override. */
-export const SETTINGS_VERSION = 5;
+export const SETTINGS_VERSION = 6;
 
 /** Settings each style keeps for itself (v5): changing one style never
  * changes another. Colours can be shared with `matchColours`. */
@@ -27,6 +27,31 @@ export interface StylePrefs {
   camera: CameraView;
   flatZoom: number;
 }
+
+/** Where the now-playing overlay sits. */
+export type Corner = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
+
+/** Now playing (v6): the track your media player reports. */
+export interface NowPlayingPrefs {
+  /** Show the overlay on a track change and when the mouse moves. */
+  show: boolean;
+  position: Corner;
+  /** Previous / play-pause / next buttons in the overlay. */
+  controls: boolean;
+}
+
+/** Set Mode (v6): the autopilot that switches visuals with the music. */
+export interface SetModePrefs {
+  on: boolean;
+  /** Pieces (catalog PIECES ids) it may choose; empty = all. */
+  include: string[];
+  /** Never switch more often than this (s). */
+  minInterval: number;
+  /** Change palettes too. */
+  palettes: boolean;
+}
+
+export const SET_MODE_INTERVALS = [60, 120, 180, 300, 600] as const;
 
 export interface PersistedSettings {
   /** Schema version (see SETTINGS_VERSION). */
@@ -77,6 +102,21 @@ export interface PersistedSettings {
   };
   /** Was the app fullscreen when it last closed? */
   fullscreen: boolean;
+  // ── v6 ──
+  /** Display name of the pinned output device (fallback when its id changes). */
+  audioDeviceName: string;
+  /** Skip the home menu and open the last visual. */
+  openLastVisual: boolean;
+  /** The first-run intro has been seen. */
+  onboarded: boolean;
+  /** Launch count (the launch moment shortens after the first few). */
+  launches: number;
+  nowPlaying: NowPlayingPrefs;
+  setMode: SetModePrefs;
+  /** Display used for fullscreen (monitor name); null = the one the window is on. */
+  fullscreenMonitor: string | null;
+  /** Check GitHub Releases for updates on launch. */
+  checkUpdates: boolean;
 }
 
 /** Frame-rate cap choices; 0 = match the display. */
@@ -109,6 +149,14 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
     y: null,
   },
   fullscreen: false,
+  audioDeviceName: '',
+  openLastVisual: false,
+  onboarded: false,
+  launches: 0,
+  nowPlaying: { show: true, position: 'bottom-left', controls: true },
+  setMode: { on: false, include: [], minInterval: 120, palettes: true },
+  fullscreenMonitor: null,
+  checkUpdates: true,
 };
 
 /** Load saved settings from disk; returns DEFAULT_SETTINGS if none exist. */
@@ -116,12 +164,12 @@ export async function loadSettings(): Promise<PersistedSettings> {
   try {
     const raw = await invoke<unknown>('load_settings');
     if (raw === null || raw === undefined) {
-      return { ...DEFAULT_SETTINGS };
+      return defaultSettings();
     }
     return mergeWithDefaults(raw);
   } catch (err) {
     console.warn('Failed to load settings, using defaults:', err);
-    return { ...DEFAULT_SETTINGS };
+    return defaultSettings();
   }
 }
 
@@ -193,9 +241,9 @@ function renameKeys(m: Record<string, unknown>): Record<string, unknown> {
 
 /** Validate / fill in missing fields when loading. Tolerant of partial JSON. */
 export function mergeWithDefaults(raw: unknown): PersistedSettings {
-  if (!raw || typeof raw !== 'object') return { ...DEFAULT_SETTINGS };
+  if (!raw || typeof raw !== 'object') return defaultSettings();
   const r = raw as Record<string, unknown>;
-  const out: PersistedSettings = { ...DEFAULT_SETTINGS };
+  const out: PersistedSettings = defaultSettings();
 
   const ids = STYLES.map((d) => d.id);
   const rawVariants = (r.variants && typeof r.variants === 'object' ? r.variants : {}) as Record<string, unknown>;
@@ -290,7 +338,38 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     styles[id] = parseStylePrefs(p, stylePrefsOf(out));
   }
   out.styles = styles;
+
+  // ── v6 ──
+  if (typeof r.audioDeviceName === 'string') out.audioDeviceName = r.audioDeviceName;
+  // Before v6 the pinned device was saved by its display name.
+  else if (version < 6 && out.audioDevice !== 'default') out.audioDeviceName = out.audioDevice;
+  if (typeof r.openLastVisual === 'boolean') out.openLastVisual = r.openLastVisual;
+  // Anyone upgrading from an earlier version has used Sonora already: no intro.
+  out.onboarded = typeof r.onboarded === 'boolean' ? r.onboarded : version < 6;
+  if (typeof r.launches === 'number' && Number.isFinite(r.launches)) out.launches = Math.max(0, Math.round(r.launches));
+  else if (version < 6) out.launches = 10;
+  const np = (r.nowPlaying && typeof r.nowPlaying === 'object' ? r.nowPlaying : {}) as Record<string, unknown>;
+  out.nowPlaying = {
+    show: typeof np.show === 'boolean' ? np.show : DEFAULT_SETTINGS.nowPlaying.show,
+    position: np.position === 'bottom-left' || np.position === 'bottom-right' || np.position === 'top-left' || np.position === 'top-right'
+      ? np.position : DEFAULT_SETTINGS.nowPlaying.position,
+    controls: typeof np.controls === 'boolean' ? np.controls : DEFAULT_SETTINGS.nowPlaying.controls,
+  };
+  const sm = (r.setMode && typeof r.setMode === 'object' ? r.setMode : {}) as Record<string, unknown>;
+  out.setMode = {
+    on: typeof sm.on === 'boolean' ? sm.on : false,
+    include: Array.isArray(sm.include) ? sm.include.filter((x): x is string => typeof x === 'string') : [],
+    minInterval: typeof sm.minInterval === 'number' && Number.isFinite(sm.minInterval) ? clamp(Math.round(sm.minInterval), 30, 1800) : DEFAULT_SETTINGS.setMode.minInterval,
+    palettes: typeof sm.palettes === 'boolean' ? sm.palettes : DEFAULT_SETTINGS.setMode.palettes,
+  };
+  if (typeof r.fullscreenMonitor === 'string' && r.fullscreenMonitor) out.fullscreenMonitor = r.fullscreenMonitor;
+  if (typeof r.checkUpdates === 'boolean') out.checkUpdates = r.checkUpdates;
   return out;
+}
+
+/** A fresh copy of the defaults (nested objects not shared). */
+export function defaultSettings(): PersistedSettings {
+  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as PersistedSettings;
 }
 
 function clamp(v: number, lo: number, hi: number): number {

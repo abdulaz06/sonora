@@ -8,16 +8,22 @@
  */
 
 import { initController } from '../app/controller';
+import type { Platform } from '../app/platform';
+import { initShell } from '../app/shell';
+import { gpuReason, showGpuFallback } from '../ui/screens/gpu';
+import { audioStatus, nowPlaying } from '../app/stores';
 import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
 import { createSourceUi, type SourceUi } from './source-ui';
 import { CAMERA_PRESETS } from '../engine/camera';
 import { presetsFor } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
-import { DEFAULT_SETTINGS, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
+import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
 import type { QualityPreset } from '../engine/quality';
 import type { SonoraEvent } from '../engine/events';
 import type { LightMode, StyleId } from '../styles/visual-style';
+
+declare const __APP_VERSION__: string;
 
 // ── Tuning ──────────────────────────────────────────────────────
 const STORAGE_KEY = 'sonora.web.settings';
@@ -39,7 +45,7 @@ export interface HarnessApi {
   analyseOnly(seconds: number): number;
   snapshot(): string;
   configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string; responsiveness?: number }): void;
-  /** Fire a trackChange with a title (Turing grows it out of the pattern). */
+  /** Fire a trackChange with a title (as a media session would). */
   seedText(title: string): void;
   time(): number;
   events: SonoraEvent[];
@@ -70,6 +76,7 @@ const BAR_CSS = `
 #webbar select option { background: #08080A; }
 #webbar .brand { color: #ECE7DF; letter-spacing: 0.04em; text-transform: none; font-family: 'Inter', system-ui, sans-serif; font-weight: 600; font-size: 13px; }
 #webbar .dim { color: rgba(236,231,223,0.45); }
+body.scr-overlay #webbar { display: none; }
 #drop-hint { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 1001;
   background: rgba(8,8,10,0.7); color: #ECE7DF; font: 600 22px 'Inter', system-ui, sans-serif; letter-spacing: -0.02em; }
 body.dragging #drop-hint { display: flex; }
@@ -78,9 +85,9 @@ body.dragging #drop-hint { display: flex; }
 function loadLocalSettings(): PersistedSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? mergeWithDefaults(JSON.parse(raw)) : { ...DEFAULT_SETTINGS };
+    return raw ? mergeWithDefaults(JSON.parse(raw)) : defaultSettings();
   } catch {
-    return { ...DEFAULT_SETTINGS };
+    return defaultSettings();
   }
 }
 
@@ -89,7 +96,9 @@ async function main(): Promise<void> {
   const harness = params.has('harness');
   const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 
-  const settings = harness ? { ...DEFAULT_SETTINGS, autoDrift: false } : loadLocalSettings();
+  // ?fresh=1 starts from defaults (first run); ?onboarded=1 skips the intro.
+  const settings = harness || params.has('fresh') ? { ...defaultSettings(), autoDrift: false } : loadLocalSettings();
+  if (params.has('onboarded')) settings.onboarded = true;
   let saveTimer = 0;
   const persist = (): void => {
     if (harness) return;
@@ -97,14 +106,20 @@ async function main(): Promise<void> {
     saveTimer = window.setTimeout(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)), SAVE_DEBOUNCE_MS);
   };
 
-  const renderer = initRenderer(canvas, {
-    initialStyle: settings.mode,
-    autoStart: !harness,
-    preserveDrawingBuffer: harness,
-    seed: harness ? 1234 : undefined,
-  });
+  let renderer: ReturnType<typeof initRenderer>;
+  try {
+    renderer = initRenderer(canvas, {
+      initialStyle: settings.mode,
+      autoStart: !harness,
+      preserveDrawingBuffer: harness,
+      seed: harness ? 1234 : undefined,
+    });
+  } catch (err) {
+    showGpuFallback(gpuReason(err), String(err));
+    return;
+  }
   let openSource: () => void = () => undefined;
-  const controller = initController({ renderer, settings, persist, openAudioSource: () => window.setTimeout(() => openSource(), 0) });
+  const controller = initController({ renderer, settings, persist });
   const source = await WasmFrameSource.create();
   source.subscribe((f) => controller.onFrame(f));
 
@@ -124,6 +139,45 @@ async function main(): Promise<void> {
   }
 
   openSource = buildBar(source, tracks, renderer).open;
+  source.onStatus((st) => audioStatus.patch({ device: st.state === 'idle' ? '' : st.label }));
+
+  const platform: Platform = {
+    kind: 'web',
+    version: __APP_VERSION__,
+    listDevices: async () => [],
+    setDevice: () => undefined,
+    openSourceChooser: () => window.setTimeout(() => openSource(), 0),
+    toggleFullscreen: () => { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen(); },
+    isFullscreen: () => !!document.fullscreenElement,
+    onFullscreenChange: (cb) => document.addEventListener('fullscreenchange', () => cb(!!document.fullscreenElement)),
+  };
+  const demo = params.has('demo');
+  if (demo) startDemo();
+  const screen = params.get('screen');
+  await initShell(controller, platform, {
+    noLaunch: params.has('nolaunch'),
+    start: screen === 'menu' || screen === 'detail' || screen === 'visual' || screen === 'intro' ? screen : undefined,
+    startStyle: (params.get('style') as StyleId | null) ?? undefined,
+  });
+  // ?track=<name> plays a test track straight away (UI reviews with live audio).
+  const track = params.get('track');
+  if (track && tracks[track]) {
+    const buf = await fetch(`/test-audio/${tracks[track].file}`).then((r) => r.arrayBuffer());
+    const b = await source.loadFile(buf);
+    await source.playBuffer(b, Number(params.get('t') ?? 0), () => undefined, track);
+  }
+}
+
+/** Screenshot reviews: a believable device, level and now-playing without real audio. */
+function startDemo(): void {
+  audioStatus.patch({ device: 'Speakers (Realtek(R) Audio)' });
+  let t = 0;
+  window.setInterval(() => {
+    t += 0.05;
+    const beat = Math.max(0, Math.sin(t * 7.8)) ** 6;
+    audioStatus.patch({ level: 0.42 + 0.3 * beat + 0.08 * Math.sin(t * 1.3), hearing: true, silentFor: 0 });
+  }, 50);
+  nowPlaying.set({ title: 'Night Drive', artist: 'Lumen Field', album: 'Low Light', art: '', playing: true, app: 'Spotify.exe', canPrev: true, canNext: true, canPlayPause: true });
 }
 
 function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, renderer: ReturnType<typeof initRenderer>): SourceUi {
@@ -138,7 +192,6 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
     <span class="brand">sonora</span>
     <span id="src-slot"></span>
     <button id="play" style="display:none">Pause</button>
-    <button id="seed" title="Grow a word into the Turing pattern (fires a track change with this title)">Seed text</button>
     <span id="clock" class="dim" style="display:none"></span>
     <span id="fps" class="dim">-- fps</span>
   `;
@@ -158,10 +211,6 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
     playBtn.textContent = 'Pause';
     renderer.events.notifyTrackChange({ title: label.replace(/\.[a-z0-9]+$/i, '') });
   };
-  bar.querySelector<HTMLButtonElement>('#seed')!.addEventListener('click', () => {
-    const text = window.prompt('Text to grow into the pattern (Turing style)', 'SONORA');
-    if (text && text.trim()) renderer.events.notifyTrackChange({ title: text.trim() });
-  });
   const ui = createSourceUi(source, Object.entries(tracks).map(([id, m]) => ({ id, file: m.file })), playData);
   bar.querySelector('#src-slot')!.replaceWith(ui.chip);
 

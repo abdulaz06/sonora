@@ -45,9 +45,9 @@ export async function getCurrentDevice(): Promise<CurrentDevice> {
 }
 
 /** Pass 'default' to follow the system default; any other id pins. */
-export async function setDevice(id: string): Promise<void> {
+export async function setDevice(id: string, name = ''): Promise<void> {
   try {
-    await invoke('set_audio_device', { id: id === 'default' ? null : id });
+    await invoke('set_audio_device', { id: id === 'default' ? null : id, name: name || null });
   } catch (err) {
     console.warn('Failed to set audio device:', err);
   }

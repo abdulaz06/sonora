@@ -24,8 +24,8 @@ const CSS = `
 #src-chip .state { color: rgba(236,231,223,0.45); }
 #src-chip .state.warn { color: #ECE7DF; }
 #src-sheet {
-  position: fixed; top: 58px; left: 16px; width: 380px; z-index: 1002; display: none;
-  background: rgba(8,8,10,0.96); border: 1px solid rgba(236,231,223,0.14); color: rgba(236,231,223,0.86);
+  position: fixed; top: 72px; right: clamp(24px, 3.3vw, 64px); width: 400px; z-index: 2500; display: none;
+  background: #08080A; border: 1px solid rgba(236,231,223,0.14); color: rgba(236,231,223,0.86);
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; font-size: 12px;
 }
 #src-sheet.open { display: block; }
@@ -219,6 +219,5 @@ export function createSourceUi(
   };
   requestAnimationFrame(tick);
 
-  if (!last) setTimeout(open, 400);
   return { chip, open };
 }

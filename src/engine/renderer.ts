@@ -106,6 +106,11 @@ export interface Renderer {
   setFpsCap(fps: number): void;
   getQualityPreset(): QualityPreset;
   setStyle(id: StyleId, immediate?: boolean): void;
+  /** Switch style, look and view together: crossfade (default) or cut. The
+   * look and view apply at the swap, so the outgoing picture never changes. */
+  transition(t: { style: StyleId; variant: string; depth: boolean; cut?: boolean }): void;
+  /** Ask the flash guard for a deliberate flash (e.g. a hard cut); false = skip it. */
+  requestFlash(): boolean;
   getStyle(): StyleId;
   getDescriptor(): StyleDescriptor;
   setVariant(id: string): void;
@@ -143,9 +148,8 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   });
   if (!ctxGl) throw new Error('WebGL 2 not supported');
   const gl: WebGL2RenderingContext = ctxGl;
-  if (!gl.getExtension('EXT_color_buffer_float')) {
-    console.warn('EXT_color_buffer_float not available — float render targets may fail');
-  }
+  // Every art style renders into float targets; without them the screen would stay black.
+  if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('float render targets not supported (EXT_color_buffer_float)');
   gl.getExtension('OES_texture_float_linear');
 
   // ── Shared fullscreen quad ──
@@ -205,6 +209,8 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
 
   let fadeAlpha = 1;
   let pending: StyleDescriptor | null = null;
+  /** Look / view to apply when the pending style swaps in (transition()). */
+  let pendingLook: { variant: string; depth: boolean } | null = null;
 
   let frame: AudioFeatureFrame = emptyFrame();
   let time = 0;
@@ -247,6 +253,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
         style.dispose();
         descriptor = pending;
         pending = null;
+        if (pendingLook) { variant = pendingLook.variant; depth = pendingLook.depth; pendingLook = null; }
         variant = descriptor.variants.some((v) => v.id === variant) ? variant : descriptor.defaultVariant;
         style = makeStyle(descriptor);
       }
@@ -418,6 +425,24 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       }
       pending = d;
     },
+    transition(t): void {
+      const d = getStyle(t.style);
+      if (t.cut) {
+        style.dispose();
+        descriptor = d;
+        pending = null;
+        pendingLook = null;
+        variant = d.variants.some((v) => v.id === t.variant) ? t.variant : d.defaultVariant;
+        depth = t.depth;
+        style = makeStyle(d);
+        fadeAlpha = 1;
+        return;
+      }
+      if (d.id === descriptor.id && !pending && variant === t.variant && depth === t.depth) return;
+      pending = d;
+      pendingLook = { variant: t.variant, depth: t.depth };
+    },
+    requestFlash: () => flash.request(),
     getStyle: () => (pending ?? descriptor).id,
     getDescriptor: () => pending ?? descriptor,
     setVariant(id: string): void {

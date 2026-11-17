@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "vite";
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf-8")) as { version: string };
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
@@ -10,6 +13,7 @@ export default defineConfig(async () => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // The verify harness runs its own server next to `npm run dev:web`; a
   // separate dependency cache keeps the two from invalidating each other.
   // @ts-expect-error process is a nodejs global
@@ -19,16 +23,20 @@ export default defineConfig(async () => ({
     port: 1420,
     strictPort: true,
     host: host || false,
-    hmr: host
+    // @ts-expect-error process is a nodejs global
+    hmr: process.env.SONORA_VITE_CACHE ? false : host
       ? {
           protocol: "ws",
           host,
           port: 1421,
         }
       : undefined,
-    watch: {
+    // The verify / media harness must never reload mid-render when a source
+    // file changes: no file watching or HMR for its server.
+    // @ts-expect-error process is a nodejs global
+    watch: process.env.SONORA_VITE_CACHE ? null : {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      ignored: ["**/src-tauri/**", "**/media/**", "**/verify/**"],
     },
   },
 }));

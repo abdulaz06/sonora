@@ -7,8 +7,14 @@ import {
   type Monitor,
 } from '@tauri-apps/api/window';
 
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+
 import { TauriFrameSource } from './audio/tauri-source';
 import { initController } from './app/controller';
+import type { MediaAction, Platform } from './app/platform';
+import { initShell } from './app/shell';
+import { audioStatus, nowPlaying, type MediaInfo } from './app/stores';
 import { initRenderer } from './engine/renderer';
 import {
   getCurrentDevice,
@@ -17,7 +23,11 @@ import {
   setDevice,
 } from './ipc/audio-device';
 import { createSettingsSaver, loadSettings, type PersistedSettings } from './ipc/settings';
-import { initFullscreen } from './ui/fullscreen';
+import { checkForUpdate, installUpdate } from './ipc/updater';
+import { toast } from './ui/ds/components';
+import { gpuReason, showGpuFallback } from './ui/screens/gpu';
+
+declare const __APP_VERSION__: string;
 
 /** Min logical-px overlap between window and a monitor we'll accept. */
 const MIN_VISIBLE_PX = 100;
@@ -263,42 +273,32 @@ async function main(): Promise<void> {
   await applyInitialWindowState(settings);
 
   // ── Apply the persisted audio device preference before anything else so
-  //    the backend's first capture lands on the right device. The pipeline
-  //    polls preference each tick, so this just needs to fire once. ──
+  //    the backend's first capture lands on the right device (by endpoint id,
+  //    falling back to the saved name for settings from before v6). ──
   if (settings.audioDevice && settings.audioDevice !== 'default') {
-    void setDevice(settings.audioDevice);
+    void setDevice(settings.audioDevice, settings.audioDeviceName);
   }
 
-  const renderer = initRenderer(canvas, { initialStyle: settings.mode });
+  let renderer: ReturnType<typeof initRenderer>;
+  try {
+    renderer = initRenderer(canvas, { initialStyle: settings.mode, autoStart: false });
+  } catch (err) {
+    showGpuFallback(gpuReason(err), String(err));
+    return;
+  }
 
-  await initFullscreen({
-    initialFullscreen: settings.fullscreen,
-    onChange: (fs) => {
-      settings.fullscreen = fs;
-      persist();
-    },
-  });
+  const controller = initController({ renderer, settings, persist });
+  const platform = await desktopPlatform(settings, persist);
 
   // The backend takes a moment to start its first capture; an empty name is
   // filled in by the device-changed event.
-  const [audioDevices, currentDevice] = await Promise.all([listDevices(), getCurrentDevice()]);
+  const current = await getCurrentDevice();
+  audioStatus.patch({ device: current.name, pinned: current.pinned });
+  void onDeviceChanged((name) => audioStatus.patch({ device: name }));
 
-  const controller = initController({
-    renderer,
-    settings,
-    persist,
-    audio: {
-      devices: audioDevices,
-      currentName: currentDevice.name,
-      onChange: (id) => { void setDevice(id); },
-    },
-  });
-
-  // Re-fetch the list on every change: plug/unplug is usually the cause.
-  void onDeviceChanged(async (name) => {
-    controller.syncAudio(null, name);
-    controller.syncAudio(await listDevices(), null);
-  });
+  // ── Now playing (Windows media session) ──
+  void listen<MediaInfo | null>('media-session', (e) => nowPlaying.set(e.payload));
+  void invoke<MediaInfo | null>('get_media_session').then((m) => nowPlaying.set(m)).catch(() => undefined);
 
   // ── Window resize / move persistence ──
   watchWindowState((sz, pos) => {
@@ -315,6 +315,87 @@ async function main(): Promise<void> {
   const source = new TauriFrameSource();
   source.subscribe((frame) => controller.onFrame(frame));
   await source.start();
+
+  await initShell(controller, platform);
+
+  // ── Updates: a quiet notice with one-click install ──
+  if (settings.checkUpdates) {
+    window.setTimeout(() => {
+      void checkForUpdate().then((v) => {
+        if (!v) return;
+        toast(`sonora ${v} is available`, {
+          ms: 0,
+          action: { label: 'Install', onClick: () => { toast('downloading the update…', { ms: 0 }); void installUpdate(); } },
+        });
+      });
+    }, 6000);
+  }
+}
+
+/** The desktop side of the Platform interface (Tauri window, tray, media keys). */
+async function desktopPlatform(settings: PersistedSettings, persist: () => void): Promise<Platform> {
+  const win = getCurrentWindow();
+  let fs = false;
+  const listeners: ((fs: boolean) => void)[] = [];
+  const setFs = (v: boolean): void => {
+    if (v === fs) return;
+    fs = v;
+    settings.fullscreen = v;
+    persist();
+    for (const l of listeners) l(v);
+  };
+  try { fs = await win.isFullscreen(); } catch { fs = false; }
+  void win.onResized(async () => { try { setFs(await win.isFullscreen()); } catch { /* ignore */ } });
+
+  /** Fullscreen on the chosen display: move the window there first. */
+  async function enterFullscreen(): Promise<void> {
+    const want = settings.fullscreenMonitor;
+    if (want) {
+      try {
+        const mons = await availableMonitors();
+        const m = mons.find((x) => x.name === want);
+        if (m) {
+          const r = monitorRect(m);
+          await win.setPosition(new LogicalPosition(Math.round(r.x + 40), Math.round(r.y + 40)));
+        }
+      } catch { /* fall through: fullscreen where the window is */ }
+    }
+    await win.setFullscreen(true);
+    setFs(true);
+  }
+  async function toggle(): Promise<void> {
+    try {
+      if (fs) { await win.setFullscreen(false); setFs(false); } else await enterFullscreen();
+    } catch (err) { console.warn('Fullscreen toggle failed:', err); }
+  }
+  if (settings.fullscreen && !fs) void enterFullscreen();
+
+  const trayListeners: ((a: string) => void)[] = [];
+  void listen<string>('tray', (e) => {
+    if (e.payload === 'fullscreen') void toggle();
+    for (const l of trayListeners) l(e.payload);
+  });
+
+  return {
+    kind: 'desktop',
+    version: __APP_VERSION__,
+    listDevices,
+    setDevice: (id, name) => { void setDevice(id, name); },
+    toggleFullscreen: () => { void toggle(); },
+    isFullscreen: () => fs,
+    onFullscreenChange: (cb) => { listeners.push(cb); cb(fs); },
+    async listMonitors() {
+      try {
+        const mons = await availableMonitors();
+        return mons.map((m, i) => ({ name: m.name ?? `display-${i}`, label: `${m.name ?? `Display ${i + 1}`} · ${m.size.width}×${m.size.height}` }));
+      } catch { return []; }
+    },
+    mediaControl: (a: MediaAction) => { void invoke('media_control', { action: a }).catch(() => undefined); },
+    checkForUpdate,
+    installUpdate,
+    onTray: (cb) => { trayListeners.push(cb); },
+    setTraySetMode: (on) => { void invoke('set_tray_set_mode', { on }).catch(() => undefined); },
+  };
 }
 
 document.addEventListener('DOMContentLoaded', () => {
