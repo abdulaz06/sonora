@@ -54,3 +54,6 @@ verify/
 # Large media (reference reels stay local)
 *.mp4
 *.mov
+
+# Media masters and loop frames (npm run media); shipped assets are in src/assets/media/
+/media/
