@@ -35,7 +35,7 @@ export const PLAN = [
   look('ink-sumi', { style: 'ink', look: 'sumi', depth: true, track: H, candidates: [30, 44, 50, 54, 58, 64, 70, 76], pick: 54 }),
   look('wisp-ground', { style: 'wisp', look: 'ground', depth: true, track: H, candidates: [30, 44, 50, 54, 58, 64, 70, 76], pick: 54, palette: 2 }),
   look('wisp-tunnel', { style: 'wisp', look: 'tunnel', depth: true, track: H, candidates: [30, 44, 50, 54, 58, 64, 70, 76], pick: 50, palette: 3 }),
-  look('voyage-void', { loop: 3.5, style: 'voyage', look: 'void', track: H, candidates: [86, 88, 90, 92, 94, 96, 98, 100], pick: 95.5 }),
+  look('voyage-void', { loop: 2.5, style: 'voyage', look: 'void', track: H, candidates: [95, 96, 97, 97.5, 98, 98.5], pick: 96 }),
   look('voyage-city', { loop: 3.5, style: 'voyage', look: 'city', track: H, candidates: [86, 88, 90, 92, 94, 96, 98, 100], pick: 94, palette: 5 }),
   look('voyage-ocean', { loop: 3.5, style: 'voyage', look: 'ocean', track: H, candidates: [86, 88, 90, 92, 94, 96, 98, 100], pick: 95 }),
 

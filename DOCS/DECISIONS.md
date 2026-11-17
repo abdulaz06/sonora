@@ -168,3 +168,36 @@ Every style keeps its own palette, custom hue, colour drift and drift speed, res
 ## D49 — Wisp Depth: flames stay in view, embers react
 Flames that leave the screen (or drift past 1.6 orbit radii) turn hard for home and speed up; past 3 radii they are pulled straight back. Embers each drift on their own phase of the field with their own heading (no shared pattern), are dragged along and spun around the flames' paths, ride bass smoke rings outward and stir on kicks. Depth's drop flare and ring smoke are gentler (near the camera they blew out).
 
+
+## D50 — Home menu is the front door; the engine pauses there
+Every launch opens on a home menu ("Open straight into my last visual" is a setting, off by default). The menu shows only pre-rendered media: the render loop is stopped (`renderer.stop()`) and analysis keeps running so meters stay live. Choosing a style expands its thumbnail to full screen and dissolves into the live render, which starts underneath. Esc or Menu returns. Five style cards form a film strip: the focused card opens wide and plays its loop; captions sit below the pictures (no text over imagery, no gradient scrims).
+
+## D51 — Design system
+Tokens, components and one motion family (expo-out / quint in-out, 140–1100 ms, reduced motion respected) live in `src/ui/ds/`. Fonts are bundled: Inter variable with its optical-size axis (opsz 32 is Inter Display, used for headlines) and IBM Plex Mono 400/500/600, OFL licences beside the files. Components return plain elements; screens are in `src/ui/screens/`. The controller became UI-free: screens call its setters and subscribe to changes.
+
+## D52 — Media pipeline
+`npm run media` renders every thumbnail and loop from the engine in audio time (harness, real GPU), from a plan in `scripts/media-plan.mjs` with candidate times, a curated pick and loop length. Masters and frames go to the git-ignored `media/`; shipped: WebP stills (1280/640, palettes 480) and VP9 WebM loops (960×540, 30 fps, seamless by blending the frames after the end over the start, capped at ~1.35 MB) in `src/assets/media/` with `manifest.json` (source track, time, palette, camera per asset) for reuse by the landing page. Voyage look thumbnails are the natural breakdown vistas (Void: the fractal in the stars, City: the curved world and hanging city, Ocean: the swells), so no engine change was needed. Shipped total 12.7 MB. While UI work is in progress the pipeline runs from a git worktree pinned to the engine commit (the harness server now also runs without file watching / HMR).
+
+## D53 — Settings v6, first run
+v6 adds open-last-visual, onboarded, launches, now playing (show, corner, controls), Set Mode (on, include list, minimum interval, palettes), fullscreen display, update checks and the pinned device's display name. Saves from before v6 count as onboarded (they have used Sonora) and keep every per-style value; "Show the intro again" is in Settings › System.
+
+## D54 — Set Mode
+Switches on `trackChange` (crossfade) and, with 60% chance, on a drop that follows a build of 8 s or more (hard cut on the drop frame through `renderer.requestFlash()`, crossfade if refused); a breakdown also switches after three intervals without one (continuous mixes). Never sooner than the minimum interval (default 2 min). Choice: a 20 s rolling picture of intensity, four-on-the-floor, beat confidence, ambient-free rhythm and BPM gives an energy 0–1, matched against each piece's place on the calm→driving scale with a Gaussian weight and random jitter; the last three picks and the current piece are excluded. Ink's view leans Depth with energy. `renderer.transition()` applies style, look and view together at the swap.
+
+## D55 — Now playing
+Rust polls the Windows media session (GSMTC) every 500 ms on its own thread and emits `media-session` only when something changes; the cover is read only when the track changes (data URL, ≤1.5 MB). Polling instead of WinRT event handlers keeps it simple and robust when players come and go. A real track change calls `events.notifyTrackChange` (the first session seen at startup does not); the silence-gap detector stays as the fallback.
+
+## D56 — Devices pinned by endpoint id
+The device list comes from the Windows device API (endpoint id + friendly name). A pin stores both; the pipeline resolves the id to the current name to open it with cpal, falling back to the saved name (pre-v6 settings, or an id that changed).
+
+## D57 — Security
+Strict CSP (self only; inline styles allowed for the runtime-built UI; data:/blob: images for covers; IPC). The opener plugin is gone; the capability lists only the window, event, updater and restart permissions the app calls.
+
+## D58 — Updates and releases
+`tauri-plugin-updater` reads `latest.json` from the latest GitHub Release; artifacts are signed with a key held in GitHub Actions secrets (and locally in `~/.tauri/`, never in the repo). A `v*` tag builds NSIS + MSI on windows-latest with tauri-action and publishes the Release with notes from `DOCS/release-notes/`. Installers stay unsigned (SmartScreen: More info → Run anyway).
+
+## D59 — Shortcuts
+Consolidated in the shell: F / F11 fullscreen, Esc back (clean mode → fullscreen → menu), H clean, M Set Mode, S next style, V next look (Wisp: Flat → Ground → Tunnel; styles without looks toggle the view), 1–9 palettes (0 = tenth), D signals, C camera preset. Arrow keys move focus spatially on the menu and detail (gamepad style).
+
+## D60 — Tagline
+"see your music" (was "see the music"). Used on About and the first intro screen only, not on the home menu.

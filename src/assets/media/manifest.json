@@ -1645,10 +1645,10 @@
     "640": "voyage-void-640.webp"
    },
    "loop": "voyage-void.webm",
-   "loopSeconds": 3.5,
+   "loopSeconds": 2.5,
    "source": {
     "track": "house-124",
-    "time": 95.5,
+    "time": 96,
     "palette": 0,
     "light": "auto",
     "camera": null,

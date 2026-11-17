@@ -92,7 +92,15 @@ async function candidates(browser) {
 async function render(browser) {
   for (const e of entries) {
     const page = await openPage(browser, e);
-    const now = await seek(page, 0, e.pick, e.warmup);
+    // Replay the contact sheet's path exactly (Voyage's flight depends on where
+    // rendering starts): candidates[0] after its warm-up, then continuously
+    // through each candidate up to the pick.
+    let now = 0;
+    for (const t of e.candidates) {
+      if (t > e.pick) break;
+      now = await seek(page, now, t, e.warmup);
+    }
+    now = await seek(page, now, e.pick, e.warmup);
     save(join(MEDIA, 'masters', `${e.name}.png`), await grab(page, 1920, 1080, 'image/png', 1, e.crop ?? 1));
     if (e.loop > 0) {
       const dir = join(MEDIA, 'frames', e.name);
