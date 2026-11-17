@@ -45,7 +45,7 @@ export function runOnboarding(platform: 'desktop' | 'web', on: OnboardingHandler
     if (step === 0) {
       setStage('ink', 'ink · glow');
       body.replaceChildren(
-        h('span', { class: 's-label' }, 'sonora'),
+        h('span', { class: 's-label' }, 'see your music'),
         h('h1', { class: 's-h1' }, 'a visual instrument for whatever’s playing.'),
         h('p', { class: 's-body' }, 'sonora listens to the music on your PC and turns it into moving pictures, in time with every beat. nothing to set up, no account, and no sound ever leaves your computer.'));
       foot.replaceChildren(steps, button('Begin', { variant: 'primary', iconAfter: 'arrowRight', onClick: next }));

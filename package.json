@@ -14,7 +14,10 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "events": "esbuild scripts/event-report.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/event-report.mjs --log-level=warning && node node_modules/.cache/event-report.mjs",
-    "media": "node scripts/media.mjs"
+    "media": "node scripts/media.mjs",
+    "test": "vitest run",
+    "test:smoke": "node scripts/smoke.mjs",
+    "ui:shots": "node scripts/ui-shots.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "~2.12",
@@ -26,6 +29,7 @@
     "ffmpeg-static": "^5.3.0",
     "playwright": "^1.65.0",
     "typescript": "~5.6.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^3.2.7"
   }
 }

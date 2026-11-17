@@ -32,4 +32,4 @@
 - Never: glow, gradients, drop shadows, outlines, rotating the glint, recolouring outside Night/Bone, stretching.
 - Motion: the glint can animate as a brand moment (lines extend from the dot on launch/loading, pulse on a drop in Set Mode). Keep it under 1 s and ease-out.
 - Layout: lots of black space, thin 1 px Bone/12% dividers, square corners (icons excepted), hard grid. UI chrome hides itself; the visuals fill the screen.
-- Voice: few words, lowercase confidence, no exclamation marks, no "AI-powered" or "ultimate" language. e.g. "sonora — see the music." / "a visual instrument for whatever's playing."
+- Voice: few words, lowercase confidence, no exclamation marks, no "AI-powered" or "ultimate" language. e.g. "sonora — see your music." / "a visual instrument for whatever's playing."

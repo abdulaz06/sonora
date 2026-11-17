@@ -289,6 +289,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
 
     const keys = section('keys', 'keys', null, keyList([...SHORTCUTS, [['C'], 'Next camera preset (Depth)']]));
     const about = section('about', 'about', null, h('div', { class: 'st-about' }, lockup(),
+      h('p', { class: 's-h3', style: { margin: '0' } }, 'see your music.'),
       h('p', { class: 's-small', style: { margin: '0' } }, `version ${platform.version}. a visual instrument for whatever’s playing.`),
       h('p', { class: 's-small', style: { margin: '0' } }, 'sonora analyses sound on your computer only. no audio, song or usage data ever leaves it.'),
       h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license')));
