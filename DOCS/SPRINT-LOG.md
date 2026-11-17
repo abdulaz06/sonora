@@ -1,3 +1,77 @@
+# Prompt 3: the product (menu, onboarding, UI, Set Mode, now playing) → v1.0.0
+
+> Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
+
+## Checklist
+
+### 0. Ground rules
+- [x] 0.1 Caught up (CLAUDE.md, sprint log, decisions, DOCS/16, brand, registry, UI, controller, settings, scripts); commit attribution disabled in `.claude/settings.json`
+
+### 1. Design system
+- [ ] 1.1 Fonts bundled locally (Inter, Inter Display, IBM Plex Mono) with OFL licences
+- [ ] 1.2 Tokens (colour, type, spacing, motion) + components: button, segmented, slider, toggle, select, card, thumbnail card, sheet, toast, kbd hint, info (i)
+- [ ] 1.3 Motion language (one easing family, reduced motion)
+- [ ] 1.4 UI kit page (`kit.html`), screenshot-reviewed at 1920×1080 / 1366×768 / 2560×1440
+
+### 2. Media
+- [ ] 2.1 `npm run media` pipeline (masters in git-ignored `media/`, shipped WebP 1280/640 + WebM loops in `public/media/`, manifest)
+- [ ] 2.2 Candidates rendered, contact sheets reviewed, picks curated (styles, looks, views, classic)
+- [ ] 2.3 Voyage hero (inside the fractal) + vistas per backdrop (Void / City / Ocean)
+- [ ] 2.4 Settings explainer media (responsiveness, quality, light/dark, camera presets)
+- [ ] 2.5 Budget checked (≤ 25 MB) and logged
+
+### 3. Home menu
+- [ ] 3.1 Launch moment (glint lines extend, lockup settles; skippable, shorter on later launches)
+- [ ] 3.2 Style cards (hero), classic row, hover loops
+- [ ] 3.3 Style detail (big preview, looks, views, Start)
+- [ ] 3.4 Resume, Set Mode card, audio status (device, live meter, guidance), settings/about/shortcuts
+- [ ] 3.5 Expand-into-visual transition; Esc/Menu back; keyboard + arrow navigation
+- [ ] 3.6 Engine paused on the menu (no rAF), analysis keeps running; "Open straight into my last visual" setting
+
+### 4. First run
+- [ ] 4.1 Onboarding (what it is / audio check / styles-looks-views / shortcuts), skippable, first launch only
+
+### 5. Visuals screen and settings
+- [ ] 5.1 Auto-hiding in-visual bar (menu, quick switcher, Set Mode, fullscreen, settings); H clean; D debug
+- [ ] 5.2 Settings rebuilt: sections, (i) cards with copy + media where useful, palette swatches on a thumbnail, per-style vs global labels
+- [ ] 5.3 Settings v6 migration + test (keeps every per-style value)
+
+### 6. Now playing
+- [ ] 6.1 Rust GSMTC reader (title/artist/album/art/state, change events) + transport controls
+- [ ] 6.2 Overlay (settings: on/off, position) + menu display
+- [ ] 6.3 `trackChange` from real media info (gap detection fallback)
+
+### 7. Set Mode
+- [ ] 7.1 Autopilot: switches on trackChange / long-build drops, min interval, music-suited choice, no repeats, hard cut on the drop beat or crossfade, flash-guarded
+- [ ] 7.2 Settings (include list with thumbnails, interval, palettes), menu card, in-visual button, M key, tray item, corner label
+
+### 8. Brand and hardening
+- [ ] 8.1 Icons (tauri icon + hand-tuned .ico), window title "sonora", tray 32 px
+- [ ] 8.2 Tray: Show, Menu, Set Mode, Fullscreen, Quit
+- [ ] 8.3 Multi-monitor fullscreen display choice (remembered)
+- [ ] 8.4 Strict CSP; opener removed; minimal capabilities
+- [ ] 8.5 Output devices pinned by endpoint ID (name fallback)
+- [ ] 8.6 GPU fallback message
+- [ ] 8.7 Shortcuts consolidated (F/F11, Esc, H, M, S, V, 1–9, D) and listed
+- [ ] 8.8 Regression checks (device switching, capture recovery, off-screen net, persistence, fps cap, quality presets)
+- [ ] 8.9 Engine gates re-run: verify-art, flicker-art, perf-art, sync — unchanged
+
+### 9. Updater, CI, tests
+- [ ] 9.1 tauri-plugin-updater + signing keys (secrets) + in-app update notice
+- [ ] 9.2 CI workflow (typecheck, clippy, cargo test, build, migration tests)
+- [ ] 9.3 Release workflow (v* tag → NSIS + MSI, signed updater artifacts, latest.json, Release)
+- [ ] 9.4 Tests: DSP synthetic, event layer on generated tracks, settings v1→v6, Playwright smoke (menu → detail → visual → menu)
+
+### 10. README and release
+- [ ] 10.1 README rewritten (portfolio grade)
+- [ ] 10.2 Version 1.0.0, tag, Release with both installers + latest.json
+- [ ] 10.3 Installed NSIS build smoke-tested
+- [ ] 10.4 Summary at the top of this log
+
+## Notes (Prompt 3)
+
+---
+
 # Feedback round 7 — done (awaiting review)
 
 Notes: Ink still did not hit like v0.1: the background "wave" movement constantly moves and pushes hits away; shapes were blobs; Sumi lost its black-on-bone look and flickered; Marble's hits teleported. Abdul recorded current Ink on the same song as his v0.1 clip. Also: Silk's Planet preset; settings per style with an option to share colours; Wisp Depth flames going off screen; embers not reactive and always the same pattern.
