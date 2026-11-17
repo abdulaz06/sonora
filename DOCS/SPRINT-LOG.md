@@ -53,8 +53,8 @@
 - [x] 8.5 Output devices pinned by endpoint ID (name fallback)
 - [x] 8.6 GPU fallback message
 - [x] 8.7 Shortcuts consolidated (F/F11, Esc, H, M, S, V, 1–9, D) and listed
-- [ ] 8.8 Regression checks (device switching, capture recovery, off-screen net, persistence, fps cap, quality presets)
-- [ ] 8.9 Engine gates re-run: verify-art, flicker-art, perf-art, sync — unchanged
+- [x] 8.8 Regression checks (device switching, capture recovery, off-screen net, persistence, fps cap, quality presets)
+- [x] 8.9 Engine gates re-run: verify-art, flicker-art, perf-art, sync — unchanged
 
 ### 9. Updater, CI, tests
 - [x] 9.1 tauri-plugin-updater + signing keys (secrets) + in-app update notice
@@ -76,6 +76,8 @@
 - Tests: `cargo test` (DSP synthetic: silence, bands, 124 BPM kick train, loudness), `npm test` 13 tests (settings v1→v6, Set Mode, events on generated tracks), `npm run test:smoke` 14 checks pass.
 - Updater keys: generated with the Tauri CLI, private key + password in `~/.tauri/` and in Actions secrets `TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)`; public key in tauri.conf.json.
 - Tagline changed mid-run to "see your music" (D60): About, first intro screen, README, brand doc.
+- Engine gates re-run after all engine-side changes (transition(), requestFlash(), float-target check): sync house-124 Ink Glow/Marble 100%, Sumi 96% regional, Silk 91%, Wisp Ground/Tunnel, Warp, Voyage 100%; flicker on dense-128 (palette 0, resp 0.6 and 1) swings 0.5–2.42/s, blown-out ≤ 4%; perf 1.05–3.41 ms (Low/Medium). Two one-frame steps sit at/over 0.12 (Ink Glow 0.121, Silk 0.76 = its flash-guarded drop inversion): the pre-Prompt-3 engine (8bddd7a, worktree) measures exactly the same, so nothing moved.
+- Regressions: default-device capture, persistence (v6), fps cap and quality presets checked in the release build; capture recovery, device auto-switch and the off-screen safety net are untouched code paths (no physical plug/unplug test).
 - No LICENSE file exists in the repo (left alone as asked).
 
 ---

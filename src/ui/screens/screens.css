@@ -280,3 +280,7 @@ body.sonora-idle .sm-label { opacity: 0.45; }
   .scard .cap { height: 124px; padding-top: 12px; padding-bottom: 12px; }
   .scard .suits { display: none; }
 }
+/* Collapsed cards: the hidden description takes no space, so names share a baseline. */
+.scard:not(.is-open) .detail { position: absolute; visibility: hidden; }
+.scard .cap { justify-content: flex-start; gap: clamp(8px, 1.3vh, 16px); }
+.scard .cap-bottom { align-items: flex-start; }
