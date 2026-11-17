@@ -1,3 +1,34 @@
+# Prompt 3 summary — sonora 1.0.0 shipped
+
+**Release:** https://github.com/abdulaz06/sonora/releases/tag/v1.0.0 (NSIS + MSI, signed updater artifacts, `latest.json`). CI and release workflows green.
+
+**What shipped**
+- Home menu as the front door: film-strip style cards with hover loops, style detail (big preview, looks and views as labelled thumbnails, Start), Continue, Set Mode card, live audio status with plain guidance, now playing, and the thumbnail-expands-into-the-visual transition. The engine stops rendering on the menu; analysis keeps meters live.
+- First run (once): what sonora is, an audio check with a "got it" moment and troubleshooting, style / look / view / palette defined, the keys that matter.
+- In-visual bar that hides itself (Menu, quick switcher with look / view / palette thumbnails, Set Mode, palette, fullscreen, settings); H clean mode; D signals.
+- Settings rebuilt: sections, every control with an (i) card (pictures or loops for Responsiveness, Depth vs Flat, camera presets, Light/Dark, Quality), palettes shown on the current style, per-style vs global labelled. Settings v6 with migration tests.
+- Set Mode (autopilot), now playing from the Windows media session (overlay, controls, real `trackChange`), tray (Show, Menu, Set Mode, Fullscreen, Quit), fullscreen display choice, devices pinned by endpoint id, strict CSP and minimal capabilities, GPU fallback screen, brand icons, updater with a one-click notice.
+- Design system with bundled fonts and a UI kit (`kit.html`); media pipeline `npm run media` (13.3 MB shipped, manifest for the landing page).
+- Tests: DSP on synthetic signals (cargo), settings v1 to v6, Set Mode, event layer on generated tracks (vitest), Playwright smoke test. README rewritten. Decisions D50–D60.
+
+**Screenshots:** `verify/ui/` (`npm run ui:shots`, 17 states at 3 sizes); media contact sheets in `media/sheets/`.
+
+**Try first:** install from the release, let the intro run with music playing; on the menu hover each card, open Voyage and compare Void / City / Ocean, press Start; in the visual press M (Set Mode) and leave it running through a few tracks in Spotify (watch the song card on each change).
+
+**By hand**
+- Install the published NSIS build (it asks for admin, which this session can't approve) and give it a quick run. The update notice can only be seen once a newer release exists.
+- Sonora 0.1.0 is still installed in Program Files; the 1.0 installer installs into the same folder.
+- Decide on a LICENSE (none in the repo).
+- Back up the updater signing key and password in `~/.tauri/` (also in the repo's Actions secrets): losing them means installed copies can't update.
+
+**Known issues**
+- Ink Glow's largest one-frame luminance step on dense-128 is 0.121 (gate 0.12) and Silk's drop inversion cut is 0.76. Both are identical on the engine from before this sprint (measured), so not regressions, but Ink Glow sits on the gate's edge.
+- Now playing was not seen live (no media session was open during the desktop check); the reader builds clean and is covered by review only.
+- Physical device plug/unplug and multi-monitor fullscreen weren't testable here (one display).
+- `C:/Users/abdul/sonora-media` is a git worktree pinned to the pre-UI engine, used for media renders; remove it with `git worktree remove C:/Users/abdul/sonora-media` when no longer needed.
+
+---
+
 # Prompt 3: the product (menu, onboarding, UI, Set Mode, now playing) → v1.0.0
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
@@ -64,9 +95,9 @@
 
 ### 10. README and release
 - [x] 10.1 README rewritten (portfolio grade)
-- [ ] 10.2 Version 1.0.0, tag, Release with both installers + latest.json
-- [ ] 10.3 Installed NSIS build smoke-tested
-- [ ] 10.4 Summary at the top of this log
+- [x] 10.2 Version 1.0.0, tag, Release with both installers + latest.json
+- [ ] 10.3 Installed NSIS build smoke-tested (needs you: the per-machine installer asks for admin, which this session cannot approve; the same commit's release build was smoke-tested by hand, and the published installer was downloaded and its signing key checked)
+- [x] 10.4 Summary at the top of this log
 
 ## Notes (Prompt 3)
 - Design system in `src/ui/ds/`, screens in `src/ui/screens/`, shell in `src/app/shell.ts` (D50, D51). Fonts bundled (Inter variable with opsz = Inter Display, IBM Plex Mono). UI kit: `kit.html`.
