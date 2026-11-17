@@ -22,7 +22,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 5199;
 const MEDIA = process.env.SONORA_MEDIA_DIR || join(ROOT, 'media');
 const FPS = 30;
-const LOOP_W = 960, LOOP_H = 540;
+const LOOP_W = 1024, LOOP_H = 576;
 /** Extra seconds rendered after a loop and blended over its start (seamless). */
 const SEAM_S = 0.6;
 

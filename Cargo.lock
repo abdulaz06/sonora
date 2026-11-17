@@ -3413,7 +3413,7 @@ dependencies = [
 
 [[package]]
 name = "sonora"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "cpal",
@@ -3430,7 +3430,7 @@ dependencies = [
 
 [[package]]
 name = "sonora-dsp"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "rustfft",
  "serde",
@@ -3439,7 +3439,7 @@ dependencies = [
 
 [[package]]
 name = "sonora-dsp-wasm"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "serde_json",
  "sonora-dsp",

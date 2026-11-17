@@ -21,7 +21,7 @@ FFMPEG = os.path.join(ROOT, "node_modules", "ffmpeg-static", "ffmpeg.exe" if os.
 FPS = 30
 SEAM_S = 0.6
 LOOP_CRF = 38
-LOOP_W = 960
+LOOP_W, LOOP_H = 1024, 576
 LOOP_MAX_BYTES = 1_350_000
 
 
@@ -64,8 +64,9 @@ def encode_loop(name, e):
     n = len(files) - seam
     if n <= seam:
         raise SystemExit(f"{name}: not enough loop frames")
-    width = min(LOOP_W, max(e["sizes"]) if e["kind"] == "explain" else LOOP_W)
-    height = width * 9 // 16
+    # Both sides multiples of 16: some hardware VP9 decoders show their
+    # padding rows (a green stripe) on 960x540.
+    width, height = (768, 432) if e["kind"] == "explain" else (LOOP_W, LOOP_H)
     with tempfile.TemporaryDirectory() as tmp:
         for i in range(n):
             im = Image.open(os.path.join(d, files[i])).convert("RGB")

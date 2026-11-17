@@ -1,111 +1,114 @@
-# sonora
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="DOCS/brand/sonora-lockup-bone.svg">
+    <img src="DOCS/brand/sonora-lockup-night.svg" alt="sonora" width="360">
+  </picture>
+</p>
 
-A visual instrument for whatever's playing. Sonora listens to your system audio on Windows and paints it, live, in styles built to look like art rather than a spectrum analyser.
-
-Built with Rust, TypeScript, raw WebGL 2 and Tauri 2.
+<p align="center"><strong>see your music.</strong><br>a visual instrument for whatever’s playing — a Windows music visualizer that listens to your PC and paints it, live, in time with every beat.</p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI" title="Watch Sonora — Flow Ink with sound">
-    <img src="DOCS/assets/flow-ink-thumbnail.png" alt="Sonora Flow Ink audio-reactive visualization — click to watch the demo" width="900" />
-  </a>
+  <a href="https://github.com/abdulaz06/sonora/releases/latest"><img alt="Download the latest release for Windows" src="https://img.shields.io/github/v/release/abdulaz06/sonora?label=download%20for%20windows&style=for-the-badge&color=ECE7DF&labelColor=08080A"></a>
 </p>
-<p align="center"><a href="https://www.youtube.com/watch?v=kDKyOMpcxeI"><strong>▶ Flow Ink (v0.1) with sound</strong></a></p>
+<p align="center"><sub>website: <em>coming soon</em> · demo: <em>new 1.0 demo coming soon</em> · <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI">early version (v0.1) demo</a></sub></p>
+
+<p align="center"><img src="src/assets/media/ink-1280.webp" alt="Ink, glowing liquid ink on a 3D surface" width="900"></p>
 
 ## Styles
 
-- **Ink** (flagship): ink carried by a smooth, slowly changing current, the motion of the original Flow Ink that felt locked to the beat. Every kick drops a big soft glow of ink near the centre that sinks into broad sheets and curls; calm parts stay calm, so hits stand out. Mids and highs add smaller drops. **Depth** (default) turns the ink into a lit surface with a gliding camera (presets Glide, Horizon, Planet, Valley, Overhead; height, tilt and planet/bowl curvature); **Flat** looks straight down, with its own Zoom. Looks: **Glow**, **Marble** (two-tone marbling), **Sumi** (black ink on paper).
-- **Silk**: millions of particles drawn into flowing threads that light up on every kick; builds gather the threads into a knot and the drop bursts them into a starburst. **Flat** (default) is a canvas; **Depth** lifts the threads into ribbons floating and dipping over the ground under the gliding camera.
-- **Wisp**: three coloured flames darting through the dark, trailing smoke; bass hits blow smoke rings. **Flat** (default) or **Depth** with two looks: **Ground** (the flames light a dark plain beneath them like lanterns, embers float around you) and **Tunnel** (a chase camera rides behind the flames down an endless, winding tunnel of smoke and embers; beats send rings of light down it).
-- **Warp**: hyperspace streaks whose speed follows the song: slow motion in breakdowns and quiet intros, regular pace with the beat, accelerating through builds, jumping at the drop.
-- **Voyage**: a flight through a raymarched 3D fractal that breathes and twists on the beat, with three backdrops: **Void** (a dark, star-filled sky in your colours), **City** (a curved world of fields, rivers, mountains and cities that rises around the fractal and hangs overhead) and **Ocean** (a curved sea of huge rolling swells). Calm moments fly out for wide shots; the camera returns as the music picks up, and the drop dives back in with a barrel roll.
+Five art styles, each with its own looks and views. Every frame below is a real render from the engine.
 
-Every style keeps its own settings (colours, colour drift, responsiveness, camera, Flat zoom); tick **Same colours for every style** to share colours. Responsiveness (Smooth → Punchy) changes how hard things move, never how much they flash; brightness stays steady and every deliberate flash goes through a limiter (at most three per second). Frame rate is capped at 60 by default (30 – 144 or max in Settings).
+| | | |
+|---|---|---|
+| <img src="src/assets/media/ink-glow-640.webp" alt="Ink Glow"><br>**Ink** · Glow — liquid ink that blooms on every kick | <img src="src/assets/media/ink-marble-640.webp" alt="Ink Marble"><br>**Ink** · Marble — two-tone marbling | <img src="src/assets/media/ink-sumi-640.webp" alt="Ink Sumi"><br>**Ink** · Sumi — black ink on bone paper |
+| <img src="src/assets/media/silk-640.webp" alt="Silk"><br>**Silk** — millions of points of light pulled into threads | <img src="src/assets/media/wisp-640.webp" alt="Wisp"><br>**Wisp** — three flames shedding smoke rings on the bass | <img src="src/assets/media/wisp-tunnel-640.webp" alt="Wisp Tunnel"><br>**Wisp** · Tunnel — chase the flames down an endless tunnel |
+| <img src="src/assets/media/warp-640.webp" alt="Warp"><br>**Warp** — hyperspace that follows the song’s pace | <img src="src/assets/media/voyage-640.webp" alt="Voyage"><br>**Voyage** — a flight through a 3D fractal | <img src="src/assets/media/voyage-city-640.webp" alt="Voyage City"><br>**Voyage** · City — a curved world wraps around it |
 
-Aura and Halo from v0.1 remain available under **Show classic styles** in settings.
+Looks: Ink (Glow, Marble, Sumi), Wisp Depth (Ground, Tunnel), Voyage (Void, City, Ocean). Views: **Depth** (a 3D camera that glides, banks on beats and lurches on drops) or **Flat** (a 2D canvas) for Ink, Silk and Wisp. Aura and Halo from v0.1 live under *Show classic styles*.
+
+## What’s new in 1.0
+
+- **A home menu.** Every launch opens on a menu of the five styles; hover one to watch it move, open it to compare looks and views side by side, and press Start: the thumbnail grows into the live visual. Continue picks up where you left off.
+- **First run.** A short intro explains what sonora is, checks that it can hear your music (with plain advice if it can’t) and defines the four words you need: style, look, view, palette.
+- **Set Mode.** Let sonora choose, like a VJ: it switches style, look and view when the track changes, or on a big drop after a long build, picking calm visuals for calm music and driving ones for four-on-the-floor. Never more often than you allow.
+- **Now playing.** The song, artist and cover from Spotify, browsers or any player that reports to Windows, shown for a few seconds when the track changes, with previous / play / next. Real track changes also tell the visuals a new song started.
+- **Settings for everyone.** Every control has an (i) card that explains it, with pictures where words aren’t enough (Smooth vs Punchy, Depth vs Flat, camera presets, quality). Palettes are shown on the current style.
+- **A proper Windows app.** Updates from GitHub with one click, a tray menu (Menu, Set Mode, Fullscreen), fullscreen on the display you choose, devices remembered by their Windows id, and a clear message instead of a black screen on graphics cards that can’t run it.
 
 ## How it works
 
 ```text
-WASAPI loopback (desktop)        Web Audio + AudioWorklet (browser)
-            \                      /
-             sonora-dsp (Rust; native or WebAssembly)
-             FFT → bands → per-band normalisation → onsets → beat/tempo
-             mapping layer: fade, intensity, presence ×7, hits ×7, 96-bin spectrum
-                          |
-                 AudioFeatureFrame, 60 per second of audio
-                          |
-   event layer (drop, build, breakdown, big hit, track change)
-                          |
-   style (world camera, palette, quality) → bloom / tonemap / grain → screen
+WASAPI loopback (desktop, Rust)         Web Audio + AudioWorklet (browser)
+                 \                        /
+        sonora-dsp — one Rust crate, native or WebAssembly
+        FFT → bands → per-band normalisation → onsets → beat / tempo
+        mapping layer: fade, intensity, presence ×7, hits ×7, spectrum
+                              |
+                AudioFeatureFrame, 60 per second of audio
+                              |
+        event layer: drop · build · breakdown · big hit · track change
+                              |
+        WebGL 2 style (world camera, palette, quality) → bloom / tonemap / grain
 ```
 
-The same analysis crate runs in the desktop app and in the browser; a parity check confirms both produce the same frames. Instrument and section labels are heuristics derived from band energy and onsets, not source separation or machine learning.
+The same analysis crate runs in the desktop app and in the browser (a parity check confirms they produce the same frames), so the renderer can be developed and verified in a plain browser. The home menu shows pre-rendered media only: the engine stops rendering while it’s open and keeps listening, so meters stay live.
 
-## Choosing what Sonora hears
+## Guarantees, enforced by a harness
 
-- **Desktop app (recommended):** listens to your speakers directly. Leave Audio on "Whatever Windows is playing on" and it follows device changes by itself: plug in headphones or 3.5 mm speakers and the visuals carry on.
-- **Browser (`npm run dev:web`):** click the source chip top-left.
-  - **Browser tab** (best): share the tab playing music with "Also share tab audio" on. Keeps working when you change speakers or headphones.
-  - **Whole computer:** Entire screen with "Also share system audio" on; hears any app, including the Spotify desktop app. Browsers keep this tied to the speakers active when you started, so after a device change Sonora shows a one-click Reconnect.
-  - **Microphone / line-in**, **audio file** (or drop one on the page), **test tracks**.
+A verification harness renders any style against generated test tracks in a real browser on the GPU, deterministically in audio time, and checks:
 
-## Controls
+- **Beat sync** — every art look visibly reacts to ≥ 90% of kicks (`--sync`, whole-screen and regional).
+- **Flicker** — fewer than 2.5 large brightness swings per second either way, no single-frame jump over 0.12, at most 6% blown out, on a loud, dense track at Punchy (`--flicker`). Every deliberate flash goes through a WCAG 2.3.1 limiter.
+- **Motion** — big shapes move, not fine shimmer: fine-detail share ≤ 45% and a steady background (`scripts/motion-check.py`).
+- **Cost** — synced frame cost per style at 1080p (1–6 ms on a laptop GPU at Medium).
+
+The same harness renders every thumbnail and preview loop in the app (`npm run media`).
+
+## Keyboard
 
 | Key | Action |
 | --- | --- |
-| `F11` / `F` | Fullscreen |
-| `H` | Clean mode (hide all UI) |
-| `D` | Debug overlay (signals, events, fps) |
+| `F` / `F11` | Fullscreen |
+| `Esc` | Back / menu |
+| `H` | Hide everything (clean mode) |
+| `M` | Set Mode on / off |
 | `S` | Next style |
-| `V` | Depth / Flat |
+| `V` | Next look (or view) |
+| `1`–`9` | Palettes |
+| `D` | Audio signals (advanced) |
 | `C` | Next camera preset (Depth) |
-| Drag / scroll | Depth: look around / change height. Flat: move / zoom (kept apart from Depth; the Zoom slider's middle is the default, double-click it to reset). Double-click the picture resets the Depth camera |
-| `1`–`0` | Palette |
-| `Esc` | Leave fullscreen / clean mode, close panels |
+| Arrows / Enter | Move around the menu |
 
-Settings (each with a one-line explanation): style and look, view, background, camera, palette (Ocean, Aurora, Ember, Neon, Crimson, Gold, Violet, four two-tone palettes, or any custom colour), colour drift (off by default), responsiveness (how hard visuals snap to each beat), quality (Low / Medium / High / Auto), audio source. The tray menu offers Show, Hide, Fullscreen and Quit.
+## Privacy
 
-Quality presets change real work, not only post effects: render resolution, simulation and ink resolution, solver iterations and mesh density. Auto watches frame time and steps down or up.
+sonora analyses sound on your computer only. No audio, song titles or usage data ever leave it. The only network request is the update check against GitHub Releases, which you can turn off in Settings › System.
+
+## Install
+
+Download the installer from [Releases](https://github.com/abdulaz06/sonora/releases/latest). The installers aren’t code-signed yet, so Windows SmartScreen may warn on first launch: choose **More info → Run anyway**.
 
 ## Build from source
 
-Windows, with:
+Windows, with Node.js 20+, stable Rust (MSVC) plus `rustup target add wasm32-unknown-unknown`, `cargo install wasm-pack`, the Microsoft C++ Build Tools and WebView2 ([Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)).
 
-- Node.js 20+ and npm
-- stable Rust (MSVC) with the WebAssembly target: `rustup target add wasm32-unknown-unknown`
-- `wasm-pack`: `cargo install wasm-pack`
-- Microsoft C++ Build Tools (Desktop development with C++), WebView2
-- the VBSCRIPT optional feature for MSI packaging
-
-See the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
-
-```powershell
-npm ci
-npm run tauri dev        # desktop app with system audio
-npm run dev:web          # renderer in a browser: test tracks, audio files, mic, tab audio
-npm run tauri build      # installers in target/release/bundle/
+```bash
+npm install
+npm run tauri dev                 # desktop app with real system audio
+npm run dev:web                   # renderer in the browser, http://localhost:5173/web.html
+npm run tauri build               # NSIS + MSI installers
+npm test                          # settings migration, Set Mode, event layer
+npm run test:smoke                # menu → detail → visual → menu in a real browser
+cargo test --workspace            # DSP on synthetic signals
+npm run verify -- --style ink --variant glow --track house-124 --sync
+npm run media                     # re-render every thumbnail and loop
 ```
 
-### Verification
+## Tech
 
-```powershell
-npm run gen:audio                                   # procedural test tracks (no copyrighted music)
-npm run check:parity -- house-124                   # desktop vs browser analysis frames
-npm run verify -- --variant sumi --track all        # screenshots at silence/fade-in/build/drop/breakdown
-npm run verify -- --sync --flat --track house-124   # beat sync: share of kicks with a visible response
-```
+Rust (cpal WASAPI loopback, a platform-free DSP crate, wasm-bindgen, the Windows media session API) · TypeScript strict · raw WebGL 2 (GPU fluids and particles, raymarching, HDR post) · Tauri 2 (updater, tray) · Playwright + system Edge for verification · Vitest.
 
-`npm run verify` renders in a real browser on the GPU, in audio time, and writes screenshots, an 8-frame strip across the drop, the detected events and frame timing to `verify/`.
+## Roadmap
 
-## Audio and privacy
-
-Audio stays in memory and is never saved or uploaded. Only derived feature frames reach the renderer. There is no telemetry or network client in the desktop app. Preferences and window state are stored locally in the app-data directory (the browser build uses localStorage).
-
-## Known limitations
-
-- Devices are pinned by display name, not a stable endpoint id.
-- Requires WebGL 2 with float render targets.
-- Tempo on half-time music may read at half the notated BPM.
-- The Tauri content security policy is unset.
-
-Deeper reading: [visual direction](DOCS/16-VISUAL-DIRECTION.md) · [mapping layer](DOCS/14-MAPPING-LAYER-SPEC.md) · [brand](DOCS/brand/17-BRAND.md) · [decisions](DOCS/DECISIONS.md).
+- Steam release
+- More styles
+- A new demo video and the website

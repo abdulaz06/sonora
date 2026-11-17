@@ -59,7 +59,7 @@ body.scr-overlay #canvas { visibility: hidden; }
 .scard .s-media > img, .scard .s-media > video { transition: transform var(--d5) var(--ease), opacity var(--d3) var(--ease), filter var(--d4) var(--ease); }
 .scard:not(.is-open) .s-media > img { filter: saturate(0.7) brightness(0.72); }
 .scard.is-open .s-media > img, .scard.is-open .s-media > video { transform: scale(1.015); }
-.scard .cap { flex: none; height: clamp(118px, 15vh, 176px); border-top: var(--line); padding: clamp(14px, 1.7vh, 22px) clamp(16px, 1.25vw, 26px); display: flex; flex-direction: column; justify-content: space-between; position: relative; }
+.scard .cap { flex: none; height: clamp(136px, 16vh, 184px); border-top: var(--line); padding: clamp(14px, 1.7vh, 22px) clamp(16px, 1.25vw, 26px); display: flex; flex-direction: column; justify-content: space-between; position: relative; }
 .scard .cap-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
 .scard .idx { font-family: var(--f-mono); font-size: var(--t-micro); letter-spacing: 0.12em; color: var(--b40); }
 .scard .heavy { font-family: var(--f-mono); font-size: var(--t-micro); letter-spacing: 0.12em; text-transform: uppercase; color: var(--b40); white-space: nowrap; opacity: 0; transition: opacity var(--d3) var(--ease); }
@@ -277,5 +277,6 @@ body.sonora-idle .sm-label { opacity: 0.45; }
 }
 @media (max-height: 820px) {
   .scr-menu .menu-head h1 { font-size: clamp(36px, 3.4vw, 64px); }
-  .scard .cap { height: 112px; }
+  .scard .cap { height: 124px; padding-top: 12px; padding-bottom: 12px; }
+  .scard .suits { display: none; }
 }

@@ -61,7 +61,7 @@ export function createMenu(ctl: Controller, on: MenuHandlers, platform: 'desktop
           h('span', { class: 'idx' }, String(i + 1).padStart(2, '0')),
           info.heavy ? h('span', { class: 'heavy' }, 'heavy on graphics') : null),
         h('div', { class: 'cap-bottom' },
-          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '12px', minWidth: '0' } },
+          h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '0' } },
             h('span', { class: 'name' }, info.label.toLowerCase()),
             h('div', { class: 'detail' }, h('span', { class: 'line' }, info.line), h('span', { class: 'suits' }, `suits ${info.suits}`))),
           looks),

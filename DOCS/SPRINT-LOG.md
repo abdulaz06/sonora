@@ -8,69 +8,78 @@
 - [x] 0.1 Caught up (CLAUDE.md, sprint log, decisions, DOCS/16, brand, registry, UI, controller, settings, scripts); commit attribution disabled in `.claude/settings.json`
 
 ### 1. Design system
-- [ ] 1.1 Fonts bundled locally (Inter, Inter Display, IBM Plex Mono) with OFL licences
-- [ ] 1.2 Tokens (colour, type, spacing, motion) + components: button, segmented, slider, toggle, select, card, thumbnail card, sheet, toast, kbd hint, info (i)
-- [ ] 1.3 Motion language (one easing family, reduced motion)
-- [ ] 1.4 UI kit page (`kit.html`), screenshot-reviewed at 1920×1080 / 1366×768 / 2560×1440
+- [x] 1.1 Fonts bundled locally (Inter, Inter Display, IBM Plex Mono) with OFL licences
+- [x] 1.2 Tokens (colour, type, spacing, motion) + components: button, segmented, slider, toggle, select, card, thumbnail card, sheet, toast, kbd hint, info (i)
+- [x] 1.3 Motion language (one easing family, reduced motion)
+- [x] 1.4 UI kit page (`kit.html`), screenshot-reviewed at 1920×1080 / 1366×768 / 2560×1440
 
 ### 2. Media
-- [ ] 2.1 `npm run media` pipeline (masters in git-ignored `media/`, shipped WebP 1280/640 + WebM loops in `public/media/`, manifest)
-- [ ] 2.2 Candidates rendered, contact sheets reviewed, picks curated (styles, looks, views, classic)
-- [ ] 2.3 Voyage hero (inside the fractal) + vistas per backdrop (Void / City / Ocean)
-- [ ] 2.4 Settings explainer media (responsiveness, quality, light/dark, camera presets)
-- [ ] 2.5 Budget checked (≤ 25 MB) and logged
+- [x] 2.1 `npm run media` pipeline (masters in git-ignored `media/`, shipped WebP 1280/640 + WebM loops in `public/media/`, manifest)
+- [x] 2.2 Candidates rendered, contact sheets reviewed, picks curated (styles, looks, views, classic)
+- [x] 2.3 Voyage hero (inside the fractal) + vistas per backdrop (Void / City / Ocean)
+- [x] 2.4 Settings explainer media (responsiveness, quality, light/dark, camera presets)
+- [x] 2.5 Budget checked (≤ 25 MB) and logged
 
 ### 3. Home menu
-- [ ] 3.1 Launch moment (glint lines extend, lockup settles; skippable, shorter on later launches)
-- [ ] 3.2 Style cards (hero), classic row, hover loops
-- [ ] 3.3 Style detail (big preview, looks, views, Start)
-- [ ] 3.4 Resume, Set Mode card, audio status (device, live meter, guidance), settings/about/shortcuts
-- [ ] 3.5 Expand-into-visual transition; Esc/Menu back; keyboard + arrow navigation
-- [ ] 3.6 Engine paused on the menu (no rAF), analysis keeps running; "Open straight into my last visual" setting
+- [x] 3.1 Launch moment (glint lines extend, lockup settles; skippable, shorter on later launches)
+- [x] 3.2 Style cards (hero), classic row, hover loops
+- [x] 3.3 Style detail (big preview, looks, views, Start)
+- [x] 3.4 Resume, Set Mode card, audio status (device, live meter, guidance), settings/about/shortcuts
+- [x] 3.5 Expand-into-visual transition; Esc/Menu back; keyboard + arrow navigation
+- [x] 3.6 Engine paused on the menu (no rAF), analysis keeps running; "Open straight into my last visual" setting
 
 ### 4. First run
-- [ ] 4.1 Onboarding (what it is / audio check / styles-looks-views / shortcuts), skippable, first launch only
+- [x] 4.1 Onboarding (what it is / audio check / styles-looks-views / shortcuts), skippable, first launch only
 
 ### 5. Visuals screen and settings
-- [ ] 5.1 Auto-hiding in-visual bar (menu, quick switcher, Set Mode, fullscreen, settings); H clean; D debug
-- [ ] 5.2 Settings rebuilt: sections, (i) cards with copy + media where useful, palette swatches on a thumbnail, per-style vs global labels
-- [ ] 5.3 Settings v6 migration + test (keeps every per-style value)
+- [x] 5.1 Auto-hiding in-visual bar (menu, quick switcher, Set Mode, fullscreen, settings); H clean; D debug
+- [x] 5.2 Settings rebuilt: sections, (i) cards with copy + media where useful, palette swatches on a thumbnail, per-style vs global labels
+- [x] 5.3 Settings v6 migration + test (keeps every per-style value)
 
 ### 6. Now playing
-- [ ] 6.1 Rust GSMTC reader (title/artist/album/art/state, change events) + transport controls
-- [ ] 6.2 Overlay (settings: on/off, position) + menu display
-- [ ] 6.3 `trackChange` from real media info (gap detection fallback)
+- [x] 6.1 Rust GSMTC reader (title/artist/album/art/state, change events) + transport controls
+- [x] 6.2 Overlay (settings: on/off, position) + menu display
+- [x] 6.3 `trackChange` from real media info (gap detection fallback)
 
 ### 7. Set Mode
-- [ ] 7.1 Autopilot: switches on trackChange / long-build drops, min interval, music-suited choice, no repeats, hard cut on the drop beat or crossfade, flash-guarded
-- [ ] 7.2 Settings (include list with thumbnails, interval, palettes), menu card, in-visual button, M key, tray item, corner label
+- [x] 7.1 Autopilot: switches on trackChange / long-build drops, min interval, music-suited choice, no repeats, hard cut on the drop beat or crossfade, flash-guarded
+- [x] 7.2 Settings (include list with thumbnails, interval, palettes), menu card, in-visual button, M key, tray item, corner label
 
 ### 8. Brand and hardening
-- [ ] 8.1 Icons (tauri icon + hand-tuned .ico), window title "sonora", tray 32 px
-- [ ] 8.2 Tray: Show, Menu, Set Mode, Fullscreen, Quit
-- [ ] 8.3 Multi-monitor fullscreen display choice (remembered)
-- [ ] 8.4 Strict CSP; opener removed; minimal capabilities
-- [ ] 8.5 Output devices pinned by endpoint ID (name fallback)
-- [ ] 8.6 GPU fallback message
-- [ ] 8.7 Shortcuts consolidated (F/F11, Esc, H, M, S, V, 1–9, D) and listed
+- [x] 8.1 Icons (tauri icon + hand-tuned .ico), window title "sonora", tray 32 px
+- [x] 8.2 Tray: Show, Menu, Set Mode, Fullscreen, Quit
+- [x] 8.3 Multi-monitor fullscreen display choice (remembered)
+- [x] 8.4 Strict CSP; opener removed; minimal capabilities
+- [x] 8.5 Output devices pinned by endpoint ID (name fallback)
+- [x] 8.6 GPU fallback message
+- [x] 8.7 Shortcuts consolidated (F/F11, Esc, H, M, S, V, 1–9, D) and listed
 - [ ] 8.8 Regression checks (device switching, capture recovery, off-screen net, persistence, fps cap, quality presets)
 - [ ] 8.9 Engine gates re-run: verify-art, flicker-art, perf-art, sync — unchanged
 
 ### 9. Updater, CI, tests
-- [ ] 9.1 tauri-plugin-updater + signing keys (secrets) + in-app update notice
-- [ ] 9.2 CI workflow (typecheck, clippy, cargo test, build, migration tests)
-- [ ] 9.3 Release workflow (v* tag → NSIS + MSI, signed updater artifacts, latest.json, Release)
-- [ ] 9.4 Tests: DSP synthetic, event layer on generated tracks, settings v1→v6, Playwright smoke (menu → detail → visual → menu)
+- [x] 9.1 tauri-plugin-updater + signing keys (secrets) + in-app update notice
+- [x] 9.2 CI workflow (typecheck, clippy, cargo test, build, migration tests)
+- [x] 9.3 Release workflow (v* tag → NSIS + MSI, signed updater artifacts, latest.json, Release)
+- [x] 9.4 Tests: DSP synthetic, event layer on generated tracks, settings v1→v6, Playwright smoke (menu → detail → visual → menu)
 
 ### 10. README and release
-- [ ] 10.1 README rewritten (portfolio grade)
+- [x] 10.1 README rewritten (portfolio grade)
 - [ ] 10.2 Version 1.0.0, tag, Release with both installers + latest.json
 - [ ] 10.3 Installed NSIS build smoke-tested
 - [ ] 10.4 Summary at the top of this log
 
 ## Notes (Prompt 3)
+- Design system in `src/ui/ds/`, screens in `src/ui/screens/`, shell in `src/app/shell.ts` (D50, D51). Fonts bundled (Inter variable with opsz = Inter Display, IBM Plex Mono). UI kit: `kit.html`.
+- Screenshots: `npm run ui:shots` → `verify/ui/<state>-<w>x<h>.png` (17 states × 1920×1080 / 1366×768 / 2560×1440), all reviewed; fixes from review: CSS reset specificity (grey cards, oversized buttons), hidden labels showing, source chooser auto-opening over the menu, palette swatch collapsed, stage layout, nav wrapping, card caption height on short windows.
+- Media (D52): 35 named assets + 55 palette thumbnails, 15 loops; total shipped 13.3 MB (budget 25). Picks from contact sheets in `media/sheets/`. Voyage vistas are the breakdown wide shots. Loops at 1024×576: 960×540 showed a green stripe from this GPU's VP9 decoder padding (also in WebView2).
+- Desktop app (release build) checked by hand on this machine with a fresh settings file: launch → intro → audio check heard a test track ("got it") → menu → detail → live Ink → Esc → menu; settings persisted (onboarded, v6); your settings were backed up and restored.
+- Tests: `cargo test` (DSP synthetic: silence, bands, 124 BPM kick train, loudness), `npm test` 13 tests (settings v1→v6, Set Mode, events on generated tracks), `npm run test:smoke` 14 checks pass.
+- Updater keys: generated with the Tauri CLI, private key + password in `~/.tauri/` and in Actions secrets `TAURI_SIGNING_PRIVATE_KEY(_PASSWORD)`; public key in tauri.conf.json.
+- Tagline changed mid-run to "see your music" (D60): About, first intro screen, README, brand doc.
+- No LICENSE file exists in the repo (left alone as asked).
 
 ---
+
 
 # Feedback round 7 — done (awaiting review)
 
