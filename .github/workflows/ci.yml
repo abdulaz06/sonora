@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Install
+        run: npm ci
+
+      - name: WASM build
+        run: npm run build:wasm
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Cargo test
+        run: cargo test --workspace
+
+      - name: Generate test audio
+        run: npm run gen:audio
+
+      - name: Tests (settings migration, Set Mode, event layer)
+        run: npm test
+
+      - name: Frontend build
+        run: npx vite build

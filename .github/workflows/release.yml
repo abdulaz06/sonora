@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Install
+        run: npm ci
+
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          f="DOCS/release-notes/${GITHUB_REF_NAME}.md"
+          [ -f "$f" ] || f="DOCS/release-notes/latest.md"
+          {
+            echo 'body<<NOTES_EOF'
+            cat "$f"
+            echo 'NOTES_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Builds the WASM + frontend (beforeBuildCommand), the NSIS and MSI
+      # installers, signs the updater artifacts and uploads latest.json.
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'sonora ${{ github.ref_name }}'
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
