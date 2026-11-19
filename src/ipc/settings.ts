@@ -159,7 +159,7 @@ export function capIsEven(cap: number, hz: number): boolean {
  * always included.
  */
 export function fpsCapChoices(hz: number, current: number): FpsCapChoice[] {
-  const out: FpsCapChoice[] = [{ value: 0, label: hz ? `match ${fpsLabel(hz)}` : 'match display', uneven: false }];
+  const out: FpsCapChoice[] = [{ value: 0, label: 'match', uneven: false }];
   const divisors = hz ? DIVISOR_CAPS.slice(0, hz >= 100 ? 2 : 1).map((k) => ({ value: k, fps: hz / -k })) : [];
   for (const d of divisors) if (d.fps >= 20) out.push({ value: d.value, label: fpsLabel(d.fps), uneven: false });
   for (const c of COMMON_FPS_CAPS) {

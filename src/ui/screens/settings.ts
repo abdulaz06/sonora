@@ -297,7 +297,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
         const hz = ctl.renderer.displayHz();
         const choices = fpsCapChoices(hz, s.fpsCap);
         const cur = choices.find((c) => c.value === s.fpsCap);
-        return row('Frame rate', INFO.fps(hz), cur ? (cur.value === 0 ? cur.label : `${cur.label} fps`) : '',
+        return row('Frame rate', INFO.fps(hz), cur ? (cur.value === 0 ? (hz ? `match ${fpsLabel(hz)} hz` : 'match display') : `${cur.label} fps`) : '',
           segmented(choices.map((c) => ({ value: String(c.value), label: c.label })), String(s.fpsCap), (v) => ctl.setFpsCap(Number(v)), 'Frame rate').el);
       })(),
       row('Show FPS', INFO.showFps(), null, toggle('', s.showFps, (v) => ctl.setShowFps(v)).el, true),

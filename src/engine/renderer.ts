@@ -45,6 +45,8 @@ import postCompositeFragSrc from './shaders/post-composite.frag?raw';
 const CAP_SLACK_MS = 2;
 /** Display refresh measurement: rAF intervals kept (median of these). */
 const REFRESH_SAMPLES = 120;
+/** rAF frames sampled at startup while the render loop is paused. */
+const PROBE_FRAMES = 90;
 /** A cap within this fraction of refresh / k paces every k-th refresh. */
 const DIVISOR_TOLERANCE = 0.04;
 /** Frame pacing stats: rendered-frame times kept (s), and an interval longer
@@ -572,6 +574,25 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     },
     stats: () => ({ fps, frameMs, quality: quality.params, flashes: flash.recentFlashes, exposure: autoExposure, sceneWidth: sceneW, sceneHeight: sceneH }),
   };
+
+  // Measure the display refresh right away (settings can be opened on the
+  // menu, where the render loop is paused): a short rAF probe that draws nothing.
+  {
+    let probes = 0;
+    let probeLast = 0;
+    const probe = (now: number): void => {
+      // While the loop runs it measures; this only fills in when it's paused.
+      if (!running && probeLast) {
+        const saved = lastRaf;
+        lastRaf = probeLast;
+        measureRefresh(now);
+        lastRaf = saved;
+      }
+      probeLast = now;
+      if (++probes < PROBE_FRAMES) requestAnimationFrame(probe);
+    };
+    requestAnimationFrame(probe);
+  }
 
   if (options.autoStart ?? true) api.start();
   return api;

@@ -89,11 +89,11 @@ describe('settings migration', () => {
 
   it('frame-rate choices pace evenly on the measured display', () => {
     const c165 = fpsCapChoices(165, 0);
-    expect(c165.map((c) => c.label)).toEqual(['match 165', '82.5', '55', '30', '60', '120', '144']);
+    expect(c165.map((c) => c.label)).toEqual(['match', '82.5', '55', '30', '60', '120', '144']);
     expect(c165.filter((c) => c.uneven).map((c) => c.value)).toEqual([30, 60, 120, 144]);
     const c60 = fpsCapChoices(60, 0);
-    expect(c60.map((c) => c.label)).toEqual(['match 60', '30']);
-    expect(fpsCapChoices(144, 0).map((c) => c.label)).toEqual(['match 144', '72', '48', '30', '60', '120']);
+    expect(c60.map((c) => c.label)).toEqual(['match', '30']);
+    expect(fpsCapChoices(144, 0).map((c) => c.label)).toEqual(['match', '72', '48', '30', '60', '120']);
     expect(capIsEven(60, 120)).toBe(true);
     expect(capIsEven(60, 165)).toBe(false);
     // A saved choice missing from the list is still offered.
