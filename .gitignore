@@ -57,3 +57,6 @@ verify/
 
 # Media masters and loop frames (npm run media); shipped assets are in src/assets/media/
 /media/
+
+# Original reference recordings (large, local only)
+local-reference/
