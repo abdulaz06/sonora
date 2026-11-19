@@ -44,7 +44,8 @@ export interface HarnessApi {
   advance(seconds: number, dt: number): number;
   /** Advance audio only (no rendering) — for fast seeking. */
   analyseOnly(seconds: number): number;
-  snapshot(): string;
+  /** Canvas as a data URL (PNG by default; 'image/jpeg' for videos). */
+  snapshot(type?: string, quality?: number): string;
   configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string; responsiveness?: number; debug?: Partial<DebugFlags> }): void;
   /** Fire a trackChange with a title (as a media session would). */
   seedText(title: string): void;
@@ -277,8 +278,8 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
     analyseOnly(seconds: number): number {
       return source.stepOffline(seconds);
     },
-    snapshot(): string {
-      return renderer.canvas.toDataURL('image/png');
+    snapshot(type = 'image/png', quality?: number): string {
+      return renderer.canvas.toDataURL(type, quality);
     },
     configure(o) {
       if (o.debug) setDebugFlags(o.debug);

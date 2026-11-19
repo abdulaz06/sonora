@@ -24,6 +24,13 @@ uniform float u_pulse;        // bass-hit envelope × fade: frame-accurate beat 
 uniform float u_pulse_gain;   // how much ink brightens on a hit
 uniform float u_grain_amt;    // paper / pigment grain (0 = none)
 uniform int u_linear;         // Glow: v0.1 linear density → brightness
+uniform int u_height_cubic;   // harness: 1 = blurred field sampled with Catmull-Rom (0 = bilinear, shipped)
+uniform int u_marble_spark;   // Marble highlight: 1 lights the marble in its own colours; 0 mint glow (legacy)
+uniform int u_dye_filter;     // harness: 0 auto, 1 bilinear, 2 Catmull-Rom, 3 B-spline
+uniform float u_dither;       // harness: Marble stipple dither scale (1 = shipped)
+uniform float u_veins;        // harness: Marble vein strength scale (1 = shipped)
+uniform float u_vein_aa;      // Marble: fade veins thinner than a pixel to their mean tone (0 = legacy)
+uniform float u_stip_aa;      // harness: widen the stipple threshold by the field's pixel footprint
 
 struct InkSample {
   vec4 d;      // sharpened dye
@@ -34,7 +41,12 @@ struct InkSample {
 InkSample sampleInk(vec2 uv, float lod) {
   InkSample s;
   vec4 raw = lod < 0.5 && u_linear == 0 ? sampleBicubic(u_dye, uv, vec2(u_dye_res)) : texture(u_dye, uv);
-  s.blur = texture(u_height, uv);
+  if (u_dye_filter == 1) raw = texture(u_dye, uv);
+  else if (u_dye_filter == 2) raw = sampleBicubic(u_dye, uv, vec2(u_dye_res));
+  else if (u_dye_filter == 3) raw = sampleBSpline(u_dye, uv, vec2(u_dye_res));
+  // Harness knob: Catmull-Rom sampling of the sim-resolution blurred field
+  // (tested in the smoothness fix: no measurable or visible change; off).
+  s.blur = u_height_cubic == 1 ? sampleBicubic(u_height, uv, vec2(u_sim_res)) : texture(u_height, uv);
   // Unsharp mask with a clamped negative lobe: crisper filaments, no halos.
   s.d = max(raw + u_sharpen * clamp(raw - s.blur, -0.2 * raw, vec4(8.0)), 0.0);
   s.d.a = raw.a;
@@ -69,17 +81,32 @@ vec3 shadeInkBase(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
     float ratio = a / (total + 0.12);
     float cov = 1.0 - exp(-total * 1.6);
     float field = ratio * cov + s.edge * 0.25;
-    float veins = 0.5 + 0.5 * sin((ratio * 9.0 + (s.blur.r - s.blur.g) * 4.0) * 6.2832);
-    veins = smoothstep(0.86, 1.0, veins) * cov;
-    float n = hash12(fragCoord) - 0.5;
+    float phase = ratio * 9.0 + (s.blur.r - s.blur.g) * 4.0;
+    float veins = 0.5 + 0.5 * sin(phase * 6.2832);
+    veins = smoothstep(0.86, 1.0, veins);
+    // Where the ink ratio is steep (sharp, fast-stretched boundaries) the
+    // vein lines get thinner than a pixel: drawn as is they alias into
+    // broken, stair-stepped lines that crawl every frame. Fade only those
+    // toward their average tone; veins wide enough to draw are untouched.
+    float cyclesPerPx = fwidth(phase);
+    veins = mix(veins, 0.1, smoothstep(0.12, 0.3, cyclesPerPx) * u_vein_aa);
+    veins *= cov * u_veins;
+    float n = (hash12(fragCoord) - 0.5) * u_dither;
     // Dither a little softer than before: with the faster flow a strong
     // dither sparkles where colours mix.
-    float stip = smoothstep(0.5 - 0.16, 0.5 + 0.16, field + n * 0.3 + (g - 0.5) * 0.12);
+    float fw = fwidth(field) * u_stip_aa;
+    float stip = smoothstep(0.5 - 0.16 - fw, 0.5 + 0.16 + fw, field + n * 0.3 + (g - 0.5) * 0.12);
     vec3 bright = light ? mix(u_paper, u_ink_a * 0.9, 0.08) : u_ink_a;
     vec3 dark = light ? u_ink_a * 0.55 : u_bg * 0.6;
     vec3 col = mix(dark, bright, stip);
     col = mix(col, light ? dark * 0.7 : bright * 1.25, veins * 0.6);
-    col += light ? vec3(0.0) : u_spark * sp * 2.0;
+    if (u_marble_spark == 1) {
+      // Duotone: a high hit lights the marble already there, in its own
+      // colours (never a third-colour patch landing in empty space).
+      col += light ? vec3(0.0) : col * min(sp, 1.5) * 0.9;
+    } else {
+      col += light ? vec3(0.0) : u_spark * sp * 2.0;
+    }
     cover = cov;
     return col;
   }

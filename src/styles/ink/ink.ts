@@ -30,7 +30,9 @@ import { clamp01, createRng } from '../../engine/math';
 import type { SonoraEvent } from '../../engine/events';
 import type { QualityParams } from '../../engine/quality';
 import type { StyleContext, StyleDeps, VisualStyle } from '../visual-style';
+import { debugFlags, inkExp } from '../../engine/debug-flags';
 import { FluidSim, type FlowParams, type Splat } from './fluid';
+import { flowVelocity } from './flow-field';
 
 import commonSrc from './shaders/common.glsl?raw';
 import inkSrc from './shaders/ink.glsl?raw';
@@ -109,8 +111,9 @@ const RADIUS_WIDEN = 1.5;
  * (0 soft gaussian, 1 solid body with a ragged edge) and amount. Glow: v0.1's
  * soft glowing blobs. Sumi: small crisp ink drops (a soft blob's faint skirt
  * greys the whole page on paper, which reads as flicker). Marble: hits mix
- * into the marbled field at a third of the strength, as before round 6, so
- * they never land as obvious patches. */
+ * into the marbled field at full strength (a third was tried in the
+ * smoothness fix: no fewer pops, weaker hits); its highlight channel lights
+ * the marble in its own colours instead of adding a third colour. */
 const DROPS: Record<string, { radius: number; edge: number; amount: number }> = {
   glow: { radius: 1, edge: 0, amount: 1 },
   // edge -1: a solid round drop with a soft rim (see splat.frag)
@@ -123,6 +126,19 @@ const DROPS: Record<string, { radius: number; edge: number; amount: number }> = 
  * often landing on a near-empty screen, builds over six. */
 const ATTACK: number[] = [0.35, 0.35, 0.3];
 const ATTACK_DROP: number[] = [0.12, 0.16, 0.2, 0.2, 0.18, 0.14];
+/** The landing above was counted in frames and tuned at 60 fps; at 165 fps
+ * it landed in 18 ms instead of 50 (the "teleport"). It is now a time
+ * profile: the same shares at 0, 1/60 and 2/60 s, linear in between, so every
+ * frame rate lands a hit in the tuned time (and 60 fps lands exactly as before). */
+const LAND_STEP = 1 / 60;
+/** New ink enters the flow instead of appearing: each hit starts as a small
+ * seed (this fraction of its radius) on the frame of the hit and spreads to
+ * full size over GROW_TIME (ease-out), carried by the flow while it lands.
+ * Its final shape is exactly the old blob's. */
+const GROW_SEED = 0.45;
+const GROW_TIME = 0.1;
+/** The one-frame push lasts one 60 fps frame of time at any frame rate. */
+const PUSH_TIME = 1 / 60;
 /** Marble draws a full screen of two-tone marbling (as before round 6): a
  * marbled field seeded across the world that renews slowly (fade, 1/s), with
  * the same motion and hits as Glow mixing into it. */
@@ -303,10 +319,87 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     const v = flowSpeed(ctx) * SCREEN_UV * 1.2 * strength;   // v0.1: kick × falloff × strength × 1.2, × speed
     const seed = rng() * 100;
     const r = radius * SCREEN_UV * RADIUS_WIDEN * look.radius;
+    if (!debugFlags.inkLegacy) {
+      // Lands over time (see LAND_STEP / GROW_*), starting on this frame.
+      const cum: number[] = [];
+      attack.reduce((s, w) => { cum.push(s + w); return s + w; }, 0);
+      const ld: Landing = { x, y, radius: r, dye, detail: look.edge, seed, age: 0, cum, m: 0, r: 0,
+        pvx: tps(pushX * v), pvy: tps(pushY * v), fresh: true };
+      landings.push(ld);
+      land(ld, ctx.dt);
+      return;
+    }
     const part = (k: number): Splat['dye'] => [dye[0] * attack[k], dye[1] * attack[k], dye[2] * attack[k], 0];
     // The push and the first share land on the frame of the hit; the rest follows.
     push({ x, y, radius: r, dye: part(0), vx: tps(pushX * v), vy: tps(pushY * v), radial: 0, swirl: 0, detail: look.edge, seed });
     pending.push({ x, y, radius: r, dye, detail: look.edge, seed, step: 1, attack });
+  }
+
+  // ── Landing over time (fixed behaviour) ───────────────────────
+  /** A hit still landing: `cum` = cumulative shares at 0, 1/60, 2/60 … s;
+   * `m` / `r` = the amount and radius already deposited; push in sim texels/s. */
+  interface Landing { x: number; y: number; radius: number; dye: Splat['dye']; detail: number; seed: number; age: number; cum: number[]; m: number; r: number; pvx: number; pvy: number; fresh: boolean }
+  const landings: Landing[] = [];
+  const flowOut: [number, number] = [0, 0];
+  const growSeed = (): number => inkExp('growSeed', GROW_SEED);
+  const growTime = (): number => inkExp('growTime', GROW_TIME);
+
+  /** Share of a hit landed by `age` seconds (linear between the 60 fps steps). */
+  function landedShare(cum: number[], age: number): number {
+    const f = age / LAND_STEP;
+    const i = Math.floor(f + 1e-6);
+    if (i >= cum.length - 1) return 1;
+    const t = Math.max(0, f - i);
+    return cum[i] + (cum[i + 1] - cum[i]) * t;
+  }
+
+  /** Radius scale at `age`: from the seed to full size, ease-out. */
+  function grownRadius(age: number): number {
+    const T = growTime();
+    if (T <= 0) return 1;
+    const u = Math.min(1, age / T);
+    const s = growSeed();
+    return s + (1 - s) * (1 - (1 - u) * (1 - u));
+  }
+
+  /**
+   * Deposit what this landing should hold now. The ink on screen is always one
+   * blob of the current radius and amount: add the new stage, subtract the
+   * previous one (exact in a float target), so it spreads outward rather than
+   * fading in, and its final shape is the old blob's. Then carry it (and the
+   * push) with the flow, as the GPU carries the ink already deposited.
+   */
+  function land(q: Landing, dt: number): void {
+    const m = landedShare(q.cum, q.age);
+    const r = q.radius * grownRadius(q.age);
+    const d = q.dye;
+    const k = variant === 'sumi' ? SUMI_DYE : 1;
+    if (m > q.m + 1e-6 || r > q.r + 1e-9) {
+      sim.splat({ x: q.x, y: q.y, radius: r, dye: [d[0] * m * k, d[1] * m * k, d[2] * m * k, 0], vx: 0, vy: 0, radial: 0, swirl: 0, detail: q.detail, seed: q.seed });
+      if (q.m > 0) sim.splat({ x: q.x, y: q.y, radius: q.r, dye: [-d[0] * q.m * k, -d[1] * q.m * k, -d[2] * q.m * k, 0], vx: 0, vy: 0, radial: 0, swirl: 0, detail: q.detail, seed: q.seed });
+      q.m = m;
+      q.r = r;
+    }
+    // Push: the old one-frame push, spread over one 60 fps frame of time.
+    const w = Math.max(0, Math.min(q.age + dt, PUSH_TIME) - q.age) / Math.max(dt, 1e-6);
+    if (w > 0 && (q.pvx !== 0 || q.pvy !== 0)) {
+      sim.splat({ x: q.x, y: q.y, radius: q.radius, dye: [0, 0, 0, 0], vx: q.pvx * w, vy: q.pvy * w, radial: 0, swirl: 0, detail: 0, seed: q.seed });
+    }
+    const sdt = Math.min(dt, 1 / 30);
+    flowVelocity(q.x, q.y, params, flowOut);
+    q.x += (flowOut[0] + (q.pvx * w) / sim.simRes) * sdt;
+    q.y += (flowOut[1] + (q.pvy * w) / sim.simRes) * sdt;
+    q.age += dt;
+  }
+
+  function landAll(dt: number): void {
+    for (let i = landings.length - 1; i >= 0; i--) {
+      const q = landings[i];
+      // Landed already this frame (a hit from onEvent, before update).
+      if (q.fresh) { q.fresh = false; continue; }
+      land(q, dt);
+      if (q.m >= 1 - 1e-6 && q.age >= growTime() && q.age >= PUSH_TIME) landings.splice(i, 1);
+    }
   }
 
   function bassBlob(ctx: StyleContext, hit: number, scale = 1, attack = ATTACK): void {
@@ -391,7 +484,9 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       params.z = flowZ;
       params.detail = FLOW_DETAIL * clamp01(ctx.intensitySmoothed);
       params.speed = flowSpeed(ctx) * SCREEN_UV;
-      params.soft = SOFT_ADVECT[variant] ?? true;
+      params.soft = (SOFT_ADVECT[variant] ?? true) && inkExp('soft', 1) > 0;
+      const wantDye = Math.round(FLOW_DYE_RES[dyeLevel] * inkExp('dyeScale', 1));
+      if (wantDye !== sim.dyeRes) sim.configure(quality.simResolution, wantDye, quality.iterations);
 
       // v0.1 fade: longer when loud (glow follower), extra when silent.
       const perFrame = FADE_PER_FRAME[0] + (FADE_PER_FRAME[1] - FADE_PER_FRAME[0]) * clamp01(ctx.intensityGlow);
@@ -404,8 +499,10 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       params.dyeFloorDecay[0] = marble ? 0 : 0.01 + 0.04 * (1 - fade);
       params.dyeFloorDecay[1] = params.dyeFloorDecay[0];
 
-      landPending();
+      if (debugFlags.inkLegacy) { landings.length = 0; landPending(); }
+      else { landAll(dt); pending.length = 0; }
       mapAudio(ctx);
+      for (const q of landings) q.fresh = false;
     },
 
     render(ctx: StyleContext): void {
@@ -453,7 +550,15 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
         gl.uniform1f(u.u_fade, ctx.fadeInOut);
         gl.uniform1f(u.u_time, time);
         gl.uniform1f(u.u_drop, ctx.eventState.dropEnvelope);
-        gl.uniform1f(u.u_sharpen, (SHARPEN[variant] ?? 0.4) * (quality.level === 'low' ? 0.7 : 1));
+        gl.uniform1f(u.u_sharpen, (SHARPEN[variant] ?? 0.4) * (quality.level === 'low' ? 0.7 : 1) * inkExp('sharpen', 1));
+        const legacy = debugFlags.inkLegacy;
+        gl.uniform1i(u.u_height_cubic, inkExp('heightCubic', 0));
+        gl.uniform1i(u.u_marble_spark, inkExp('marbleSpark', legacy ? 0 : 1));
+        gl.uniform1i(u.u_dye_filter, inkExp('dyeFilter', 0));
+        gl.uniform1f(u.u_dither, inkExp('dither', 1));
+        gl.uniform1f(u.u_veins, inkExp('veins', 1));
+        gl.uniform1f(u.u_vein_aa, inkExp('veinAA', legacy ? 0 : 1));
+        gl.uniform1f(u.u_stip_aa, inkExp('stipAA', 0));
         gl.uniform1f(u.u_glow, 1.0);
         // Marble keeps its gentle beat brightening from before round 6 (a dark
         // look: its hits land on ink that is already there). Glow and Sumi
@@ -461,7 +566,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
         // flicker.
         gl.uniform1f(u.u_pulse, variant === 'marble' ? clamp01(ctx.bassHits * ctx.fadeInOut) : 0);
         gl.uniform1f(u.u_pulse_gain, variant === 'marble' ? MARBLE_PULSE : 0);
-        gl.uniform1f(u.u_grain_amt, GRAIN[variant] ?? 1);
+        gl.uniform1f(u.u_grain_amt, (GRAIN[variant] ?? 1) * inkExp('grain', 1));
         gl.uniform1i(u.u_linear, variant === 'glow' ? 1 : 0);
       };
 

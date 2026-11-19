@@ -5,7 +5,8 @@
 // Env: SEQ_W / SEQ_H (viewport, default 960x540), SEQ_FPS (render steps per
 // second, default 60; the warm-up renders at the same rate), SEQ_QUALITY,
 // SEQ_PALETTE, SEQ_CAMERA, SEQ_RESP, SEQ_DEBUG (JSON debug flags, e.g.
-// '{"inkLegacy":true}'), SEQ_WARMUP (seconds rendered before the start, default 8).
+// '{"inkLegacy":true}'), SEQ_WARMUP (seconds rendered before the start, default 8),
+// SEQ_JPG=1 (JPEG frames, quality 0.95: videos).
 // Run from another checkout (e.g. a baseline worktree) to render that code.
 import { chromium } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
@@ -19,6 +20,7 @@ const dt = 1 / fps;
 const out = outArg ?? `verify/frame-seq/${style}-${lookArg}-${view}-${track}-${t0}${fps !== 60 ? `-${fps}fps` : ''}`;
 const W = Number(process.env.SEQ_W || 960), H = Number(process.env.SEQ_H || 540);
 const warmup = Number(process.env.SEQ_WARMUP ?? 8);
+const jpg = process.env.SEQ_JPG === '1';
 const cfg = {
   style, variant: look, depth: view === 'depth', drift: false,
   quality: process.env.SEQ_QUALITY || undefined,
@@ -49,8 +51,8 @@ try {
   const n = Math.round((Number(secs) * fps) / step);
   for (let f = 0; f < n; f++) {
     await p.evaluate(([k, d]) => window.__sonora.advance(k * d, d), [step, dt]);
-    const url = await p.evaluate(() => window.__sonora.snapshot());
-    writeFileSync(`${out}/f${String(f).padStart(5, '0')}.png`, Buffer.from(url.split(',')[1], 'base64'));
+    const url = await p.evaluate((jpg) => (jpg ? window.__sonora.snapshot('image/jpeg', 0.95) : window.__sonora.snapshot()), jpg);
+    writeFileSync(`${out}/f${String(f).padStart(5, '0')}.${jpg ? 'jpg' : 'png'}`, Buffer.from(url.split(',')[1], 'base64'));
   }
   writeFileSync(`${out}/seq.json`, JSON.stringify({ style, look, track, start, secs: Number(secs), view, step, fps, W, H, cfg }, null, 1));
   console.log(`${n} frames (every ${step} at ${fps} fps) from ${start}s → ${out}`);

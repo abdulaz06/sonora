@@ -54,3 +54,18 @@ vec4 sampleBicubic(sampler2D tex, vec2 uv, vec2 res) {
   r += texture(tex, vec2(t3.x, t3.y)) * w3.x * w3.y;
   return r;
 }
+// Cubic B-spline sample (4 bilinear taps): smooth (C2), slightly soft. `res` = texture size.
+vec4 sampleBSpline(sampler2D tex, vec2 uv, vec2 res) {
+  vec2 p = uv * res - 0.5;
+  vec2 f = p - floor(p);
+  vec2 tc = floor(p) + 0.5;
+  vec2 f2 = f * f, f3 = f2 * f;
+  vec2 w0 = (1.0 - 3.0 * f + 3.0 * f2 - f3) / 6.0;
+  vec2 w1 = (4.0 - 6.0 * f2 + 3.0 * f3) / 6.0;
+  vec2 w2 = (1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3) / 6.0;
+  vec2 w3 = f3 / 6.0;
+  vec2 g0 = w0 + w1, g1 = w2 + w3;
+  vec2 h0 = (tc - 1.0 + w1 / g0) / res, h1 = (tc + 1.0 + w3 / g1) / res;
+  return (texture(tex, vec2(h0.x, h0.y)) * g0.x + texture(tex, vec2(h1.x, h0.y)) * g1.x) * g0.y
+       + (texture(tex, vec2(h0.x, h1.y)) * g0.x + texture(tex, vec2(h1.x, h1.y)) * g1.x) * g1.y;
+}
