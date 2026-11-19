@@ -382,8 +382,8 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
 
   /**
    * Deposit what this landing should hold now. The ink on screen is always one
-   * blob of the current radius and amount: add the new stage, subtract the
-   * previous one (exact in a float target), so it spreads outward rather than
+   * blob of the current radius and amount: each frame adds the difference
+   * between this stage and the previous one, so it spreads outward rather than
    * fading in, and its final shape is the old blob's. Then carry it (and the
    * push) with the flow, as the GPU carries the ink already deposited.
    */
@@ -393,8 +393,9 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     const d = q.dye;
     const k = variant === 'sumi' ? SUMI_DYE : 1;
     if (m > q.m + 1e-6 || r > q.r + 1e-9) {
-      sim.splat({ x: q.x, y: q.y, radius: r, dye: [d[0] * m * k, d[1] * m * k, d[2] * m * k, 0], vx: 0, vy: 0, radial: 0, swirl: 0, detail: q.detail, seed: q.seed });
-      if (q.m > 0) sim.splat({ x: q.x, y: q.y, radius: q.r, dye: [-d[0] * q.m * k, -d[1] * q.m * k, -d[2] * q.m * k, 0], vx: 0, vy: 0, radial: 0, swirl: 0, detail: q.detail, seed: q.seed });
+      // One additive splat: this stage minus the previous one (never negative).
+      sim.splat({ x: q.x, y: q.y, radius: r, dye: [d[0] * m * k, d[1] * m * k, d[2] * m * k, 0], vx: 0, vy: 0, radial: 0, swirl: 0,
+        detail: q.detail, seed: q.seed, prev: q.m > 0 ? { radius: q.r / r, amount: q.m / m } : undefined });
       q.m = m;
       q.r = r;
     }
@@ -463,6 +464,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
 
   // ── Per-frame mapping (v0.1) ──────────────────────────────────
   function mapAudio(ctx: StyleContext, dt: number): void {
+    if (inkExp('noHits', 0) > 0) return;
     const fade = ctx.fadeInOut;
     bassCooldown -= dt; highCooldown -= dt; midCooldown -= dt;
     if (fade <= 0.1) return;
@@ -543,7 +545,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       else {
         landAll(dt);
         pending.length = 0;
-        for (const h of eventHits) bassBlob(ctx, 1, h.scale, h.attack);
+        if (inkExp('noHits', 0) === 0) for (const h of eventHits) bassBlob(ctx, 1, h.scale, h.attack);
         eventHits.length = 0;
       }
       // Hits are decided per analysis frame (60 per second of audio), not per

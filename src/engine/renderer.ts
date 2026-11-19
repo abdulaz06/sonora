@@ -35,6 +35,7 @@ import { GenerativeState } from './generative';
 import { buildProgram } from './gl-utils';
 import { PostProcessPipeline } from './post-process';
 import { QualityManager, type QualityParams, type QualityPreset } from './quality';
+import { debugFlags } from './debug-flags';
 
 import fullscreenVertSrc from './shaders/fullscreen.vert?raw';
 import postBloomFragSrc from './shaders/post-bloom.frag?raw';
@@ -365,7 +366,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       style.render(ctx);
       const measured = artPost.takeLuma();
       if (measured !== null) flash.observe(measured);
-      if (post.tonemap === 'filmic') {
+      if (post.tonemap === 'filmic' && !debugFlags.fixedExposure) {
         if (measured !== null) {
           const over = Math.max((artPost.latestHot - AE_HOT_TARGET) / AE_HOT_TARGET, (measured - AE_LUMA_TARGET) / AE_LUMA_TARGET);
           aeTarget = over > 0 ? Math.max(AE_MIN, autoExposure * (1 - Math.min(0.4, over * 0.25))) : Math.min(1, autoExposure * 1.05);

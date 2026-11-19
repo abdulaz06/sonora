@@ -403,10 +403,13 @@ export class WasmFrameSource implements FrameSource {
     const an = this.analyzer;
     if (!pcm || !an) return 0;
     // Keep the fraction: steps of 1/165 s are 267.27 samples at 44.1 kHz, and
-    // rounding each one ran the audio 0.1% slow at 165 fps.
-    this.offlineTarget = Math.max(this.offlineTarget, this.offlinePos) + seconds * this.offlineRate;
-    const end = Math.min(pcm.length, Math.round(this.offlineTarget));
+    // rounding each one ran the audio 0.1% slow at 165 fps. Audio is fed in
+    // whole hops: the analyser reads the latest window when a hop is pending,
+    // so feeding partial hops would shift every analysis window by the step
+    // size and make the frames depend on the render rate.
     const hop = an.hop();
+    this.offlineTarget = Math.max(this.offlineTarget, this.offlinePos) + seconds * this.offlineRate;
+    const end = Math.min(pcm.length, Math.floor(Math.round(this.offlineTarget) / hop) * hop);
     let produced = 0;
     while (this.offlinePos < end) {
       const next = Math.min(end, this.offlinePos + hop);

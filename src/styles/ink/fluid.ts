@@ -30,7 +30,7 @@ const SPLAT_EXTENT = 2.6;
 const MAX_SIM_DT = 1 / 30;
 /** Fraction of last frame's pressure kept as the solver's starting guess. */
 const PRESSURE_WARM_START = 0.8;
-const INSTANCE_FLOATS = 13;
+const INSTANCE_FLOATS = 15;
 /** Concurrent beat kicks and how fast each fades (s). */
 const MAX_KICKS = 8;
 const KICK_TAU = 0.09;
@@ -56,6 +56,9 @@ export interface Splat {
   /** 0 = soft blob, 1 = noisy core with tendrils. */
   detail: number;
   seed: number;
+  /** A landing's previous stage (this splat draws only what it adds):
+   * radius and amount as fractions of this one's. */
+  prev?: { radius: number; amount: number };
 }
 
 /** v0.1-style motion (`stepFlow`): the velocity is a curl-noise field. */
@@ -192,6 +195,7 @@ export class FluidSim {
     attrib(2, 4, 4);
     attrib(3, 4, 8);
     attrib(4, 1, 12);
+    attrib(5, 2, 13);
     gl.bindVertexArray(null);
 
     this.configure(simRes, dyeRes, iterations);
@@ -245,6 +249,7 @@ export class FluidSim {
       a[o + 4] = s.dye[0]; a[o + 5] = s.dye[1]; a[o + 6] = s.dye[2]; a[o + 7] = s.dye[3];
       a[o + 8] = s.vx; a[o + 9] = s.vy; a[o + 10] = s.radial; a[o + 11] = s.swirl;
       a[o + 12] = s.detail;
+      a[o + 13] = s.prev ? s.prev.radius : 0; a[o + 14] = s.prev ? s.prev.amount : 0;
       this.instanceCount++;
     }
   }

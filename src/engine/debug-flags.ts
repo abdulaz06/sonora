@@ -11,13 +11,18 @@
 export interface DebugFlags {
   inkLegacy: boolean;
   inkExp: Record<string, number>;
+  /** Harness: hold auto exposure at 1. Its measurement is an async GPU
+   * readback that lands after a wall-clock delay, so in offline renders (as
+   * fast as possible, any step size) its timing depends on the render rate. */
+  fixedExposure: boolean;
 }
 
-export const debugFlags: DebugFlags = { inkLegacy: false, inkExp: {} };
+export const debugFlags: DebugFlags = { inkLegacy: false, inkExp: {}, fixedExposure: false };
 
 export function setDebugFlags(f: Partial<DebugFlags>): void {
   if (f.inkLegacy !== undefined) debugFlags.inkLegacy = f.inkLegacy;
   if (f.inkExp) debugFlags.inkExp = { ...f.inkExp };
+  if (f.fixedExposure !== undefined) debugFlags.fixedExposure = f.fixedExposure;
 }
 
 /** Experiment knob value (harness), or `fallback` when unset. */

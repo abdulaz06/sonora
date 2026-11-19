@@ -6,12 +6,14 @@ layout(location = 1) in vec4 a_geom;     // center.xy, radius, seed
 layout(location = 2) in vec4 a_dye;      // dye amount per channel
 layout(location = 3) in vec4 a_vel;      // vx, vy, radial, swirl (sim texels/s)
 layout(location = 4) in float a_detail;  // 0 soft blob .. 1 tendrils
+layout(location = 5) in vec2 a_prev;     // landing: previous stage (radius ratio, amount ratio)
 uniform float u_extent;                  // quad half-size in radii
 out vec2 v_d;
 flat out vec4 v_dye;
 flat out vec4 v_vel;
 flat out float v_seed;
 flat out float v_detail;
+flat out vec2 v_prev;
 void main() {
   vec2 uv = a_geom.xy + a_corner * a_geom.z * u_extent;
   v_d = a_corner * u_extent;
@@ -19,5 +21,6 @@ void main() {
   v_vel = a_vel;
   v_seed = a_geom.w;
   v_detail = a_detail;
+  v_prev = a_prev;
   gl_Position = vec4(uv * 2.0 - 1.0, 0.0, 1.0);
 }
