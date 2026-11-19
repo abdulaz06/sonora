@@ -261,7 +261,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     frame, time: 0, dt: 0,
     fadeInOut: 0, intensity: 0, intensitySmoothed: 0,
     bassHits: 0, bassPresence: 0, midHits: 0, midPresence: 0, highHits: 0, highPresence: 0,
-    beatPhase: 0, beatConfidence: 0, beatOnset: false, responsiveness: 0.6, intensityGlow: 0,
+    beatPhase: 0, beatConfidence: 0, beatOnset: false, analysisFrames: 0, responsiveness: 0.6, intensityGlow: 0,
     events: [], eventState: events.state, camera,
     palette: colorEngine.getResolved(), light: false, depth,
     quality: quality.params, post, flash,
@@ -315,6 +315,8 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     ctx.beatConfidence = f.beat.confidence;
     ctx.beatOnset = beatOnsetLatched;
     beatOnsetLatched = false;
+    ctx.analysisFrames = framesSinceStep;
+    framesSinceStep = 0;
     beatPulse.update(f.beat.phase, ctx.beatOnset && f.fade_in_out > 0.5, dt, f.beat.confidence, f.energy.instant);
 
     ctx.events = drained;
@@ -379,6 +381,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
 
   // Beat onsets arrive at analysis rate; latch so a render frame never misses one.
   let beatOnsetLatched = false;
+  let framesSinceStep = 0;
 
   // Frame-rate cap. "Match display" renders on every refresh. A cap that
   // divides the measured refresh (165 → 82.5, 55) renders every k-th refresh,
@@ -411,10 +414,13 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
         rafIntervals.push(d);
         if (rafIntervals.length > REFRESH_SAMPLES) rafIntervals.shift();
         if (rafIntervals.length >= 20) {
-          // Lower quartile of intervals: rAF never fires early, but slow frames
-          // stretch some intervals, so the median of the fastest half is robust.
+          // rAF never fires early, but slow frames stretch some intervals: take
+          // the mean of the intervals near the fastest (within 20% of the 10th
+          // percentile), which is the refresh without the jitter bias.
           const sorted = [...rafIntervals].sort((a, b) => a - b);
-          refreshMs = sorted[Math.floor(sorted.length * 0.25)];
+          const base = sorted[Math.floor(sorted.length * 0.1)];
+          const near = sorted.filter((d) => d <= base * 1.2);
+          refreshMs = near.reduce((x, y) => x + y, 0) / near.length;
         }
       }
     }
@@ -456,6 +462,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     pushFrame(fr: AudioFeatureFrame): void {
       events.process(fr);
       if (fr.beat.onset) beatOnsetLatched = true;
+      framesSinceStep++;
       frame = fr;
     },
     step,

@@ -16,7 +16,7 @@ out vec4 frag;
 //#include common
 //#include ink
 void main() {
-  vec2 uv = v_world / u_domain;
+  vec2 uv = warpUv(v_world / u_domain);
   vec3 toCam = u_cam_pos - v_pos;
   float dist = length(toCam);
   vec3 V = toCam / dist;

@@ -62,6 +62,10 @@ export interface HarnessApi {
   /** Real time: run the renderer's own rAF loop with a frame cap for `seconds`,
    * feeding audio at wall-clock speed; returns every rendered frame's time (ms). */
   pacingRun(seconds: number, cap: number): Promise<{ frames: number[]; displayHz: number }>;
+  /** Analysis-frame hit envelopes since the track was loaded (audio time s). */
+  hitLog(): { t: number; bass: number; mid: number; high: number }[];
+  /** Camera state (debugging frame-rate independence). */
+  cam(): Record<string, unknown>;
 }
 
 declare global {
@@ -252,6 +256,11 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
   const events: SonoraEvent[] = [];
   renderer.onEvent((e) => events.push(e));
   const gl = renderer.canvas.getContext('webgl2');
+  const hits: { t: number; bass: number; mid: number; high: number }[] = [];
+  source.subscribe((f) => hits.push({
+    t: source.offlineTime, bass: Math.max(f.hits.sub_bass, f.hits.bass),
+    mid: Math.max(f.hits.low_mid, f.hits.mid, f.hits.upper_mid), high: Math.max(f.hits.high, f.hits.air),
+  }));
   const api: HarnessApi = {
     ready: true,
     tracks,
@@ -262,6 +271,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       const pcm = decodeWavMono(buf);
       if (!pcm) throw new Error('could not decode wav');
       source.loadOffline(pcm.mono, pcm.sampleRate);
+      hits.length = 0;
       return { duration: pcm.mono.length / pcm.sampleRate, sampleRate: pcm.sampleRate };
     },
     advance(seconds: number, dt: number): number {
@@ -366,6 +376,12 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
         requestAnimationFrame(feed);
         renderer.start();
       });
+    },
+    hitLog: () => hits,
+    cam: () => {
+      const c = renderer.camera as unknown as Record<string, unknown>;
+      const pick = (k: string): unknown => c[k];
+      return { position: pick('position'), yaw: pick('yaw'), pitch: pick('pitch'), roll: pick('roll'), center: pick('center'), viewHeight: pick('viewHeight'), t: pick('t'), time: source.offlineTime, hits: hits.length };
     },
     seedText(title: string): void { renderer.events.notifyTrackChange({ title }); },
     time: () => source.offlineTime,

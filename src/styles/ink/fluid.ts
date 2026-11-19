@@ -78,6 +78,9 @@ export interface FlowParams {
   cap: [number, number, number, number];
   /** Soft single-step advection (v0.1) instead of MacCormack. */
   soft: boolean;
+  /** Advect in fixed steps of this many seconds (0 = once per rendered frame).
+   * Call `planSteps` before queuing the frame's splats; draw with `warpTime`. */
+  fixedStep?: number;
 }
 
 export interface FluidParams {
@@ -146,6 +149,12 @@ export class FluidSim {
   private holdData = new Float32Array(MAX_HOLDS * 4);
   private holdCount = 0;
   private clock = 0;
+  private acc = 0;
+  private planned = -1;
+  /** Fixed-step mode: seconds since the last advection step. The display
+   * samples the ink this far along the flow, so motion stays smooth at any
+   * refresh while the ink is resampled exactly as at the tuned rate. */
+  warpTime = 0;
 
   private vel!: Double;
   private pressure!: Double;
@@ -263,12 +272,31 @@ export class FluidSim {
    * v0.1 Flow Ink motion: velocity = curl-noise field (overwritten each frame),
    * splats add ink and a one-frame push on top, then the ink is advected.
    */
+  /**
+   * Fixed-step mode: how many advection steps of `step` seconds this frame
+   * runs (0 at refresh rates above 1/step on most frames). Call once per frame
+   * before queuing splats.
+   */
+  planSteps(rawDt: number, step: number): number {
+    this.acc += Math.min(Math.max(rawDt, 0), MAX_SIM_DT * 2);
+    let n = Math.floor(this.acc / step + 1e-6);
+    // A long hitch: run at most 3 steps and drop the rest (no spiral).
+    if (n > 3) { n = 3; this.acc = 3 * step; }
+    this.acc = Math.max(0, this.acc - n * step);
+    this.planned = n;
+    this.warpTime = this.acc;
+    return n;
+  }
+
   stepFlow(rawDt: number, p: FlowParams): void {
     const gl = this.gl;
-    const dt = Math.min(rawDt, MAX_SIM_DT);
+    const fixed = (p.fixedStep ?? 0) > 0;
+    if (!fixed) { this.warpTime = 0; this.planned = -1; }
+    const steps = fixed ? Math.max(0, this.planned) : 1;
+    const dt = fixed ? p.fixedStep! : Math.min(rawDt, MAX_SIM_DT);
     const simTexel = 1 / this.simRes;
     const dyeTexel = 1 / this.dyeRes;
-    this.clock += dt;
+    this.clock += dt * steps;
     gl.disable(gl.BLEND);
     gl.disable(gl.DEPTH_TEST);
     gl.bindVertexArray(this.quadVAO);
@@ -290,13 +318,16 @@ export class FluidSim {
       u_dissipation: p.dyeDissipation as number[], u_floor_decay: p.dyeFloorDecay as number[],
       u_drizzle: p.drizzle as number[], u_drizzle_t: this.clock, u_cap: p.cap as number[],
     };
-    if (p.soft) {
-      this.pass('advectDye', this.dye.write, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.dye.read }, { ...dyeU, u_pass: 2 });
-    } else {
-      this.pass('advectDye', this.tmp, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.dye.read }, { ...dyeU, u_pass: 0 });
-      this.pass('advectDye', this.dye.write, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.tmp }, { ...dyeU, u_pass: 1 });
+    for (let i = 0; i < steps; i++) {
+      if (p.soft) {
+        this.pass('advectDye', this.dye.write, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.dye.read }, { ...dyeU, u_pass: 2 });
+      } else {
+        this.pass('advectDye', this.tmp, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.dye.read }, { ...dyeU, u_pass: 0 });
+        this.pass('advectDye', this.dye.write, { u_vel: this.vel.read, u_dye: this.dye.read, u_tmp: this.tmp }, { ...dyeU, u_pass: 1 });
+      }
+      this.swap(this.dye);
     }
-    this.swap(this.dye);
+    this.planned = -1;
     this.pass('height', this.heightTex, { u_dye: this.dye.read }, { u_texel: [simTexel, simTexel] });
     gl.bindVertexArray(null);
   }

@@ -145,6 +145,8 @@ const GROW: Record<string, { seed: number; time: number }> = {
 };
 /** The one-frame push lasts one 60 fps frame of time at any frame rate. */
 const PUSH_TIME = 1 / 60;
+/** One analysis frame of audio (the DSP produces 60 per second). */
+const ANALYSIS_DT = 1 / 60;
 /** Marble draws a full screen of two-tone marbling (as before round 6): a
  * marbled field seeded across the world that renews slowly (fade, 1/s), with
  * the same motion and hits as Glow mixing into it. */
@@ -275,8 +277,12 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   const params: FlowParams = {
     period: FLOW_PERIOD, detail: 0, offset: flowOffset, z: flowZ, speed: 0,
     dyeDissipation: [1, 1, 1.4, 6], dyeFloorDecay: [0.01, 0.01, 0.02, 0],
-    drizzle: [0, 0, 1], cap: DYE_CAP, soft: true,
+    drizzle: [0, 0, 1], cap: DYE_CAP, soft: true, fixedStep: 0,
   };
+  /** Fixed-step advection: steps the sim runs this frame (-1 = per-frame mode). */
+  let stepsNow = -1;
+  /** Hits from events (drop, big hit), landed in update(). */
+  const eventHits: { scale: number; attack: number[] }[] = [];
 
   // ── Placement helpers ─────────────────────────────────────────
   /** Domain uv for a normalised screen point (may be off-screen). */
@@ -318,7 +324,13 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
    */
   function blob(ctx: StyleContext, sx: number, sy: number, channel: 0 | 1 | 2, strength: number, radius: number, pushX: number, pushY: number, attack = ATTACK): void {
     const [vx, vy] = toView(ctx, sx, sy);
-    const [x, y] = screenToUv(ctx, vx, vy);
+    let [x, y] = screenToUv(ctx, vx, vy);
+    if (stepsNow >= 0 && sim.warpTime > 0) {
+      // The display shows the ink `warpTime` along the flow: land where it will be seen.
+      flowVelocity(x, y, params, flowOut);
+      x -= flowOut[0] * sim.warpTime;
+      y -= flowOut[1] * sim.warpTime;
+    }
     const look = DROPS[variant] ?? DROPS.glow;
     const dye: Splat['dye'] = [0, 0, 0, 0];
     dye[channel] = strength * look.amount;
@@ -330,7 +342,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       const cum: number[] = [];
       attack.reduce((s, w) => { cum.push(s + w); return s + w; }, 0);
       const ld: Landing = { x, y, radius: r, dye, detail: look.edge, seed, age: 0, cum, m: 0, r: 0,
-        pvx: tps(pushX * v), pvy: tps(pushY * v), fresh: true };
+        pvx: tps(pushX * v), pvy: tps(pushY * v), fresh: true, pushed: false };
       landings.push(ld);
       land(ld, ctx.dt);
       return;
@@ -344,7 +356,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   // ── Landing over time (fixed behaviour) ───────────────────────
   /** A hit still landing: `cum` = cumulative shares at 0, 1/60, 2/60 … s;
    * `m` / `r` = the amount and radius already deposited; push in sim texels/s. */
-  interface Landing { x: number; y: number; radius: number; dye: Splat['dye']; detail: number; seed: number; age: number; cum: number[]; m: number; r: number; pvx: number; pvy: number; fresh: boolean }
+  interface Landing { x: number; y: number; radius: number; dye: Splat['dye']; detail: number; seed: number; age: number; cum: number[]; m: number; r: number; pvx: number; pvy: number; fresh: boolean; pushed: boolean }
   const landings: Landing[] = [];
   const flowOut: [number, number] = [0, 0];
   const growSeed = (): number => inkExp('growSeed', (GROW[variant] ?? GROW.glow).seed);
@@ -386,12 +398,22 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       q.m = m;
       q.r = r;
     }
-    // Push: the old one-frame push, spread over one 60 fps frame of time.
-    const w = Math.max(0, Math.min(q.age + dt, PUSH_TIME) - q.age) / Math.max(dt, 1e-6);
+    // Push: the old one-frame push, lasting one 60 fps frame of time. With
+    // fixed-step advection it rides the first step after the hit (exactly as at 60 fps).
+    let w: number;
+    let sdt: number;
+    if (stepsNow >= 0) {
+      w = stepsNow > 0 && !q.pushed ? 1 / stepsNow : 0;
+      if (w > 0) q.pushed = true;
+      sdt = (params.fixedStep ?? 0) * stepsNow;
+    } else {
+      w = Math.max(0, Math.min(q.age + dt, PUSH_TIME) - q.age) / Math.max(dt, 1e-6);
+      sdt = Math.min(dt, 1 / 30);
+    }
     if (w > 0 && (q.pvx !== 0 || q.pvy !== 0)) {
       sim.splat({ x: q.x, y: q.y, radius: q.radius, dye: [0, 0, 0, 0], vx: q.pvx * w, vy: q.pvy * w, radial: 0, swirl: 0, detail: 0, seed: q.seed });
     }
-    const sdt = Math.min(dt, 1 / 30);
+    // Carry the landing point as the GPU carries the ink already deposited.
     flowVelocity(q.x, q.y, params, flowOut);
     q.x += (flowOut[0] + (q.pvx * w) / sim.simRes) * sdt;
     q.y += (flowOut[1] + (q.pvy * w) / sim.simRes) * sdt;
@@ -404,7 +426,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       // Landed already this frame (a hit from onEvent, before update).
       if (q.fresh) { q.fresh = false; continue; }
       land(q, dt);
-      if (q.m >= 1 - 1e-6 && q.age >= growTime() && q.age >= PUSH_TIME) landings.splice(i, 1);
+      if (q.m >= 1 - 1e-6 && q.age >= growTime() && q.age >= PUSH_TIME && (stepsNow < 0 || q.pushed)) landings.splice(i, 1);
     }
   }
 
@@ -440,8 +462,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   }
 
   // ── Per-frame mapping (v0.1) ──────────────────────────────────
-  function mapAudio(ctx: StyleContext): void {
-    const dt = ctx.dt;
+  function mapAudio(ctx: StyleContext, dt: number): void {
     const fade = ctx.fadeInOut;
     bassCooldown -= dt; highCooldown -= dt; midCooldown -= dt;
     if (fade <= 0.1) return;
@@ -465,12 +486,18 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     id: 'ink',
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
+      // Event hits land in update() (after this frame's advection steps are
+      // planned), on this same frame; the previous behaviour landed them here.
+      const hit = (scale: number, attack: number[]): void => {
+        if (debugFlags.inkLegacy) bassBlob(ctx, 1, scale, attack);
+        else eventHits.push({ scale, attack });
+      };
       if (e.type === 'drop') {
         flowZ += FLOW_JUMP;
-        bassBlob(ctx, 1, 1.15, ATTACK_DROP);
+        hit(1.15, ATTACK_DROP);
         lastDropAt = clock;
       } else if (e.type === 'bigHit' && clock - lastDropAt > 1.5) {
-        bassBlob(ctx, 1);
+        hit(1, ATTACK);
       } else if (e.type === 'trackChange') {
         flowZ += FLOW_JUMP;
       }
@@ -505,9 +532,24 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       params.dyeFloorDecay[0] = marble ? 0 : 0.01 + 0.04 * (1 - fade);
       params.dyeFloorDecay[1] = params.dyeFloorDecay[0];
 
+      // The soft step resamples the ink (bilinear) every time it runs, which
+      // blurs it a little: run once per rendered frame, 165 fps blurred it
+      // ~2x as much per second as the tuned 60 fps (softer, dimmer hits). It
+      // runs at the tuned 60 Hz; the display samples the ink along the flow in
+      // between, so motion stays smooth at any refresh.
+      params.fixedStep = !debugFlags.inkLegacy && inkExp('fixedStep', 1) > 0 ? LAND_STEP : 0;
+      stepsNow = params.fixedStep ? sim.planSteps(dt, params.fixedStep) : -1;
       if (debugFlags.inkLegacy) { landings.length = 0; landPending(); }
-      else { landAll(dt); pending.length = 0; }
-      mapAudio(ctx);
+      else {
+        landAll(dt);
+        pending.length = 0;
+        for (const h of eventHits) bassBlob(ctx, 1, h.scale, h.attack);
+        eventHits.length = 0;
+      }
+      // Hits are decided per analysis frame (60 per second of audio), not per
+      // rendered frame: the same hits, at the same moments, at any refresh.
+      if (debugFlags.inkLegacy) mapAudio(ctx, ctx.dt);
+      else if (ctx.analysisFrames > 0) mapAudio(ctx, ctx.analysisFrames * ANALYSIS_DT);
       for (const q of landings) q.fresh = false;
     },
 
@@ -543,6 +585,10 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
         gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, sim.dyeTexture); gl.uniform1i(u.u_dye, 0);
         gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, sim.heightTexture); gl.uniform1i(u.u_height, 1);
         gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, grainTex); gl.uniform1i(u.u_grain, 2);
+        gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, sim.velocityTexture); gl.uniform1i(u.u_vel, 3);
+        gl.uniform1f(u.u_warp, stepsNow >= 0 ? sim.warpTime : 0);
+        gl.uniform4fv(u.u_warp_diss, params.dyeDissipation);
+        gl.uniform4fv(u.u_warp_floor, params.dyeFloorDecay);
         gl.uniform1f(u.u_dye_res, sim.dyeRes);
         gl.uniform1f(u.u_sim_res, sim.simRes);
         gl.uniform1f(u.u_domain, DOMAIN);

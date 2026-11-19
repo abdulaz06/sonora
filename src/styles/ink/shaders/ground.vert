@@ -11,12 +11,17 @@ uniform float u_height_scale;
 uniform float u_lift_scale;
 uniform vec3 u_cam_pos;
 uniform float u_curve_k;            // >0 planet (∩), <0 bowl (U)
+uniform sampler2D u_vel;            // fixed-step advection: sample the height along the flow (ink.glsl warpUv)
+uniform float u_warp;
+uniform float u_sim_res;
 out vec2 v_world;
 out vec3 v_pos;
 float inkHeightV(vec4 blur) { return 1.0 - exp(-(blur.r + blur.g) * 0.9); }
 void main() {
   vec2 world = u_grid_origin + a_grid * u_grid_size;
-  vec4 hb = textureLod(u_height, world / u_domain, 0.0);
+  vec2 huv = world / u_domain;
+  if (u_warp > 0.0) huv -= textureLod(u_vel, huv, 0.0).xy / u_sim_res * u_warp;
+  vec4 hb = textureLod(u_height, huv, 0.0);
   float h = inkHeightV(hb) * u_height_scale + hb.a * u_lift_scale;
   // Far vertices are sparse relative to the field: flatten them so distant
   // ridges don't alias into spikes (fog hides the rest).

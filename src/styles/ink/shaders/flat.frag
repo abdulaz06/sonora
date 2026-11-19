@@ -13,7 +13,7 @@ void main() {
   vec2 p = (gl_FragCoord.xy - 0.5 * u_resolution) / u_resolution.y;
   float c = cos(u_cam_rot), s = sin(u_cam_rot);
   vec2 world = u_cam_center + mat2(c, s, -s, c) * p * u_cam_view_h;
-  vec2 uv = world / u_domain;
+  vec2 uv = warpUv(world / u_domain);
 
   float texelsPerPixel = u_dye_res * u_cam_view_h / (u_domain * u_resolution.y);
   InkSample ink = sampleInk(uv, texelsPerPixel > 1.5 ? 1.0 : 0.0);

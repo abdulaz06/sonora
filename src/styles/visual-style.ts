@@ -113,6 +113,10 @@ export interface StyleSignals {
   beatPhase: number;
   beatConfidence: number;
   beatOnset: boolean;
+  /** Analysis frames (60 per second of audio) that arrived since the last
+   * rendered frame: per-hit logic runs per analysis frame so it is the same
+   * at any refresh rate. */
+  analysisFrames: number;
   /** Responsiveness slider, 0 = smooth, 1 = punchy. */
   responsiveness: number;
 }

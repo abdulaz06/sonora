@@ -31,6 +31,21 @@ uniform float u_dither;       // harness: Marble stipple dither scale (1 = shipp
 uniform float u_veins;        // harness: Marble vein strength scale (1 = shipped)
 uniform float u_vein_aa;      // Marble: fade veins thinner than a pixel to their mean tone (0 = legacy)
 uniform float u_stip_aa;      // harness: widen the stipple threshold by the field's pixel footprint
+// Fixed-step advection: the ink is resampled at the tuned 60 Hz; between steps
+// the display samples it u_warp seconds further along the flow (and faded as
+// far), so motion is smooth at any refresh.
+uniform sampler2D u_vel;      // flow velocity, sim texels per second
+uniform float u_warp;         // seconds since the last advection step (0 = none)
+uniform vec4 u_warp_diss;     // per-channel decay (1/s), as the sim applies it
+uniform vec4 u_warp_floor;    // per-channel subtractive decay (units/s)
+
+/** Domain uv to sample the ink at, `u_warp` seconds along the flow. */
+vec2 warpUv(vec2 uv) {
+  return u_warp > 0.0 ? uv - texture(u_vel, uv).xy / u_sim_res * u_warp : uv;
+}
+vec4 warpFade(vec4 d) {
+  return u_warp > 0.0 ? max(d * exp(-u_warp_diss * u_warp) - u_warp_floor * u_warp, 0.0) : d;
+}
 
 struct InkSample {
   vec4 d;      // sharpened dye
@@ -47,6 +62,8 @@ InkSample sampleInk(vec2 uv, float lod) {
   // Harness knob: Catmull-Rom sampling of the sim-resolution blurred field
   // (tested in the smoothness fix: no measurable or visible change; off).
   s.blur = u_height_cubic == 1 ? sampleBicubic(u_height, uv, vec2(u_sim_res)) : texture(u_height, uv);
+  raw = warpFade(raw);
+  s.blur = warpFade(s.blur);
   // Unsharp mask with a clamped negative lobe: crisper filaments, no halos.
   s.d = max(raw + u_sharpen * clamp(raw - s.blur, -0.2 * raw, vec4(8.0)), 0.0);
   s.d.a = raw.a;

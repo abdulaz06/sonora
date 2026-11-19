@@ -112,6 +112,8 @@ export class WasmFrameSource implements FrameSource {
   // Offline
   private offlinePcm: Float32Array | null = null;
   private offlinePos = 0;
+  /** Exact (fractional) sample position the harness has asked for. */
+  private offlineTarget = 0;
   private offlineRate = 44100;
 
   static async create(): Promise<WasmFrameSource> {
@@ -387,6 +389,7 @@ export class WasmFrameSource implements FrameSource {
     this.offlinePcm = mono;
     this.offlineRate = sampleRate;
     this.offlinePos = 0;
+    this.offlineTarget = 0;
     this.analyzer?.free();
     this.analyzer = new WasmAnalyzer(sampleRate);
   }
@@ -399,7 +402,10 @@ export class WasmFrameSource implements FrameSource {
     const pcm = this.offlinePcm;
     const an = this.analyzer;
     if (!pcm || !an) return 0;
-    const end = Math.min(pcm.length, this.offlinePos + Math.round(seconds * this.offlineRate));
+    // Keep the fraction: steps of 1/165 s are 267.27 samples at 44.1 kHz, and
+    // rounding each one ran the audio 0.1% slow at 165 fps.
+    this.offlineTarget = Math.max(this.offlineTarget, this.offlinePos) + seconds * this.offlineRate;
+    const end = Math.min(pcm.length, Math.round(this.offlineTarget));
     const hop = an.hop();
     let produced = 0;
     while (this.offlinePos < end) {
