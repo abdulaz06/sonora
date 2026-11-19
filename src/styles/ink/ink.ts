@@ -136,8 +136,8 @@ const LAND_STEP = 1 / 60;
  * size over `time` seconds (ease-out), carried by the flow while it lands; its
  * final shape is exactly the old blob's. Glow spreads in 50 ms so its kicks
  * keep their punch (peak within ~70 ms, as before); the crisp looks, where a
- * blob popping in is most visible, spread over 100 ms (measured: pop score at
- * 165 fps p99 Glow 5.6 → 2.1, Marble 4.0 → 2.5, Sumi 4.8 → 1.8). */
+ * blob popping in is most visible, spread over 100 ms (pop score p99 at 165
+ * fps, with the other fixes: Glow 7.3 → 1.6, Marble 1.3 → 0.1, Sumi 4.8 → 1.9). */
 const GROW: Record<string, { seed: number; time: number }> = {
   glow: { seed: 0.45, time: 0.05 },
   marble: { seed: 0.45, time: 0.1 },

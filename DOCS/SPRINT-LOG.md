@@ -1,24 +1,74 @@
-# Ink smoothness fix (spawn pops, jagged lines, frame pacing) — in progress
+# Ink smoothness fix (spawn pops, jagged lines, frame pacing) — done (awaiting review)
 
-Summary: (written at the end)
+## Summary
+
+**Watch first:** `verify/ink-fix/videos/` — for each look (Depth, Ember palette, your song at 20 s), the same seeded passage rendered at 165 fps timing with the previous behaviour (left) and the fix (right): `<look>-depth-realtime-165fps.mp4` and `<look>-depth-slow4x.mp4`; `marble-highlight-landing-slow8x.mp4` is the moment class from the slow-motion evidence (a highlight hit landing in Marble Depth). In the app: Settings › Advanced › "Ink: previous behaviour" switches live between the two (fix is the default). **The switch is temporary: it gets removed once you sign off.**
+
+### Root causes (with the measurements that proved them)
+1. **Frame pacing.** The cap defaulted to 60 on a 165 Hz display; no offered cap divided 165, so frames were held 3-3-3-2 refreshes. Measured with the new real-time pacing check (renderer's own rAF loop on this 165 Hz display): cap 60 → refreshes per frame {3/2} alternating; match display → {1}, 0 held frames in 1319; 1/2 → {2}; 1/3 → {3}.
+2. **Frame-rate dependence (Ink + engine), five per-frame assumptions**, each confirmed with the new `--dt-sweep` (same seeded passage at 60/120/165 fps):
+   - landing counted in frames (18 ms at 165 fps instead of 50 ms);
+   - the one-frame push (2.75× weaker at 165 fps);
+   - **the soft advection resampled the ink once per rendered frame**: at 165 fps the ink was blurred ~2× as much per second as at the tuned 60 fps (Glow Flat passage: 60 vs 165 fps brightness +28%, picture difference 61%; Glow's median kick rise 47% → 39%; Marble's large-shape motion 3.3% → 5.5%) — this predates the fix (the previous behaviour shows it too);
+   - hits decided per rendered frame (a cooldown could expire on a different audio frame);
+   - the flash guard's running mean assumed 60 observations per second.
+3. **Spawn pops.** Three mechanisms: (a) the frame-counted landing above (a full-size blob in 18 ms); (b) the 2nd and 3rd shares of a hit landed at the hit's original spot while the 1st had already flowed on (visible as ghosted, triple-stacked bands in Sumi); (c) a full-size blob fading in instead of entering the flow. Marble's highlight was also a third colour (mint glow ×2) against its duotone intent. New pop score (new ink unexplained by the flow or by a brightness change, % of the frame per 1/60 s) at 165 fps, p99: previous **Glow 5.57 / Marble 4.03 / Sumi 4.80** (the evidence shows 4.3% in 21 ms).
+4. **Jagged, breaking lines.** One factor at a time on the same seeded sequence (dye resolution ×2, sharpening off, bilinear / Catmull-Rom / B-spline display filtering, smooth sampling of the blurred field, MacCormack vs soft advection, grain off, dither off, veins off): only **Marble's veins** moved the numbers (Marble Depth fine-detail change 11.2% → 5.6% with veins off; display-sampling factors < 0.1). The veins are a sine of the ink ratio; where the ratio is steep (fast-stretched boundaries) several vein lines fall inside one pixel and alias into dashed, saw-toothed lines that change every frame. Close-ups show it directly. Near-camera magnification and dye resolution were not the cause. Sumi has no veins; none of the display factors moved its numbers; its "breaking" was the ghosted landing (3b).
+
+### What changed and why it's minimal
+- **Frame cap (D61):** default "match display" (refresh measured from rAF intervals, also probed on the menu), even divisor caps (every 2nd/3rd refresh), common caps marked "may stutter on this display" in the (i) text when they don't divide it; settings v7 migrates a saved 60 to match, keeps other choices (test). "Unlimited" not offered (the WebView shows one frame per refresh; extras are thrown away).
+- **FPS readout (D62):** Settings › Performance › Show FPS (off) or P: tiny Bone/42% mono text in a chosen corner, fps · cap · worst frame, twice a second, DOM only.
+- **Frame-rate independence (D63):** landing and push in seconds; advection in fixed 1/60 s steps with the display sampling the ink along the flow in between (identical to before at 60 fps — 0.00 difference; less sim work at 165); hits per analysis frame; flash guard in real time. Harness: audio fed in whole hops with the fraction kept (it ran 0.1% slow at 165 fps, and partial hops shifted the analysis windows).
+- **Pops (D64):** hits start as a seed (45% radius) on the frame of the hit and spread to full size (Glow 50 ms so kicks keep their punch; Marble and Sumi 100 ms), carried by the flow (CPU copy of the curl field) — the final shape is exactly the old blob's. Marble's highlight lights the marble in its own colours. Motion model, speeds, fades, thresholds, timing of hits, camera and palettes untouched.
+- **Jagged lines (D65):** veins thinner than a pixel fade to their average tone; veins wide enough to draw are unchanged.
+
+### Gates (60 fps, the harness rate; baseline → fix). Logs: `verify/ink-fix/baseline/gates/gates.log`, `verify/ink-fix/final/gates/gates.log`
+| look · view | sync seen, house / song (regional) | median rise · peak lag | flicker (dense-128, Punchy): swings · max 1-frame step | fine share house / song | background step p99 |
+|---|---|---|---|---|---|
+| Glow · Flat | 100 / 100 (100 / 100) → 100 / 100 (100 / 100) | 27.4 / 61.2% · 62 / 54 ms → 24.0 / 56.7% · 62 / 70 ms | 2.08/s · 0.102 → 2.00/s · 0.066 | 43 / 43 → 44 / 44% | 0.0044 / 0.0040 → 0.0028 / 0.0025 |
+| Glow · Depth | 100 / 100 (100 / 100) → 100 / 100 (100 / 100) | 20.1 / 45.0% · 64 / 70 ms → 28.2 / 67.3% · 70 / 96 ms | 2.42/s · **0.121 FAIL** → 2.33/s · 0.081 | 48 / 45 → 47 / 46% | 0.0054 / 0.0040 → 0.0042 / 0.0040 |
+| Marble · Flat | 100 / 96 (100 / 100) → 100 / 96 (100 / 100) | 16.0 / 31.0% · 54 / 66 ms → 14.5 / 26.4% · 62 / 77 ms | 0.00/s · 0.062 → 0.00/s · 0.051 | 75 / 74 → 71 / 71% | 0.0299 / 0.0153 → 0.0212 / 0.0070 |
+| Marble · Depth | 100 / 96 (100 / 100) → 100 / 96 (100 / 100) | 15.9 / 35.8% · 56 / 64 ms → 13.0 / 30.8% · 67 / 101 ms | 1.00/s · 0.101 → 1.17/s · 0.041 | 71 / 71 → 67 / 68% | 0.0029 / 0.0031 → 0.0025 / 0.0028 |
+| Sumi · Flat | regional 100 / 100 → 100 / 100 | — | 0.00/s · 0.043 → 0.00/s · 0.014 | 48 / 53 → 52 / 57% | 0.0099 / 0.0075 → 0.0028 / 0.0026 |
+| Sumi · Depth | regional 96 / 96 → 100 / 100 | — | 0.00/s · 0.055 → 0.00/s · 0.025 | 42 / 54 → 50 / 60% | 0.0097 / 0.0063 → 0.0039 / 0.0036 |
+
+Sync ≥ 90% everywhere (Sumi regional). Flicker passes everywhere (it failed once at baseline). Fine share: Glow ±1, Marble 3-4 points better, Sumi 4-8 points worse (see "Unsure"). Peak lag grows by up to 37 ms in two cases (the spread delays the peak; kicks are still seen within the 133 ms window on the frame of the hit).
+
+### dt sweep (165 fps vs 60 fps, same passage). `verify/ink-fix/dt-sweep/*/dt-sweep.json`
+Fix → previous behaviour (165 fps vs its own 60 fps run):
+- Marble Depth: **PASS**, drift 3.0%, pop p99 0.09 vs 0.10, step 0.023 vs 0.018 → previous FAIL: drift 22.9%, pop p99 1.33 vs 0.15 (9×), step 0.069 vs 0.035.
+- Glow Depth: rise 44.7 vs 47.5%, swings 1.25 vs 1.50, step 0.035 vs 0.034, fine share 51 vs 51, drift 7.8%; **pop p99 1.63 vs 0.75 (2.2×, gate ≤2×)** → previous: pop 7.29 vs 1.43 (5×), step 0.066 vs 0.035, swings 1.75 vs 0.75, drift 22.8%.
+- Sumi Depth: **PASS**, drift 1.0% → previous drift 6.2%, pop p99 4.79 vs 2.87, step 0.041 vs 0.023.
+- Flat (fix): Marble **PASS** (drift 5.8%), Sumi **PASS** (1.0%), Glow pop p99 3.65 vs 1.68 (2.2×), everything else within tolerance (drift 10.9%).
+- Glow's remaining pop gap is mostly sampling phase: at 60 fps the 1/60 s window ends exactly on the hit frame (the seed appearing); at 165 fps the 18 ms window can include 12 ms of Glow's 50 ms spread. The landing curve is the same in time.
+- Still comparison (`verify/ink-fix/stills/marble-depth-60-vs-165.png`): previous @60 vs @165 pixel difference 17.5 (darker, smoother at 165); fix @60 vs @165: 5.0.
+
+### Pop score at 165 fps (p99 / peak, % of the frame per 1/60 s; your song at 20 s, Depth, Planet, Ember; final code vs previous behaviour)
+Glow 7.29 / 11.46 → 1.63 / 4.87 · Marble 1.33 / 2.55 → 0.09 / 0.15 · Sumi 4.79 / 6.13 → 1.92 / 2.28. (Earlier 2 s passage, before the advection fix: Glow 5.57 → 2.10, Marble 4.03 → 2.48, Sumi 4.80 → 1.84.)
+
+### Frame cost (interleaved, 3 rounds, Medium 1080p, median): unchanged within ±0.05 ms (1.2-1.6 ms every look and view). Pacing: PASS (above).
+
+### Unsure / for your eyes
+- **Sumi's fine-share number rises** (42-54% → 50-60%; it already failed the ≤45% gate at baseline). Two causes, both measured: ink no longer smeared by the ghosted landing (crisper bands, +3 points), and drops spreading as a moving rim (+5). Its absolute fine change stays tiny (≈2% vs Glow's ≈5%) and spread evenly, no spikes at hits. Judge with the A/B switch.
+- **The look at 165 fps changes**: the previous behaviour was blurrier at 165 fps than at the 60 fps you tuned and approved in earlier rounds; the fix restores the 60 fps look at any refresh, so Marble at 165 is crisper than what you saw with the cap at max.
+- A small 165-vs-60 difference remains from Glow's 50 ms seed spread (drift 7.8% Depth / 10.9% Flat; 0.2% brightness and 1.6% difference with the spread off; Marble and Sumi 1-6%). I couldn't pin it down further; Glow's sync, flicker and motion numbers agree, its pop p99 is 2.2× (gate 2×, likely sampling phase, explained above).
+- The analyser reads the latest window whenever a hop is pending, so its frames depend on how audio is chunked (harness only — the live app's audio callback doesn't depend on the render rate). Worth knowing for future DSP work.
+- Disk: C: hit 0 bytes mid-run; scratch renders now go outside OneDrive. 2.1 GB of older output in `verify/frame-seq/` left alone.
 
 ## Checklist
 - [x] Read CLAUDE.md, D46/D47, rounds 6-7, Ink code + shaders, renderer; slow-motion evidence (`DOCS/reference/ink-bugs/`); originals moved to git-ignored `local-reference/ink-bugs/`
-- [x] Baseline worktree pinned at the pre-fix commit (`../sonora-baseline`, eec9f5c) so every baseline render is reproducible
-- [x] Baseline gates, 3 looks × Flat/Depth: `verify/ink-fix/baseline/gates/gates.log` (sync house-124 + ref-song, flicker dense-128 Punchy palette 0, motion gate, frame cost)
-- [x] Tooling: `frame-seq.mjs` any render rate (SEQ_FPS) + debug flags; `ink-metrics.py` (pop, jag, motion at 1/60 s, compare); `ink-gates.sh`; `ink-exp.sh` (one-factor experiments)
-- [x] Legacy switch (`debugFlags.inkLegacy`) reproduces the baseline pixel for pixel (90/90 frames)
-- [x] P3 root cause: Marble's veins alias where the ink ratio is steep (one-factor experiments, close-ups); fix = vein anti-aliasing
-- [x] P1 frame cap: match display default, divisor caps, settings v7 + migration test, (i) text, FPS readout (P), flash guard running mean time-based
-- [ ] P2 pop: time-based landing, seed growth, pending carried by the flow, Marble highlight in duotone — pop score at 165 fps per look
-- [ ] Harness: `--dt-sweep`, `--pacing` (written; run and calibrate)
-- [ ] All gates re-run (3 looks × Flat/Depth) against the baseline; numbers below
-- [ ] Videos `verify/ink-fix/` (side by side, real speed + 4× slow, 165 fps timing; Marble Depth highlight landing)
-- [ ] `npm run tauri build`, app runs; summary at the top; decisions D61+
+- [x] Baseline worktree pinned at the pre-fix commit (`../sonora-baseline`, eec9f5c); baseline gates `verify/ink-fix/baseline/gates/gates.log`
+- [x] Tooling: `frame-seq.mjs` any render rate + debug flags + JPEG; `ink-metrics.py` (pop, jag, motion at 1/60 s, compare); `ink-gates.sh`; `ink-exp.sh`; `ink-cost.mjs`; `find-hits.mjs`; `ink-ab-video.sh`
+- [x] Legacy switch reproduces the baseline (max 1/255 per pixel)
+- [x] P1 frame cap: match display default, divisor caps, settings v7 + migration test, (i) text, refresh probe on the menu, FPS readout (P), UI shots at 3 sizes
+- [x] P1 frame-rate independence: landing/push in seconds, fixed-step advection + display warp, hits per analysis frame, flash guard; harness audio fixes
+- [x] P2 pops: seed spread carried by the flow (additive stages), Marble highlight in its own colours; pop score per look
+- [x] P3 jagged lines: one-factor experiments; Marble vein anti-aliasing
+- [x] Permanent harness checks: `--dt-sweep`, `--pacing`, pop score, jaggedness (`ink-metrics.py`)
+- [x] All gates re-run, 3 looks × Flat/Depth (table above); dt sweeps; pacing; cost
+- [x] Videos `verify/ink-fix/videos/` + stills; desktop build (`npm run tauri build`, updater artifacts off) runs: audio capture started, settings migrated to v7 (backup `%APPDATA%\com.abdul.sonora\settings.backup-before-v7.json`)
+- [ ] Abdul reviews (A/B switch in Settings › Advanced); then remove the switch, `inkExp` knobs he doesn't need, and tag a release
 
-## Notes
-- Disk: C: was full (0 bytes) mid-run; scratch renders now go to the session scratchpad and are deleted after measuring. 2.1 GB of older harness output in `verify/frame-seq/` left untouched.
-- Baseline already fails some gates (recorded, the bar is "no worse"): Glow Depth flicker 1-frame step 0.121 (> 0.12, noted in Prompt 3 too), Marble fine share 71-75%, Marble Flat background step p99 0.030 on house-124, Sumi fine share 48-54%, Glow Depth fine share 48% (house-124). Frame cost varies run to run (1.5-14 ms for the same look), so cost is measured with repeats.
 
 ---
 
