@@ -39,6 +39,7 @@ export class FlashGuard {
   private running = 0;
   private last = 0;
   private time = 0;
+  private lastObserved = -1;
 
   /** 0–1: how strongly the composite holds luminance steady right now. */
   get damping(): number { return this.damp; }
@@ -75,7 +76,11 @@ export class FlashGuard {
   observe(luma: number): void {
     const t = this.time;
     this.last = luma;
-    this.running += (1 - Math.exp(-1 / 60 / RUNNING_TAU)) * (luma - this.running);
+    // Time-based (it assumed 60 observations a second: at 165 fps the running
+    // mean followed 2.75x faster than tuned).
+    const dt = this.lastObserved < 0 ? 1 / 60 : Math.min(0.1, Math.max(0, t - this.lastObserved));
+    this.lastObserved = t;
+    this.running += (1 - Math.exp(-dt / RUNNING_TAU)) * (luma - this.running);
     this.history.push({ t, l: luma });
     while (this.history.length && t - this.history[0].t > TROUGH_WINDOW_S) this.history.shift();
     this.measured = this.measured.filter((m) => t - m < 1);

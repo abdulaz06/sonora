@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_SETTINGS, mergeWithDefaults, SETTINGS_VERSION } from './settings';
+import { capIsEven, DEFAULT_SETTINGS, fpsCapChoices, mergeWithDefaults, SETTINGS_VERSION } from './settings';
 
 describe('settings migration', () => {
   it('fresh install: defaults, first run pending', () => {
@@ -10,12 +10,12 @@ describe('settings migration', () => {
     expect(s.nowPlaying).toEqual(DEFAULT_SETTINGS.nowPlaying);
   });
 
-  it('v1 (no version, retired style ids) to v6', () => {
+  it('v1 (no version, retired style ids) to current', () => {
     const s = mergeWithDefaults({
       mode: 'flow-ink', variants: { 'flow-ink': 'ink' }, paletteIndex: 3, autoDrift: true,
       lightModes: { 'flow-ink': 'light' }, depth: { 'flow-ink': false }, audioDevice: 'Speakers (Realtek(R) Audio)',
     });
-    expect(s.settingsVersion).toBe(6);
+    expect(s.settingsVersion).toBe(SETTINGS_VERSION);
     expect(s.mode).toBe('ink');
     expect(s.variants.ink).toBe('glow');
     expect(s.lightModes.ink).toBe('light');
@@ -68,6 +68,36 @@ describe('settings migration', () => {
     expect(s.setMode.palettes).toBe(false);
     expect(s.audioDeviceName).toBe('Headphones');
     expect(mergeWithDefaults(JSON.parse(JSON.stringify(s)))).toEqual(s);
+  });
+
+  it('v6 to v7: the old 60 fps default becomes match display, other caps are kept', () => {
+    expect(mergeWithDefaults({ settingsVersion: 6, fpsCap: 60 }).fpsCap).toBe(0);
+    expect(mergeWithDefaults({ settingsVersion: 3, fpsCap: 60 }).fpsCap).toBe(0);
+    for (const cap of [30, 90, 120, 144, 0]) expect(mergeWithDefaults({ settingsVersion: 6, fpsCap: cap }).fpsCap).toBe(cap);
+    // From v7 on, 60 is an explicit choice and stays.
+    expect(mergeWithDefaults({ settingsVersion: 7, fpsCap: 60 }).fpsCap).toBe(60);
+    expect(mergeWithDefaults({ settingsVersion: 7, fpsCap: -2 }).fpsCap).toBe(-2);
+    expect(mergeWithDefaults({ settingsVersion: 7, fpsCap: 77 }).fpsCap).toBe(0);
+    expect(DEFAULT_SETTINGS.fpsCap).toBe(0);
+    const s = mergeWithDefaults({ settingsVersion: 6 });
+    expect(s.showFps).toBe(false);
+    expect(s.fpsCorner).toBe('top-left');
+    expect(s.inkLegacy).toBe(false);
+    const v7 = mergeWithDefaults({ settingsVersion: 7, showFps: true, fpsCorner: 'bottom-left', inkLegacy: true });
+    expect([v7.showFps, v7.fpsCorner, v7.inkLegacy]).toEqual([true, 'bottom-left', true]);
+  });
+
+  it('frame-rate choices pace evenly on the measured display', () => {
+    const c165 = fpsCapChoices(165, 0);
+    expect(c165.map((c) => c.label)).toEqual(['match 165', '82.5', '55', '30', '60', '120', '144']);
+    expect(c165.filter((c) => c.uneven).map((c) => c.value)).toEqual([30, 60, 120, 144]);
+    const c60 = fpsCapChoices(60, 0);
+    expect(c60.map((c) => c.label)).toEqual(['match 60', '30']);
+    expect(fpsCapChoices(144, 0).map((c) => c.label)).toEqual(['match 144', '72', '48', '30', '60', '120']);
+    expect(capIsEven(60, 120)).toBe(true);
+    expect(capIsEven(60, 165)).toBe(false);
+    // A saved choice missing from the list is still offered.
+    expect(fpsCapChoices(165, 90).some((c) => c.value === 90)).toBe(true);
   });
 
   it('garbage in, defaults out', () => {

@@ -14,7 +14,7 @@ import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
 /** Bump when a default changes in a way saved settings must not override. */
-export const SETTINGS_VERSION = 6;
+export const SETTINGS_VERSION = 7;
 
 /** Settings each style keeps for itself (v5): changing one style never
  * changes another. Colours can be shared with `matchColours`. */
@@ -68,7 +68,8 @@ export interface PersistedSettings {
   responsiveness: number;
   /** Quality preset (`auto` adapts to frame time). */
   quality: QualityPreset;
-  /** Frame-rate cap (fps); 0 = match the display. */
+  /** Frame-rate cap: 0 = match the display (every refresh), -k = every k-th
+   * refresh (display / k), > 0 = that many fps (v7; before, 60 was the default). */
   fpsCap: number;
   /** Show Aura / Halo in the style picker. */
   showClassic: boolean;
@@ -117,10 +118,63 @@ export interface PersistedSettings {
   fullscreenMonitor: string | null;
   /** Check GitHub Releases for updates on launch. */
   checkUpdates: boolean;
+  // ── v7 ──
+  /** Frames-per-second readout in a corner (also the P key). */
+  showFps: boolean;
+  fpsCorner: Corner;
+  /** Temporary A/B: Ink's behaviour before the smoothness fix (removed after sign-off). */
+  inkLegacy: boolean;
 }
 
-/** Frame-rate cap choices; 0 = match the display. */
-export const FPS_CAPS = [30, 60, 90, 120, 144, 0] as const;
+/** Fixed frame-rate caps offered on every display (and 90, kept for older saves). */
+export const COMMON_FPS_CAPS = [30, 60, 120, 144] as const;
+const VALID_FIXED_CAPS = [30, 60, 90, 120, 144];
+/** Divisor caps: every 2nd, 3rd (or 4th) display refresh. */
+const DIVISOR_CAPS = [-2, -3, -4];
+
+export interface FpsCapChoice {
+  value: number;
+  label: string;
+  /** Frames land on an uneven number of refreshes on this display (judder). */
+  uneven: boolean;
+}
+
+/** Display rate as a short label: 165, 82.5, 59.9 → 60. */
+export function fpsLabel(fps: number): string {
+  const r = Math.round(fps);
+  return Math.abs(fps - r) < 0.15 ? String(r) : fps.toFixed(1);
+}
+
+/** Does a fixed cap pace evenly on a display of `hz` (a whole number of refreshes per frame)? */
+export function capIsEven(cap: number, hz: number): boolean {
+  if (cap <= 0 || hz <= 0) return true;
+  const k = hz / cap;
+  return Math.round(k) >= 1 && Math.abs(k - Math.round(k)) <= 0.04 * Math.round(k);
+}
+
+/**
+ * Frame-rate choices for a display measured at `hz` (0 = not measured yet):
+ * match display, its whole-number divisors (even pacing), then the common caps
+ * (marked uneven when they don't divide the refresh). The current choice is
+ * always included.
+ */
+export function fpsCapChoices(hz: number, current: number): FpsCapChoice[] {
+  const out: FpsCapChoice[] = [{ value: 0, label: hz ? `match ${fpsLabel(hz)}` : 'match display', uneven: false }];
+  const divisors = hz ? DIVISOR_CAPS.slice(0, hz >= 100 ? 2 : 1).map((k) => ({ value: k, fps: hz / -k })) : [];
+  for (const d of divisors) if (d.fps >= 20) out.push({ value: d.value, label: fpsLabel(d.fps), uneven: false });
+  for (const c of COMMON_FPS_CAPS) {
+    // A common cap that equals a divisor already listed is not repeated.
+    // Caps at or above the refresh are the same as matching it.
+    if (divisors.some((d) => Math.abs(d.fps - c) < 0.5) || (hz && c > hz - 0.5)) continue;
+    out.push({ value: c, label: String(c), uneven: !capIsEven(c, hz) });
+  }
+  if (!out.some((c) => c.value === current)) {
+    out.push(current < 0
+      ? { value: current, label: hz ? fpsLabel(hz / -current) : `1/${-current}`, uneven: false }
+      : { value: current, label: String(current), uneven: !capIsEven(current, hz) });
+  }
+  return out;
+}
 
 export const DEFAULT_SETTINGS: PersistedSettings = {
   settingsVersion: SETTINGS_VERSION,
@@ -130,7 +184,7 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   customHue: 200,
   responsiveness: 0.6,
   quality: 'medium',
-  fpsCap: 60,
+  fpsCap: 0,
   showClassic: false,
   autoDrift: false,
   driftPeriod: DEFAULT_DRIFT_PERIOD_S,
@@ -157,6 +211,9 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   setMode: { on: false, include: [], minInterval: 120, palettes: true },
   fullscreenMonitor: null,
   checkUpdates: true,
+  showFps: false,
+  fpsCorner: 'top-left',
+  inkLegacy: false,
 };
 
 /** Load saved settings from disk; returns DEFAULT_SETTINGS if none exist. */
@@ -261,9 +318,13 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     out.variants = variants;
   }
   if (typeof r.showClassic === 'boolean') out.showClassic = r.showClassic;
-  if (typeof r.fpsCap === 'number' && (FPS_CAPS as readonly number[]).includes(r.fpsCap)) out.fpsCap = r.fpsCap;
   // v3: Auto Drift defaults off (it made palettes look wrong); older saves reset it.
   const version = typeof r.settingsVersion === 'number' ? r.settingsVersion : 1;
+  if (typeof r.fpsCap === 'number' && (r.fpsCap === 0 || VALID_FIXED_CAPS.includes(r.fpsCap) || DIVISOR_CAPS.includes(r.fpsCap))) {
+    // v7: the old default (60) judders on displays it doesn't divide (165 Hz);
+    // it becomes "match display". Any other explicit choice is kept.
+    out.fpsCap = version < 7 && r.fpsCap === 60 ? 0 : r.fpsCap;
+  }
   if (typeof r.autoDrift === 'boolean' && version >= 3) out.autoDrift = r.autoDrift;
   out.settingsVersion = SETTINGS_VERSION;
   if (typeof r.driftPeriod === 'number' && Number.isFinite(r.driftPeriod)) {
@@ -364,6 +425,10 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
   };
   if (typeof r.fullscreenMonitor === 'string' && r.fullscreenMonitor) out.fullscreenMonitor = r.fullscreenMonitor;
   if (typeof r.checkUpdates === 'boolean') out.checkUpdates = r.checkUpdates;
+  // ── v7 ──
+  if (typeof r.showFps === 'boolean') out.showFps = r.showFps;
+  if (r.fpsCorner === 'bottom-left' || r.fpsCorner === 'bottom-right' || r.fpsCorner === 'top-left' || r.fpsCorner === 'top-right') out.fpsCorner = r.fpsCorner;
+  if (typeof r.inkLegacy === 'boolean') out.inkLegacy = r.inkLegacy;
   return out;
 }
 

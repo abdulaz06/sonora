@@ -15,6 +15,7 @@ import type { StyleId } from '../styles/visual-style';
 import { closeInfo, toast } from '../ui/ds/components';
 import { createDetail } from '../ui/screens/detail';
 import { expandFrom } from '../ui/screens/expand';
+import { createFpsReadout } from '../ui/screens/fps-readout';
 import { createHud } from '../ui/screens/hud';
 import { playLaunch } from '../ui/screens/launch';
 import { createMenu } from '../ui/screens/menu';
@@ -110,7 +111,9 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     setMode: (on) => setSetMode(on),
   });
   document.body.append(menu.el, detail.el);
-  ctl.subscribe(() => { if (screen === 'menu') menu.refresh(); });
+  const fps = createFpsReadout(renderer);
+  const syncFps = (): void => fps.set(s.showFps && screen === 'visual', s.fpsCorner);
+  ctl.subscribe(() => { if (screen === 'menu') menu.refresh(); syncFps(); });
 
   function overlay(on: boolean): void { document.body.classList.toggle('scr-overlay', on); }
 
@@ -123,6 +126,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     detail.hide();
     overlay(true);
     screen = 'menu';
+    syncFps();
     menu.show();
     window.setTimeout(() => menu.focusFirst(), 50);
   }
@@ -146,6 +150,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     renderer.start();
     ctl.setCanvasInput(true);
     screen = 'visual';
+    syncFps();
     hud.show();
     entering = false;
     if (exp) await exp.dissolve();
@@ -156,6 +161,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     hud.hide(); menu.hide(); detail.hide();
     overlay(true);
     screen = 'intro';
+    syncFps();
     const el = runOnboarding(platform.kind, {
       done: () => {
         s.onboarded = true;
@@ -215,6 +221,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
         toast(STYLE_INFO[nx].label.toLowerCase(), { ms: 1200 });
       } else if (lower === 'v') nextLook();
       else if (lower === 'c') ctl.cycleCameraPreset();
+      else if (lower === 'p') { ctl.setShowFps(!s.showFps); toast(s.showFps ? 'fps on' : 'fps off', { ms: 900 }); }
       else if (/^[1-9]$/.test(k)) ctl.setPalette(Number(k) - 1);
       else if (k === '0') ctl.setPalette(9);
       return;

@@ -42,6 +42,14 @@ import postCompositeFragSrc from './shaders/post-composite.frag?raw';
 
 /** A display frame up to this early still counts as on time for the cap (ms). */
 const CAP_SLACK_MS = 2;
+/** Display refresh measurement: rAF intervals kept (median of these). */
+const REFRESH_SAMPLES = 120;
+/** A cap within this fraction of refresh / k paces every k-th refresh. */
+const DIVISOR_TOLERANCE = 0.04;
+/** Frame pacing stats: rendered-frame times kept (s), and an interval longer
+ * than this many refresh intervals counts as a held (repeated) frame. */
+const PACING_WINDOW_S = 1;
+const HELD_RATIO = 1.5;
 /** Auto exposure: allowed blown-out fraction and mean linear luminance,
  *  lowest exposure it may reach, and how fast it falls / recovers (s). Slow
  *  enough that it never pumps on beats. */
@@ -81,6 +89,20 @@ export interface RendererStats {
   sceneHeight: number;
 }
 
+/** Real-time frame pacing over the last second (FPS readout, harness). */
+export interface PacingStats {
+  /** Rendered frames per second. */
+  fps: number;
+  /** Longest interval between rendered frames (ms). */
+  worstMs: number;
+  /** Measured display refresh rate (Hz; 0 until measured). */
+  displayHz: number;
+  /** What the cap aims for right now (fps). */
+  targetFps: number;
+  /** Rendered frames that followed an interval longer than the paced one (held frames). */
+  held: number;
+}
+
 export interface RendererOptions {
   initialStyle?: StyleId;
   /** Start the rAF loop immediately (default true). */
@@ -102,8 +124,14 @@ export interface Renderer {
   stop(): void;
   setResponsiveness(t: number): void;
   setQuality(preset: QualityPreset): void;
-  /** Frame-rate cap in fps; 0 = match the display. */
+  /** Frame-rate cap: 0 = match the display (every refresh), -k = every k-th
+   * refresh (refresh / k, always even), > 0 = that many fps. */
   setFpsCap(fps: number): void;
+  /** Measured display refresh rate (Hz; 0 until enough frames were seen). */
+  displayHz(): number;
+  pacing(): PacingStats;
+  /** Record every rendered frame's timestamp (ms) until called with false; returns the log. */
+  recordFrames(on: boolean): number[];
   getQualityPreset(): QualityPreset;
   setStyle(id: StyleId, immediate?: boolean): void;
   /** Switch style, look and view together: crossfade (default) or cut. The
@@ -352,19 +380,65 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   // Beat onsets arrive at analysis rate; latch so a render frame never misses one.
   let beatOnsetLatched = false;
 
-  // Frame-rate cap: render on the display frame closest to each due time,
-  // keeping the average at the cap even when it does not divide the refresh.
-  let fpsCap = 60;
+  // Frame-rate cap. "Match display" renders on every refresh. A cap that
+  // divides the measured refresh (165 → 82.5, 55) renders every k-th refresh,
+  // so frames stay evenly spaced. Any other cap renders on the refresh closest
+  // to each due time: the average is right but the spacing alternates (e.g.
+  // 60 on 165 Hz holds frames for 3-3-3-2 refreshes, which judders).
+  let fpsCap = 0;
   let nextDue = 0;
+  let lastRaf = 0;
+  let refreshMs = 0;
+  let rafCount = 0;
+  const rafIntervals: number[] = [];
+  const rendered: number[] = [];
+  let frameLog: number[] | null = null;
+
+  /** Every-k-th-refresh pacing for the current cap, or 0 for due-time pacing. */
+  function refreshDivisor(): number {
+    if (fpsCap === 0) return 1;
+    if (fpsCap < 0) return Math.max(1, Math.round(-fpsCap));
+    if (!refreshMs) return 0;
+    const k = 1000 / refreshMs / fpsCap;
+    const kr = Math.round(k);
+    return kr >= 1 && Math.abs(k - kr) <= DIVISOR_TOLERANCE * kr ? kr : 0;
+  }
+
+  function measureRefresh(now: number): void {
+    if (lastRaf) {
+      const d = now - lastRaf;
+      if (d > 2 && d < 100) {
+        rafIntervals.push(d);
+        if (rafIntervals.length > REFRESH_SAMPLES) rafIntervals.shift();
+        if (rafIntervals.length >= 20) {
+          // Lower quartile of intervals: rAF never fires early, but slow frames
+          // stretch some intervals, so the median of the fastest half is robust.
+          const sorted = [...rafIntervals].sort((a, b) => a - b);
+          refreshMs = sorted[Math.floor(sorted.length * 0.25)];
+        }
+      }
+    }
+    lastRaf = now;
+  }
 
   function loop(now: number): void {
     if (!running) return;
-    if (fpsCap > 0) {
+    measureRefresh(now);
+    // Auto quality judges frame time against the paced interval.
+    if (fpsCap < 0 && refreshMs) quality.setFrameBudget(refreshMs * -fpsCap);
+    rafCount++;
+    const k = refreshDivisor();
+    if (k > 1) {
+      if (rafCount % k !== 0) { rafId = requestAnimationFrame(loop); return; }
+    } else if (k === 0 && fpsCap > 0) {
       const interval = 1000 / fpsCap;
       if (nextDue === 0 || now - nextDue > interval * 2) nextDue = now;
       if (now < nextDue - CAP_SLACK_MS) { rafId = requestAnimationFrame(loop); return; }
       nextDue += interval;
     }
+    rendered.push(now);
+    while (rendered.length && now - rendered[0] > PACING_WINDOW_S * 1000) rendered.shift();
+    frameLog?.push(now);
     const nowS = now / 1000;
     const wallDt = lastWall ? nowS - lastWall : 1 / 60;
     lastWall = nowS;
@@ -389,6 +463,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       if (running) return;
       running = true;
       lastWall = 0;
+      lastRaf = 0;
       rafId = requestAnimationFrame(loop);
     },
     stop(): void {
@@ -401,9 +476,30 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       ctx.responsiveness = r;
     },
     setFpsCap(n: number): void {
-      fpsCap = n > 0 ? n : 0;
+      fpsCap = Number.isFinite(n) ? n : 0;
       nextDue = 0;
       quality.setFrameBudget(fpsCap > 0 ? 1000 / fpsCap : 0);
+    },
+    displayHz: () => (refreshMs ? 1000 / refreshMs : 0),
+    pacing(): PacingStats {
+      const hz = refreshMs ? 1000 / refreshMs : 0;
+      const k = refreshDivisor();
+      const target = k >= 1 ? hz / k : fpsCap > 0 ? fpsCap : hz;
+      let worst = 0, held = 0;
+      // A frame is held when it follows a longer gap than the pacing intends.
+      const paced = k >= 1 && refreshMs ? refreshMs * k : target > 0 ? 1000 / target : 0;
+      for (let i = 1; i < rendered.length; i++) {
+        const d = rendered[i] - rendered[i - 1];
+        worst = Math.max(worst, d);
+        if (paced && d > paced + refreshMs * (HELD_RATIO - 1)) held++;
+      }
+      const span = rendered.length > 1 ? (rendered[rendered.length - 1] - rendered[0]) / 1000 : 0;
+      return { fps: span > 0 ? (rendered.length - 1) / span : 0, worstMs: worst, displayHz: hz, targetFps: target, held };
+    },
+    recordFrames(on: boolean): number[] {
+      const log = frameLog ?? [];
+      frameLog = on ? [] : null;
+      return log;
     },
     setQuality(p: QualityPreset): void {
       quality.setPreset(p);

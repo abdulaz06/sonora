@@ -13,7 +13,7 @@ import { audioStatus } from '../../app/stores';
 import { FLAT_ZOOM_MAX, FLAT_ZOOM_MIN } from '../../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES } from '../../engine/color-engine';
 import type { QualityPreset } from '../../engine/quality';
-import { FPS_CAPS, SET_MODE_INTERVALS, type Corner } from '../../ipc/settings';
+import { fpsCapChoices, fpsLabel, SET_MODE_INTERVALS, type Corner } from '../../ipc/settings';
 import { getStyle, presetsFor } from '../../styles/registry';
 import { variantSupportsLight, type LightMode } from '../../styles/visual-style';
 import {
@@ -23,7 +23,7 @@ import { h } from '../ds/dom';
 import { lockup } from './brand';
 
 const PRESET_MATCH = 0.03;
-export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'performance', 'system', 'keys', 'about'] as const;
+export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'performance', 'advanced', 'system', 'keys', 'about'] as const;
 export type SectionId = typeof SECTIONS[number];
 
 export interface SettingsHandlers {
@@ -117,9 +117,25 @@ const INFO = {
     options: [['Low', 'Smaller render size and simulations. Laptops and built-in graphics.'], ['Medium', 'Balanced. Smooth on most graphics cards.'], ['High', 'Full resolution and the finest detail.'], ['Auto', 'Starts at Medium and steps up or down to stay smooth.']],
     media: [{ src: mediaFor('explain-quality-low'), caption: 'low' }, { src: mediaFor('explain-quality-high'), caption: 'high' }],
   }),
-  fps: (): InfoContent => ({
-    title: 'frame rate', scope: 'all styles',
-    body: ['How many pictures per second sonora draws. 60 is smooth on any screen. Raise it on high-refresh displays if your graphics card keeps up; 30 eases the load on slower computers.', 'Max matches your display.'],
+  fps: (hz: number): InfoContent => {
+    const d = hz ? `${fpsLabel(hz)} Hz` : 'your display';
+    const uneven = fpsCapChoices(hz, 0).filter((c) => c.uneven).map((c) => c.label);
+    return {
+      title: 'frame rate', scope: 'all styles',
+      body: [
+        `How many pictures per second sonora draws. Match (the default) draws one for every refresh of ${hz ? `your ${d} display` : 'your display'}: the smoothest motion.`,
+        hz ? `The other numbers that are a whole fraction of ${d} (every 2nd or 3rd refresh) stay just as even and ease the load on the graphics card.` : 'Lower numbers ease the load on the graphics card.',
+        uneven.length ? `${uneven.join(', ')} may stutter on this display: they don't fit its refresh evenly, so some pictures stay on screen longer than others.` : '',
+      ].filter(Boolean),
+    };
+  },
+  showFps: (): InfoContent => ({
+    title: 'show fps', scope: 'all styles',
+    body: ['A small counter in a corner: pictures per second, what the frame rate is set to, and the slowest picture of the last second. Shortcut: P. It is never part of the visual itself.'],
+  }),
+  inkLegacy: (): InfoContent => ({
+    title: 'ink: previous behaviour', scope: 'ink',
+    body: ['Temporary, for comparing. On: Ink as it was before the smoothness fix (ink popped in and fine lines could break up). Off: the fixed version. This switch goes away once the fix is signed off.'],
   }),
   openLast: (): InfoContent => ({ title: 'open straight into my last visual', body: ['Skip the home menu on launch and start where you left off. Esc still brings the menu back.'] }),
   monitor: (): InfoContent => ({ title: 'fullscreen display', body: ['Which screen fullscreen uses. “Current” uses whichever screen the window is on.'] }),
@@ -277,7 +293,20 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
     // Performance
     const perf = section('performance', 'performance', 'all styles',
       row('Quality', INFO.quality(), s.quality, segmented((['low', 'medium', 'high', 'auto'] as QualityPreset[]).map((q) => ({ value: q, label: q })), s.quality, (v) => ctl.setQuality(v), 'Quality').el),
-      row('Frame rate', INFO.fps(), s.fpsCap === 0 ? 'max' : `${s.fpsCap} fps`, segmented(FPS_CAPS.map((n) => ({ value: String(n), label: n === 0 ? 'max' : String(n) })), String(s.fpsCap), (v) => ctl.setFpsCap(Number(v)), 'Frame rate').el));
+      (() => {
+        const hz = ctl.renderer.displayHz();
+        const choices = fpsCapChoices(hz, s.fpsCap);
+        const cur = choices.find((c) => c.value === s.fpsCap);
+        return row('Frame rate', INFO.fps(hz), cur ? (cur.value === 0 ? cur.label : `${cur.label} fps`) : '',
+          segmented(choices.map((c) => ({ value: String(c.value), label: c.label })), String(s.fpsCap), (v) => ctl.setFpsCap(Number(v)), 'Frame rate').el);
+      })(),
+      row('Show FPS', INFO.showFps(), null, toggle('', s.showFps, (v) => ctl.setShowFps(v)).el, true),
+      s.showFps ? row('FPS position', INFO.showFps(), s.fpsCorner.replace('-', ' '),
+        segmented((['top-left', 'top-right', 'bottom-left', 'bottom-right'] as Corner[]).map((c) => ({ value: c, label: c.replace('-', ' ') })), s.fpsCorner, (v) => { s.fpsCorner = v; ctl.commit(); }, 'FPS position').el) : null);
+
+    // Advanced (temporary A/B switches)
+    const advanced = section('advanced', 'advanced', null,
+      row('Ink: previous behaviour', INFO.inkLegacy(), null, toggle('', s.inkLegacy, (v) => ctl.setInkLegacy(v)).el, true));
 
     // System
     const system = section('system', 'system', null,
@@ -295,7 +324,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license')));
 
     const scroll = sh.body.scrollTop;
-    content.replaceChildren(visual, colour, camera, feel, setmode, np, audio, perf, system, keys, about);
+    content.replaceChildren(visual, colour, camera, feel, setmode, np, audio, perf, advanced, system, keys, about);
     sh.body.scrollTop = scroll;
   }
 
