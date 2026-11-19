@@ -14,6 +14,7 @@ import { getStyle, presetsFor } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 import { toggleDebugOverlay, updateDebugOverlay } from '../ui/debug-overlay';
 import type { AudioFeatureFrame } from '../types/audio-frame';
+import { setDebugFlags } from '../engine/debug-flags';
 
 /** Live audio level (0–1) from the last analysis frame, for meters. */
 export type LevelListener = (level: number, frame: AudioFeatureFrame) => void;
@@ -53,6 +54,9 @@ export interface Controller {
   setResponsiveness(t: number): void;
   setQuality(q: QualityPreset): void;
   setFpsCap(n: number): void;
+  setShowFps(on: boolean): void;
+  /** Temporary A/B: Ink before the smoothness fix. */
+  setInkLegacy(on: boolean): void;
   cycleCameraPreset(): void;
   toggleDebug(): void;
   /** Enable mouse camera control on the canvas (only while the visual shows). */
@@ -125,6 +129,7 @@ export function initController(opts: ControllerOptions): Controller {
     renderer.setQuality(settings.quality);
     renderer.setFpsCap(settings.fpsCap);
     renderer.setRingCount(settings.ringCount);
+    setDebugFlags({ inkLegacy: settings.inkLegacy });
   }
 
   // Mouse changes come from the camera itself; mirror them into settings.
@@ -226,6 +231,8 @@ export function initController(opts: ControllerOptions): Controller {
     },
     setQuality(q: QualityPreset): void { renderer.setQuality(q); settings.quality = q; changed(); },
     setFpsCap(n: number): void { renderer.setFpsCap(n); settings.fpsCap = n; changed(); },
+    setShowFps(on: boolean): void { settings.showFps = on; changed(); },
+    setInkLegacy(on: boolean): void { setDebugFlags({ inkLegacy: on }); settings.inkLegacy = on; changed(); },
     cycleCameraPreset(): void {
       if (!depthActive()) return;
       const list = presetsFor(settings.mode);
