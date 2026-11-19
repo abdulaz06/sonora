@@ -131,12 +131,18 @@ const ATTACK_DROP: number[] = [0.12, 0.16, 0.2, 0.2, 0.18, 0.14];
  * profile: the same shares at 0, 1/60 and 2/60 s, linear in between, so every
  * frame rate lands a hit in the tuned time (and 60 fps lands exactly as before). */
 const LAND_STEP = 1 / 60;
-/** New ink enters the flow instead of appearing: each hit starts as a small
- * seed (this fraction of its radius) on the frame of the hit and spreads to
- * full size over GROW_TIME (ease-out), carried by the flow while it lands.
- * Its final shape is exactly the old blob's. */
-const GROW_SEED = 0.45;
-const GROW_TIME = 0.1;
+/** New ink enters the flow instead of appearing: each hit starts as a seed
+ * (this fraction of its radius) on the frame of the hit and spreads to full
+ * size over `time` seconds (ease-out), carried by the flow while it lands; its
+ * final shape is exactly the old blob's. Glow spreads in 50 ms so its kicks
+ * keep their punch (peak within ~70 ms, as before); the crisp looks, where a
+ * blob popping in is most visible, spread over 100 ms (measured: pop score at
+ * 165 fps p99 Glow 5.6 → 2.1, Marble 4.0 → 2.5, Sumi 4.8 → 1.8). */
+const GROW: Record<string, { seed: number; time: number }> = {
+  glow: { seed: 0.45, time: 0.05 },
+  marble: { seed: 0.45, time: 0.1 },
+  sumi: { seed: 0.45, time: 0.1 },
+};
 /** The one-frame push lasts one 60 fps frame of time at any frame rate. */
 const PUSH_TIME = 1 / 60;
 /** Marble draws a full screen of two-tone marbling (as before round 6): a
@@ -341,8 +347,8 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   interface Landing { x: number; y: number; radius: number; dye: Splat['dye']; detail: number; seed: number; age: number; cum: number[]; m: number; r: number; pvx: number; pvy: number; fresh: boolean }
   const landings: Landing[] = [];
   const flowOut: [number, number] = [0, 0];
-  const growSeed = (): number => inkExp('growSeed', GROW_SEED);
-  const growTime = (): number => inkExp('growTime', GROW_TIME);
+  const growSeed = (): number => inkExp('growSeed', (GROW[variant] ?? GROW.glow).seed);
+  const growTime = (): number => inkExp('growTime', (GROW[variant] ?? GROW.glow).time);
 
   /** Share of a hit landed by `age` seconds (linear between the 60 fps steps). */
   function landedShare(cum: number[], age: number): number {

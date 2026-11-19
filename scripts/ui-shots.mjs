@@ -35,6 +35,16 @@ const STATES = {
     await p.click('text=Settings'); await wait(700);
     await p.click('.st-nav button:nth-child(2)'); await wait(900);
   } },
+  'settings-perf': { url: `${base}?${q}&screen=menu`, after: 1000, act: async (p) => {
+    await p.click('text=Settings'); await wait(700);
+    await p.click('.st-nav button:has-text("performance")'); await wait(900);
+  } },
+  'settings-fps-info': { url: `${base}?${q}&screen=menu`, after: 1000, act: async (p) => {
+    await p.click('text=Settings'); await wait(700);
+    await p.click('.st-nav button:has-text("performance")'); await wait(700);
+    await p.click('.st-row:has-text("Frame rate") .s-info'); await wait(900);
+  } },
+  'visual-fps': { url: `${base}?${q}&screen=visual&track=house-124&t=48`, after: 5000, act: async (p) => { await p.keyboard.press('p'); await wait(2500); } },
   'intro-1': { url: `${base}?nolaunch=1&fresh=1`, after: 1400 },
   'intro-2': { url: `${base}?nolaunch=1&fresh=1&demo=1`, after: 900, act: async (p) => { await p.click('text=Begin'); await wait(1500); } },
   'intro-3': { url: `${base}?nolaunch=1&fresh=1`, after: 900, act: async (p) => { await p.click('text=Begin'); await wait(400); await p.click('text=Not now'); await wait(1400); } },

@@ -67,6 +67,7 @@ function parseArgs(argv) {
     else if (a === '--resp') o.resp = Number(next());
     else if (a === '--flicker') o.flicker = true;
     else if (a === '--pacing') o.pacing = true;
+    else if (a === '--debug') o.debug = JSON.parse(next());
     else if (a === '--caps') o.caps = next();
     else if (a === '--seconds') o.seconds = Number(next());
   }
@@ -156,7 +157,7 @@ try {
     await page.waitForFunction(() => window.__sonora?.ready === true);
     await page.evaluate((o) => window.__sonora.configure({
       style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality,
-      palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp,
+      palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp, debug: o.debug,
     }), opts);
     await page.evaluate((n) => window.__sonora.loadTrack(n), name);
     // Optional: grow a title out of the pattern right after the fade-in.
@@ -216,7 +217,7 @@ try {
     if (opts.bench) {
       await page.reload();
       await page.waitForFunction(() => window.__sonora?.ready === true);
-      await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, responsiveness: o.resp }), opts);
+      await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, responsiveness: o.resp, debug: o.debug }), opts);
       await page.evaluate((n) => window.__sonora.loadTrack(n), name);
       await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, m.drop - 1));
       fps = await page.evaluate((secs) => new Promise((resolve) => {
@@ -272,7 +273,7 @@ async function runPacing(page, meta, name) {
   for (const cap of caps) {
     await page.reload();
     await page.waitForFunction(() => window.__sonora?.ready === true);
-    await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp }), opts);
+    await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp, debug: o.debug }), opts);
     await page.evaluate((n) => window.__sonora.loadTrack(n), name);
     await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, meta.markers.drop - 2));
     // Warm up (shader compiles, refresh measurement), then measure.
@@ -316,7 +317,7 @@ async function runFlicker(page, meta, name) {
   const dt = 1 / opts.fps;
   await page.reload();
   await page.waitForFunction(() => window.__sonora?.ready === true);
-  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp }), opts);
+  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp, debug: o.debug }), opts);
   await page.evaluate((n) => window.__sonora.loadTrack(n), name);
   await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
   await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);
@@ -358,7 +359,7 @@ async function runSync(page, meta, name) {
   const dt = 1 / opts.fps;
   await page.reload();
   await page.waitForFunction(() => window.__sonora?.ready === true);
-  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp }), opts);
+  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp, debug: o.debug }), opts);
   await page.evaluate((n) => window.__sonora.loadTrack(n), name);
   await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
   await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), dt]);
