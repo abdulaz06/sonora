@@ -12,13 +12,13 @@ pop  "Spawn pop": how much ink appears from nowhere in 1/60 s. For each frame,
      a pixel is *unexplained* if its colour is far (> POP_TAU) from every
      pixel within POP_R (the distance the flow can carry ink in 1/60 s) of
      the frame 1/60 s earlier, even allowing that pixel to brighten or dim
-     0.4-3.5x (a beat lighting existing ink is not a pop; a new hue, or ink
-     landing on empty background, is). Thin unexplained edges (motion) are removed
+     0.75-3.5x (a beat lighting existing ink is not a pop; a new hue, or ink
+     landing on empty background or paper, is). Thin unexplained edges (motion) are removed
      by a 3x3 opening; the rest is solid new ink. Score = peak unexplained
      area (% of the frame per 1/60 s); p99 also reported. The slow-motion
      evidence (DOCS/reference/ink-bugs) shows 0 → 4.3% of the frame in 21 ms.
 jag  "Jaggedness": on strong edges, how far the local gradient direction
-     strays from the edge's smoothed direction (structure tensor, 4 px).
+     strays from the edge's smoothed direction (structure tensor, 8 px).
      A smooth curve scores ~0; saw-tooth / stair-step edges score high.
      Reported as the gradient-weighted mean |sin| of the misalignment (%),
      after a 1.2 px pre-blur so 1-pixel dither does not count. Also reports
@@ -38,9 +38,9 @@ from PIL import Image
 
 POP_TAU = 0.16       # colour distance (0-1 RGB, Euclidean) that counts as new ink
 POP_R_480 = 3        # flow carry tolerance in pixels at 480 px wide, per 1/60 s
-POP_GAIN = (0.4, 3.5)  # per-pixel brightness change that still counts as the same ink
+POP_GAIN = (0.75, 3.5)  # per-pixel brightness change that still counts as the same ink (beat light up, a fade down; ink landing on paper is a bigger darkening)
 JAG_PRE = 1.2        # pre-blur sigma (px at 1280 wide)
-JAG_INT = 4.0        # structure-tensor integration sigma (px at 1280 wide)
+JAG_INT = 8.0        # structure-tensor integration sigma (px at 1280 wide): teeth up to ~20 px
 JAG_EDGE_PCT = 92    # strong edges: gradient magnitude above this percentile
 
 

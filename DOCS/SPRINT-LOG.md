@@ -1,3 +1,28 @@
+# Ink smoothness fix (spawn pops, jagged lines, frame pacing) — in progress
+
+Summary: (written at the end)
+
+## Checklist
+- [x] Read CLAUDE.md, D46/D47, rounds 6-7, Ink code + shaders, renderer; slow-motion evidence (`DOCS/reference/ink-bugs/`); originals moved to git-ignored `local-reference/ink-bugs/`
+- [x] Baseline worktree pinned at the pre-fix commit (`../sonora-baseline`, eec9f5c) so every baseline render is reproducible
+- [x] Baseline gates, 3 looks × Flat/Depth: `verify/ink-fix/baseline/gates/gates.log` (sync house-124 + ref-song, flicker dense-128 Punchy palette 0, motion gate, frame cost)
+- [x] Tooling: `frame-seq.mjs` any render rate (SEQ_FPS) + debug flags; `ink-metrics.py` (pop, jag, motion at 1/60 s, compare); `ink-gates.sh`; `ink-exp.sh` (one-factor experiments)
+- [x] Legacy switch (`debugFlags.inkLegacy`) reproduces the baseline pixel for pixel (90/90 frames)
+- [x] P3 root cause: Marble's veins alias where the ink ratio is steep (one-factor experiments, close-ups); fix = vein anti-aliasing
+- [x] P1 frame cap: match display default, divisor caps, settings v7 + migration test, (i) text, FPS readout (P), flash guard running mean time-based
+- [ ] P2 pop: time-based landing, seed growth, pending carried by the flow, Marble highlight in duotone — pop score at 165 fps per look
+- [ ] Harness: `--dt-sweep`, `--pacing` (written; run and calibrate)
+- [ ] All gates re-run (3 looks × Flat/Depth) against the baseline; numbers below
+- [ ] Videos `verify/ink-fix/` (side by side, real speed + 4× slow, 165 fps timing; Marble Depth highlight landing)
+- [ ] `npm run tauri build`, app runs; summary at the top; decisions D61+
+
+## Notes
+- Disk: C: was full (0 bytes) mid-run; scratch renders now go to the session scratchpad and are deleted after measuring. 2.1 GB of older harness output in `verify/frame-seq/` left untouched.
+- Baseline already fails some gates (recorded, the bar is "no worse"): Glow Depth flicker 1-frame step 0.121 (> 0.12, noted in Prompt 3 too), Marble fine share 71-75%, Marble Flat background step p99 0.030 on house-124, Sumi fine share 48-54%, Glow Depth fine share 48% (house-124). Frame cost varies run to run (1.5-14 ms for the same look), so cost is measured with repeats.
+
+---
+
+
 # Prompt 3 summary — sonora 1.0.0 shipped
 
 **Release:** https://github.com/abdulaz06/sonora/releases/tag/v1.0.0 (NSIS + MSI, signed updater artifacts, `latest.json`). CI and release workflows green.

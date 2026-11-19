@@ -21,12 +21,22 @@
 //   --out <dir>         output dir (default verify/<style>[-<look>][-flat][-camera][-light]/<track>)
 //   --headed            show the browser
 //   --no-bench          skip the FPS measurement
+//   --pacing            real-time frame pacing on the display (renderer's own rAF loop):
+//                       interval mean / p99 and held frames per cap (match, 1/2, 60)
+//   --dt-sweep          frame-rate independence (forwards to scripts/dt-sweep.mjs)
 
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
+
+// --dt-sweep has its own script (it renders each rate and runs the image metrics).
+if (process.argv.includes('--dt-sweep')) {
+  const rest = process.argv.slice(2).filter((x) => x !== '--dt-sweep');
+  const r = spawnSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'dt-sweep.mjs'), ...rest], { stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = 5199;
@@ -56,6 +66,9 @@ function parseArgs(argv) {
     else if (a === '--text') o.text = next();
     else if (a === '--resp') o.resp = Number(next());
     else if (a === '--flicker') o.flicker = true;
+    else if (a === '--pacing') o.pacing = true;
+    else if (a === '--caps') o.caps = next();
+    else if (a === '--seconds') o.seconds = Number(next());
   }
   return o;
 }
@@ -114,6 +127,13 @@ try {
   const view = opts.flat ? 'flat' : 'depth';
   const summary = [];
   console.log(`GPU: ${gpu}`);
+
+  if (opts.pacing) {
+    await runPacing(page, tracks[names[0]], names[0]);
+    await browser.close();
+    cleanup();
+    process.exit(process.exitCode ?? 0);
+  }
 
   if (opts.sync || opts.flicker) {
     for (const name of names) await (opts.flicker ? runFlicker : runSync)(page, tracks[name], name);
@@ -235,6 +255,44 @@ try {
   console.error(err);
   cleanup();
   process.exit(1);
+}
+
+// ── Real-time frame pacing ──────────────────────────────────────────
+// Runs the renderer's own rAF loop (the app's pacing code) at the display's
+// real refresh for a while per cap and reports the intervals between rendered
+// frames: mean, p99, and held frames (an interval longer than the paced one
+// by half a refresh or more, i.e. a frame shown for an extra refresh).
+// Gates: match display and its divisors hold ≤ 1% of frames. Caps that don't
+// divide the refresh are reported (they alternate by design).
+async function runPacing(page, meta, name) {
+  const PACING_MAX_HELD = 0.01;
+  const caps = (opts.caps ?? '0,-2,60').split(',').map(Number);
+  const secs = opts.seconds ?? 8;
+  const fails = [];
+  for (const cap of caps) {
+    await page.reload();
+    await page.waitForFunction(() => window.__sonora?.ready === true);
+    await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp }), opts);
+    await page.evaluate((n) => window.__sonora.loadTrack(n), name);
+    await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, meta.markers.drop - 2));
+    // Warm up (shader compiles, refresh measurement), then measure.
+    await page.evaluate((c) => window.__sonora.pacingRun(1.5, c), cap);
+    const { frames, displayHz } = await page.evaluate(([s, c]) => window.__sonora.pacingRun(s, c), [secs, cap]);
+    const iv = frames.slice(1).map((t, i) => t - frames[i]);
+    const refresh = 1000 / displayHz;
+    const k = cap === 0 ? 1 : cap < 0 ? -cap : displayHz / cap;
+    const even = Math.abs(k - Math.round(k)) < 0.04 * Math.round(k);
+    const paced = even ? refresh * Math.round(k) : 1000 / cap;
+    const held = iv.filter((d) => d > (even ? paced : refresh * Math.ceil(k)) + refresh * 0.5).length;
+    const sorted = [...iv].sort((x, y) => x - y);
+    const mean = iv.reduce((x, y) => x + y, 0) / Math.max(1, iv.length);
+    const label = cap === 0 ? 'match' : cap < 0 ? `1/${-cap}` : `${cap}`;
+    const pattern = [...new Set(iv.slice(0, 60).map((d) => Math.round(d / refresh)))].join('/');
+    console.log(`${name} [${opts.style}/${opts.variant || 'default'} ${opts.flat ? 'flat' : 'depth'}] cap ${label}: display ${displayHz.toFixed(1)} Hz, ${iv.length} frames, ${(1000 / mean).toFixed(1)} fps, interval mean ${mean.toFixed(2)} ms p99 ${sorted[Math.floor(sorted.length * 0.99)].toFixed(2)} ms max ${sorted[sorted.length - 1].toFixed(1)} ms, refreshes per frame {${pattern}}, held ${held} (${(100 * held / Math.max(1, iv.length)).toFixed(1)}%)${even ? '' : ' [uneven cap: alternates by design]'}`);
+    if (even && held / Math.max(1, iv.length) > PACING_MAX_HELD) fails.push(`cap ${label} held ${held}`);
+  }
+  console.log(fails.length ? `  PACING FAIL: ${fails.join(', ')}` : '  pacing PASS');
+  if (fails.length) process.exitCode = 1;
 }
 
 // ── Flicker / exposure measurement ──────────────────────────────────

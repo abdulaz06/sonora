@@ -22,6 +22,7 @@ import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../i
 import type { QualityPreset } from '../engine/quality';
 import type { SonoraEvent } from '../engine/events';
 import type { LightMode, StyleId } from '../styles/visual-style';
+import { setDebugFlags, type DebugFlags } from '../engine/debug-flags';
 
 declare const __APP_VERSION__: string;
 
@@ -44,7 +45,7 @@ export interface HarnessApi {
   /** Advance audio only (no rendering) — for fast seeking. */
   analyseOnly(seconds: number): number;
   snapshot(): string;
-  configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string; responsiveness?: number }): void;
+  configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string; responsiveness?: number; debug?: Partial<DebugFlags> }): void;
   /** Fire a trackChange with a title (as a media session would). */
   seedText(title: string): void;
   time(): number;
@@ -57,6 +58,9 @@ export interface HarnessApi {
   lumaTrace(seconds: number, dt: number): number[];
   /** Like lumaTrace, plus the fraction of blown-out pixels (any channel ≥ 250) per step. */
   exposureTrace(seconds: number, dt: number): { luma: number[]; clip: number[]; motion: number[]; tiles: number[][] };
+  /** Real time: run the renderer's own rAF loop with a frame cap for `seconds`,
+   * feeding audio at wall-clock speed; returns every rendered frame's time (ms). */
+  pacingRun(seconds: number, cap: number): Promise<{ frames: number[]; displayHz: number }>;
 }
 
 declare global {
@@ -277,6 +281,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       return renderer.canvas.toDataURL('image/png');
     },
     configure(o) {
+      if (o.debug) setDebugFlags(o.debug);
       if (o.style) renderer.setStyle(o.style, true);
       if (o.variant) renderer.setVariant(o.variant);
       if (o.depth !== undefined) renderer.setDepth(o.depth);
@@ -341,6 +346,25 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       const t0 = performance.now();
       for (let i = 0; i < frames; i++) { source.stepOffline(dt); renderer.step(dt); sync(); }
       return (performance.now() - t0) / frames;
+    },
+    pacingRun(seconds: number, cap: number): Promise<{ frames: number[]; displayHz: number }> {
+      return new Promise((resolve) => {
+        renderer.setFpsCap(cap);
+        renderer.recordFrames(true);
+        let last = 0;
+        const t0 = performance.now();
+        // Registered before the renderer's loop, so audio for a frame arrives first.
+        const feed = (now: number): void => {
+          source.stepOffline(Math.min(last ? (now - last) / 1000 : 1 / 60, 0.05));
+          last = now;
+          if (now - t0 < seconds * 1000) { requestAnimationFrame(feed); return; }
+          const frames = renderer.recordFrames(false);
+          renderer.stop();
+          resolve({ frames, displayHz: renderer.displayHz() });
+        };
+        requestAnimationFrame(feed);
+        renderer.start();
+      });
     },
     seedText(title: string): void { renderer.events.notifyTrackChange({ title }); },
     time: () => source.offlineTime,
