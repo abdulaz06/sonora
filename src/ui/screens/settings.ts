@@ -23,7 +23,7 @@ import { h } from '../ds/dom';
 import { lockup } from './brand';
 
 const PRESET_MATCH = 0.03;
-export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'performance', 'advanced', 'system', 'keys', 'about'] as const;
+export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'performance', 'system', 'keys', 'about'] as const;
 export type SectionId = typeof SECTIONS[number];
 
 export interface SettingsHandlers {
@@ -132,10 +132,6 @@ const INFO = {
   showFps: (): InfoContent => ({
     title: 'show fps', scope: 'all styles',
     body: ['A small counter in a corner: pictures per second, what the frame rate is set to, and the slowest picture of the last second. Shortcut: P. It is never part of the visual itself.'],
-  }),
-  inkLegacy: (): InfoContent => ({
-    title: 'ink: previous behaviour', scope: 'ink',
-    body: ['Temporary, for comparing. On: Ink as it was before the smoothness fix (ink popped in and fine lines could break up). Off: the fixed version. This switch goes away once the fix is signed off.'],
   }),
   openLast: (): InfoContent => ({ title: 'open straight into my last visual', body: ['Skip the home menu on launch and start where you left off. Esc still brings the menu back.'] }),
   monitor: (): InfoContent => ({ title: 'fullscreen display', body: ['Which screen fullscreen uses. “Current” uses whichever screen the window is on.'] }),
@@ -304,10 +300,6 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       s.showFps ? row('FPS position', INFO.showFps(), s.fpsCorner.replace('-', ' '),
         segmented((['top-left', 'top-right', 'bottom-left', 'bottom-right'] as Corner[]).map((c) => ({ value: c, label: c.replace('-', ' ') })), s.fpsCorner, (v) => { s.fpsCorner = v; ctl.commit(); }, 'FPS position').el) : null);
 
-    // Advanced (temporary A/B switches)
-    const advanced = section('advanced', 'advanced', null,
-      row('Ink: previous behaviour', INFO.inkLegacy(), null, toggle('', s.inkLegacy, (v) => ctl.setInkLegacy(v)).el, true));
-
     // System
     const system = section('system', 'system', null,
       row('Open straight into my last visual', INFO.openLast(), null, toggle('', s.openLastVisual, (v) => { s.openLastVisual = v; ctl.commit(); }).el, true),
@@ -324,7 +316,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license')));
 
     const scroll = sh.body.scrollTop;
-    content.replaceChildren(visual, colour, camera, feel, setmode, np, audio, perf, advanced, system, keys, about);
+    content.replaceChildren(visual, colour, camera, feel, setmode, np, audio, perf, system, keys, about);
     sh.body.scrollTop = scroll;
   }
 

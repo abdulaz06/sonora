@@ -19,9 +19,9 @@ try {
   await p.waitForFunction(() => window.__sonora?.ready === true);
   const res = {};
   for (let r = 0; r < rounds; r++) {
-    for (const look of ['glow', 'marble', 'sumi']) for (const view of ['flat', 'depth']) for (const legacy of [true, false]) {
-      await p.evaluate((c) => window.__sonora.configure(c), { style: 'ink', variant: look, depth: view === 'depth', quality, palette: 0, drift: false, debug: { inkLegacy: legacy, inkExp: {} } });
-      if (r === 0 && look === 'glow' && view === 'flat' && legacy) { await p.evaluate(() => window.__sonora.loadTrack('house-124')); await p.evaluate(() => window.__sonora.analyseOnly(48)); }
+    for (const look of ['glow', 'marble', 'sumi']) for (const view of ['flat', 'depth']) for (const legacy of [false]) {
+      await p.evaluate((c) => window.__sonora.configure(c), { style: 'ink', variant: look, depth: view === 'depth', quality, palette: 0, drift: false, debug: { inkExp: {} } });
+      if (r === 0 && look === 'glow' && view === 'flat' && !legacy) { await p.evaluate(() => window.__sonora.loadTrack('house-124')); await p.evaluate(() => window.__sonora.analyseOnly(48)); }
       const ms = await p.evaluate(() => window.__sonora.frameCost(120, 1 / 60));
       (res[`${look} ${view} ${legacy ? 'before' : 'after'}`] ??= []).push(ms);
     }

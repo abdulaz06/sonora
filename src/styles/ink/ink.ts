@@ -30,7 +30,7 @@ import { clamp01, createRng } from '../../engine/math';
 import type { SonoraEvent } from '../../engine/events';
 import type { QualityParams } from '../../engine/quality';
 import type { StyleContext, StyleDeps, VisualStyle } from '../visual-style';
-import { debugFlags, inkExp } from '../../engine/debug-flags';
+import { inkExp } from '../../engine/debug-flags';
 import { FluidSim, type FlowParams, type Splat } from './fluid';
 import { flowVelocity } from './flow-field';
 
@@ -337,23 +337,16 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     const v = flowSpeed(ctx) * SCREEN_UV * 1.2 * strength;   // v0.1: kick × falloff × strength × 1.2, × speed
     const seed = rng() * 100;
     const r = radius * SCREEN_UV * RADIUS_WIDEN * look.radius;
-    if (!debugFlags.inkLegacy) {
-      // Lands over time (see LAND_STEP / GROW_*), starting on this frame.
-      const cum: number[] = [];
-      attack.reduce((s, w) => { cum.push(s + w); return s + w; }, 0);
-      const ld: Landing = { x, y, radius: r, dye, detail: look.edge, seed, age: 0, cum, m: 0, r: 0,
-        pvx: tps(pushX * v), pvy: tps(pushY * v), fresh: true, pushed: false };
-      landings.push(ld);
-      land(ld, ctx.dt);
-      return;
-    }
-    const part = (k: number): Splat['dye'] => [dye[0] * attack[k], dye[1] * attack[k], dye[2] * attack[k], 0];
-    // The push and the first share land on the frame of the hit; the rest follows.
-    push({ x, y, radius: r, dye: part(0), vx: tps(pushX * v), vy: tps(pushY * v), radial: 0, swirl: 0, detail: look.edge, seed });
-    pending.push({ x, y, radius: r, dye, detail: look.edge, seed, step: 1, attack });
+    // Lands over time (see LAND_STEP / GROW_*), starting on this frame.
+    const cum: number[] = [];
+    attack.reduce((s, w) => { cum.push(s + w); return s + w; }, 0);
+    const ld: Landing = { x, y, radius: r, dye, detail: look.edge, seed, age: 0, cum, m: 0, r: 0,
+      pvx: tps(pushX * v), pvy: tps(pushY * v), fresh: true, pushed: false };
+    landings.push(ld);
+    land(ld, ctx.dt);
   }
 
-  // ── Landing over time (fixed behaviour) ───────────────────────
+  // ── Landing over time ─────────────────────────────────────────
   /** A hit still landing: `cum` = cumulative shares at 0, 1/60, 2/60 … s;
    * `m` / `r` = the amount and radius already deposited; push in sim texels/s. */
   interface Landing { x: number; y: number; radius: number; dye: Splat['dye']; detail: number; seed: number; age: number; cum: number[]; m: number; r: number; pvx: number; pvy: number; fresh: boolean; pushed: boolean }
@@ -450,18 +443,6 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
     }
   }
 
-  /** The rest of each hit's ink, landing over the next frames. */
-  interface Pending { x: number; y: number; radius: number; dye: Splat['dye']; detail: number; seed: number; step: number; attack: number[] }
-  const pending: Pending[] = [];
-  function landPending(): void {
-    for (let i = pending.length - 1; i >= 0; i--) {
-      const q = pending[i];
-      const w = q.attack[q.step];
-      push({ x: q.x, y: q.y, radius: q.radius, dye: [q.dye[0] * w, q.dye[1] * w, q.dye[2] * w, 0], vx: 0, vy: 0, radial: 0, swirl: 0, detail: q.detail, seed: q.seed });
-      if (++q.step >= q.attack.length) pending.splice(i, 1);
-    }
-  }
-
   // ── Per-frame mapping (v0.1) ──────────────────────────────────
   function mapAudio(ctx: StyleContext, dt: number): void {
     if (inkExp('noHits', 0) > 0) return;
@@ -487,13 +468,10 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
   return {
     id: 'ink',
 
-    onEvent(e: SonoraEvent, ctx: StyleContext): void {
+    onEvent(e: SonoraEvent): void {
       // Event hits land in update() (after this frame's advection steps are
-      // planned), on this same frame; the previous behaviour landed them here.
-      const hit = (scale: number, attack: number[]): void => {
-        if (debugFlags.inkLegacy) bassBlob(ctx, 1, scale, attack);
-        else eventHits.push({ scale, attack });
-      };
+      // planned), on this same frame.
+      const hit = (scale: number, attack: number[]): void => { eventHits.push({ scale, attack }); };
       if (e.type === 'drop') {
         flowZ += FLOW_JUMP;
         hit(1.15, ATTACK_DROP);
@@ -539,19 +517,14 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       // ~2x as much per second as the tuned 60 fps (softer, dimmer hits). It
       // runs at the tuned 60 Hz; the display samples the ink along the flow in
       // between, so motion stays smooth at any refresh.
-      params.fixedStep = !debugFlags.inkLegacy && inkExp('fixedStep', 1) > 0 ? LAND_STEP : 0;
+      params.fixedStep = inkExp('fixedStep', 1) > 0 ? LAND_STEP : 0;
       stepsNow = params.fixedStep ? sim.planSteps(dt, params.fixedStep) : -1;
-      if (debugFlags.inkLegacy) { landings.length = 0; landPending(); }
-      else {
-        landAll(dt);
-        pending.length = 0;
-        if (inkExp('noHits', 0) === 0) for (const h of eventHits) bassBlob(ctx, 1, h.scale, h.attack);
-        eventHits.length = 0;
-      }
+      landAll(dt);
+      if (inkExp('noHits', 0) === 0) for (const h of eventHits) bassBlob(ctx, 1, h.scale, h.attack);
+      eventHits.length = 0;
       // Hits are decided per analysis frame (60 per second of audio), not per
       // rendered frame: the same hits, at the same moments, at any refresh.
-      if (debugFlags.inkLegacy) mapAudio(ctx, ctx.dt);
-      else if (ctx.analysisFrames > 0) mapAudio(ctx, ctx.analysisFrames * ANALYSIS_DT);
+      if (ctx.analysisFrames > 0) mapAudio(ctx, ctx.analysisFrames * ANALYSIS_DT);
       for (const q of landings) q.fresh = false;
     },
 
@@ -605,13 +578,11 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
         gl.uniform1f(u.u_time, time);
         gl.uniform1f(u.u_drop, ctx.eventState.dropEnvelope);
         gl.uniform1f(u.u_sharpen, (SHARPEN[variant] ?? 0.4) * (quality.level === 'low' ? 0.7 : 1) * inkExp('sharpen', 1));
-        const legacy = debugFlags.inkLegacy;
         gl.uniform1i(u.u_height_cubic, inkExp('heightCubic', 0));
-        gl.uniform1i(u.u_marble_spark, inkExp('marbleSpark', legacy ? 0 : 1));
         gl.uniform1i(u.u_dye_filter, inkExp('dyeFilter', 0));
         gl.uniform1f(u.u_dither, inkExp('dither', 1));
         gl.uniform1f(u.u_veins, inkExp('veins', 1));
-        gl.uniform1f(u.u_vein_aa, inkExp('veinAA', legacy ? 0 : 1));
+        gl.uniform1f(u.u_vein_aa, inkExp('veinAA', 1));
         gl.uniform1f(u.u_stip_aa, inkExp('stipAA', 0));
         gl.uniform1f(u.u_glow, 1.0);
         // Marble keeps its gentle beat brightening from before round 6 (a dark

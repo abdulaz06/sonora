@@ -82,9 +82,10 @@ describe('settings migration', () => {
     const s = mergeWithDefaults({ settingsVersion: 6 });
     expect(s.showFps).toBe(false);
     expect(s.fpsCorner).toBe('top-left');
-    expect(s.inkLegacy).toBe(false);
     const v7 = mergeWithDefaults({ settingsVersion: 7, showFps: true, fpsCorner: 'bottom-left', inkLegacy: true });
-    expect([v7.showFps, v7.fpsCorner, v7.inkLegacy]).toEqual([true, 'bottom-left', true]);
+    expect([v7.showFps, v7.fpsCorner]).toEqual([true, 'bottom-left']);
+    // The temporary Ink A/B switch is gone; an old save's value is dropped.
+    expect('inkLegacy' in v7).toBe(false);
   });
 
   it('frame-rate choices pace evenly on the measured display', () => {

@@ -122,8 +122,6 @@ export interface PersistedSettings {
   /** Frames-per-second readout in a corner (also the P key). */
   showFps: boolean;
   fpsCorner: Corner;
-  /** Temporary A/B: Ink's behaviour before the smoothness fix (removed after sign-off). */
-  inkLegacy: boolean;
 }
 
 /** Fixed frame-rate caps offered on every display (and 90, kept for older saves). */
@@ -213,7 +211,6 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   checkUpdates: true,
   showFps: false,
   fpsCorner: 'top-left',
-  inkLegacy: false,
 };
 
 /** Load saved settings from disk; returns DEFAULT_SETTINGS if none exist. */
@@ -428,7 +425,6 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
   // ── v7 ──
   if (typeof r.showFps === 'boolean') out.showFps = r.showFps;
   if (r.fpsCorner === 'bottom-left' || r.fpsCorner === 'bottom-right' || r.fpsCorner === 'top-left' || r.fpsCorner === 'top-right') out.fpsCorner = r.fpsCorner;
-  if (typeof r.inkLegacy === 'boolean') out.inkLegacy = r.inkLegacy;
   return out;
 }
 

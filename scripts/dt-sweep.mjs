@@ -14,7 +14,7 @@
 //
 //   node scripts/dt-sweep.mjs --style ink --variant marble [--flat] [--track ref-song]
 //        [--start s] [--secs s] [--rates 60,120,165] [--camera planet] [--palette n]
-//        [--debug '{"inkLegacy":true}'] [--keep]
+//        [--debug '{"inkExp":{"veins":0}}'] [--keep]
 // Also: npm run verify -- --dt-sweep … (forwards here).
 import { chromium } from 'playwright';
 import { spawn, execFileSync } from 'node:child_process';
@@ -73,7 +73,7 @@ try {
     await p.evaluate((c) => window.__sonora.configure(c), {
       style, variant, depth: !flat, drift: false,
       camera: camera || undefined, palette: palette !== '' ? Number(palette) : undefined,
-      debug: debug ? JSON.parse(debug) : { inkLegacy: false, inkExp: {} },
+      debug: debug ? JSON.parse(debug) : { inkExp: {} },
     });
     await p.evaluate((n) => window.__sonora.loadTrack(n), track);
     const warm = Math.min(8, start);

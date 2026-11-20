@@ -5,7 +5,7 @@
 // Env: SEQ_W / SEQ_H (viewport, default 960x540), SEQ_FPS (render steps per
 // second, default 60; the warm-up renders at the same rate), SEQ_QUALITY,
 // SEQ_PALETTE, SEQ_CAMERA, SEQ_RESP, SEQ_DEBUG (JSON debug flags, e.g.
-// '{"inkLegacy":true}'), SEQ_WARMUP (seconds rendered before the start, default 8),
+// '{"inkExp":{"veins":0}}'), SEQ_WARMUP (seconds rendered before the start, default 8),
 // SEQ_JPG=1 (JPEG frames, quality 0.95: videos).
 // Run from another checkout (e.g. a baseline worktree) to render that code.
 import { chromium } from 'playwright';

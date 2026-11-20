@@ -25,11 +25,10 @@ uniform float u_pulse_gain;   // how much ink brightens on a hit
 uniform float u_grain_amt;    // paper / pigment grain (0 = none)
 uniform int u_linear;         // Glow: v0.1 linear density → brightness
 uniform int u_height_cubic;   // harness: 1 = blurred field sampled with Catmull-Rom (0 = bilinear, shipped)
-uniform int u_marble_spark;   // Marble highlight: 1 lights the marble in its own colours; 0 mint glow (legacy)
 uniform int u_dye_filter;     // harness: 0 auto, 1 bilinear, 2 Catmull-Rom, 3 B-spline
 uniform float u_dither;       // harness: Marble stipple dither scale (1 = shipped)
 uniform float u_veins;        // harness: Marble vein strength scale (1 = shipped)
-uniform float u_vein_aa;      // Marble: fade veins thinner than a pixel to their mean tone (0 = legacy)
+uniform float u_vein_aa;      // Marble: fade veins thinner than a pixel to their mean tone (harness: 0 = off)
 uniform float u_stip_aa;      // harness: widen the stipple threshold by the field's pixel footprint
 // Fixed-step advection: the ink is resampled at the tuned 60 Hz; between steps
 // the display samples it u_warp seconds further along the flow (and faded as
@@ -117,13 +116,9 @@ vec3 shadeInkBase(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
     vec3 dark = light ? u_ink_a * 0.55 : u_bg * 0.6;
     vec3 col = mix(dark, bright, stip);
     col = mix(col, light ? dark * 0.7 : bright * 1.25, veins * 0.6);
-    if (u_marble_spark == 1) {
-      // Duotone: a high hit lights the marble already there, in its own
-      // colours (never a third-colour patch landing in empty space).
-      col += light ? vec3(0.0) : col * min(sp, 1.5) * 0.9;
-    } else {
-      col += light ? vec3(0.0) : u_spark * sp * 2.0;
-    }
+    // A high hit lights the marble already there, in its own colours (never
+    // a third-colour patch landing in empty space).
+    col += light ? vec3(0.0) : col * min(sp, 1.5) * 0.9;
     cover = cov;
     return col;
   }
