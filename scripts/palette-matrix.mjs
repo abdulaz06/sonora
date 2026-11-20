@@ -24,6 +24,9 @@
 //   --flicker           instead of frames: the flicker / blown-out gates (dense-128, Punchy,
 //                       12 s from just before the drop, 1920x1080, same maths as verify --flicker)
 //                       for every palette × combo → verify/palettes/<name>/flicker.json
+//   --clips             instead of frames: per combo, the same 2 s passage (drop + 2 s) once
+//                       per palette, joined into one labelled clip; with --drift-cycle, one
+//                       Auto Drift full turn (60 s period) at 2× → verify/palettes/<name>/clips/
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -77,6 +80,8 @@ function parseArgs(argv) {
     else if (a === '--jobs') o.jobs = Number(next());
     else if (a === '--no-metrics') o.metrics = false;
     else if (a === '--flicker') o.flicker = true;
+    else if (a === '--clips') o.clips = true;
+    else if (a === '--drift-cycle') o.driftCycle = true;
   }
   return o;
 }
@@ -170,6 +175,49 @@ async function flickerOne(page, combo, pal, meta) {
   return r;
 }
 
+// ── Review clips ────────────────────────────────────────────────
+const CLIP_FPS = 30;
+async function clipFrames(page, combo, def, track, meta, start, secs, dir, every = 2, drift = false) {
+  mkdirSync(dir, { recursive: true });
+  await page.reload();
+  await page.waitForFunction(() => window.__sonora?.ready === true);
+  await page.evaluate((c) => window.__sonora.configure({ style: c.style, variant: c.variant, depth: c.depth, light: c.light ?? 'auto', quality: 'medium', drift: false }), combo);
+  await page.evaluate((p) => window.__sonora.setPalette(p), def);
+  if (drift) await page.evaluate(() => { window.__sonora.setPalette({ index: 0, driftDeg: 0 }); });
+  await page.evaluate((n) => window.__sonora.loadTrack(n), track);
+  await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
+  await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), DT]);
+  const n = Math.round(secs * CLIP_FPS);
+  for (let i = 0; i < n; i++) {
+    await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [every * DT, DT]);
+    const url = await page.evaluate(() => window.__sonora.snapshot('image/jpeg', 0.9));
+    writeFileSync(join(dir, `f${String(i).padStart(5, '0')}.jpg`), Buffer.from(url.split(',')[1], 'base64'));
+  }
+}
+
+async function clipDrift(page, combo, track, meta, dir) {
+  mkdirSync(dir, { recursive: true });
+  await page.reload();
+  await page.waitForFunction(() => window.__sonora?.ready === true);
+  await page.evaluate((c) => window.__sonora.configure({ style: c.style, variant: c.variant, depth: c.depth, light: c.light ?? 'auto', quality: 'medium', drift: false }), combo);
+  await page.evaluate((n) => window.__sonora.loadTrack(n), track);
+  const start = meta.markers.fadeIn + 4;
+  await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, start - 6));
+  await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [Math.min(6, start), DT]);
+  // 60 s of music, the drift turned 6° per second of music (one full turn).
+  const frames = Math.round((60 * CLIP_FPS) / 2);
+  for (let i = 0; i < frames; i++) {
+    await page.evaluate((d) => window.__sonora.setPalette({ index: 0, driftDeg: d }), (i / frames) * 360);
+    await page.evaluate(([s, d]) => window.__sonora.advance(s, d), [4 * DT, DT]);
+    const url = await page.evaluate(() => window.__sonora.snapshot('image/jpeg', 0.9));
+    writeFileSync(join(dir, `f${String(i).padStart(5, '0')}.jpg`), Buffer.from(url.split(',')[1], 'base64'));
+  }
+}
+
+function ffmpeg() {
+  return execFileSync('python', ['-c', 'import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())']).toString().trim();
+}
+
 try {
   await waitForServer(`http://localhost:${PORT}/web.html`);
   const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
@@ -211,6 +259,47 @@ try {
     markers: Object.fromEntries(trackNames.map((n) => [n, tracks[n].markers])),
     shots: Object.fromEntries(trackNames.map((n) => [n, shotsFor(tracks[n].markers)])),
   }, null, 1));
+
+  if (opts.clips) {
+    const outDir = join(ROOT, 'verify', 'palettes', opts.name, 'clips');
+    mkdirSync(outDir, { recursive: true });
+    const ff = ffmpeg();
+    const track = trackNames[0];
+    const meta = tracks[track];
+    const page = pages[0];
+    for (const combo of combos) {
+      const segs = [];
+      for (const pal of pals) {
+        const dir = join(outFrames, 'clips', combo.id, pal.name.replace(/[^\w-]+/g, '_'));
+        if (!existsSync(join(dir, 'f00059.jpg'))) await clipFrames(page, combo, pal.def, track, meta, meta.markers.drop + 2, 2, dir);
+        segs.push({ dir, label: pal.name });
+      }
+      // One labelled segment per palette, then joined.
+      const parts = [];
+      for (const [k, sgm] of segs.entries()) {
+        const part = join(outFrames, 'clips', combo.id, `seg${k}.mp4`);
+        execFileSync(ff, ['-y', '-loglevel', 'error', '-framerate', String(CLIP_FPS), '-i', join(sgm.dir, 'f%05d.jpg'),
+          '-vf', `drawtext=text='${k + 1} ${sgm.label}':x=16:y=h-36:fontsize=20:fontcolor=0xECE7DF:fontfile='C\\:/Windows/Fonts/consola.ttf'`,
+          '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '22', part]);
+        parts.push(part);
+      }
+      const list = join(outFrames, 'clips', combo.id, 'list.txt');
+      writeFileSync(list, parts.map((x) => `file '${x.split('\\').join('/')}'`).join('\n'));
+      execFileSync(ff, ['-y', '-loglevel', 'error', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', join(outDir, `${combo.id}.mp4`)]);
+      console.log(`clip ${combo.id} → ${join(outDir, combo.id + '.mp4')}`);
+    }
+    if (opts.driftCycle) {
+      const combo = combos[0];
+      const dir = join(outFrames, 'clips', `drift-${combo.id}`);
+      // Auto Drift at its shortest period (60 s), one full turn, every 4th frame → 2× speed at 30 fps.
+      await clipDrift(page, combo, track, meta, dir);
+      execFileSync(ff, ['-y', '-loglevel', 'error', '-framerate', String(CLIP_FPS), '-i', join(dir, 'f%05d.jpg'), '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '23', join(outDir, `drift-cycle-${combo.id}.mp4`)]);
+      console.log(`drift cycle → ${join(outDir, 'drift-cycle-' + combo.id + '.mp4')}`);
+    }
+    await browser.close();
+    cleanup();
+    process.exit(0);
+  }
 
   if (opts.flicker) {
     const outDir = join(ROOT, 'verify', 'palettes', opts.name);
