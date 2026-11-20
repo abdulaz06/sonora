@@ -46,7 +46,7 @@ if (process.argv.includes('--dt-sweep')) {
 }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = 5199;
+const PORT = Number(process.env.SONORA_HARNESS_PORT || 5199);
 const BENCH_SECONDS = 6;
 
 function parseArgs(argv) {
@@ -114,7 +114,7 @@ if (!existsSync(join(ROOT, 'src', 'audio', 'wasm-pkg', 'sonora_dsp_bg.wasm'))) {
 }
 
 const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
-  cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: 'node_modules/.vite-verify' },
+  cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: process.env.SONORA_VITE_CACHE || 'node_modules/.vite-verify' },
 });
 const cleanup = () => { try { if (process.platform === 'win32') execFileSync('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' }); else server.kill(); } catch { /* gone */ } };
 process.on('exit', cleanup);

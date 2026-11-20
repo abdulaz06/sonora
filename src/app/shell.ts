@@ -223,7 +223,6 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
       else if (lower === 'c') ctl.cycleCameraPreset();
       else if (lower === 'p') { ctl.setShowFps(!s.showFps); toast(s.showFps ? 'fps on' : 'fps off', { ms: 900 }); }
       else if (/^[1-9]$/.test(k)) ctl.setPalette(Number(k) - 1);
-      else if (k === '0') ctl.setPalette(9);
       return;
     }
     if (k.startsWith('Arrow')) { e.preventDefault(); spatialMove(k); }
