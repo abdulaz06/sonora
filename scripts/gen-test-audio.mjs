@@ -411,9 +411,104 @@ function dense128() {
   };
 }
 
+// ── Track F: demo-sonora (the website's demo and trailer) ────────────
+// A short original piece that shows every signal: calm intro → groove →
+// build → drop → breakdown → second build → bigger drop with a lead → tail.
+// Ends in silence long enough that looping it reads as a track change.
+function demoSonora() {
+  const bpm = 122; const beat = 60 / bpm; const bar = beat * 4; const off = 0.6;
+  const B = (b) => off + b * bar;
+  const BARS = 36;
+  const total = B(BARS) + 1.9;
+  const tr = new Track(total, 2026);
+  const bassLayer = new Track(total, 31);
+  const padLayer = new Track(total, 32);
+  const leadLayer = new Track(total, 33);
+  const chords = [[53, 56, 60], [53, 56, 61], [51, 56, 60], [51, 55, 58]]; // Fm Db Ab Eb
+  const roots = [29, 25, 32, 27];
+  const arp = [0, 1, 2, 1, 2, 0, 1, 2]; // chord tones for the drop-2 lead
+  const kicks = [];
+  const sec = (b) => (b < 4 ? 'intro' : b < 8 ? 'groove' : b < 14 ? 'build' : b < 22 ? 'drop' : b < 26 ? 'breakdown' : b < 29 ? 'build2' : b < 35 ? 'drop2' : 'tail');
+
+  for (let b = 0; b < BARS; b++) {
+    const s = sec(b); const ci = Math.floor(b / 2) % 4;
+    const drop = s === 'drop' || s === 'drop2';
+    const kickOn = s === 'groove' || (s === 'build' && b < 10) || drop;
+    for (let q = 0; q < 4; q++) {
+      const t = B(b) + q * beat;
+      if (kickOn) { tr.kick(t, drop ? 1.0 : 0.82); kicks.push(t); }
+      if (s === 'groove' || s === 'build' || drop) tr.hat(t + beat / 2, drop ? 0.5 : 0.36, drop && q % 2 === 1);
+      if (drop) { tr.hat(t + beat * 0.25, 0.16); tr.hat(t + beat * 0.75, 0.16); }
+      if (((s === 'groove' && b >= 6) || (s === 'build' && b < 10) || drop) && (q === 1 || q === 3)) tr.clap(t, drop ? 0.95 : 0.6);
+      if (s === 'groove' || (s === 'build' && b < 10)) bassLayer.bass(t + beat / 2, beat * 0.42, roots[ci] + 12, 0.55);
+      if (drop) {
+        bassLayer.bass(t, beat * 0.88, roots[ci], 0.75, roots[ci] + 12, 1.6);
+        bassLayer.bass(t + beat / 2, beat * 0.42, roots[ci] + 12, 0.9);
+      }
+      if (s === 'drop2') for (let k = 0; k < 4; k++) leadLayer.stab(t + (k * beat) / 4, [chords[ci][arp[(q * 4 + k) % 8]] + 24], 0.32);
+    }
+    if (drop && b % 2 === 0) for (const st of [0.75, 1.75, 2.5]) tr.stab(B(b) + st * beat, chords[ci].map((n) => n + 12), s === 'drop2' ? 0.42 : 0.5);
+    if (s === 'breakdown') bassLayer.bass(B(b), bar * 0.95, roots[ci] + 12, 0.35, null, 1.0);
+    // A warm sub under the intro, so the groove's entry is not heard as a drop.
+    if (s === 'intro' && b >= 1) bassLayer.bass(B(b), bar * 0.98, roots[ci], 0.3 + 0.1 * b, null, 1.0);
+    if (b % 2 === 0) {
+      const amp = s === 'intro' ? 0.5 : s === 'groove' ? 0.42 : s === 'build' || s === 'build2' ? 0.48 : drop ? 0.38 : s === 'breakdown' ? 0.75 : 0.5;
+      padLayer.pad(B(b), bar * 2, chords[ci].concat([chords[ci][0] + 12]), amp, (t) => {
+        if (t < B(4)) return 500 + 500 * clamp01((t - off) / (B(4) - off));
+        if (t >= B(8) && t < B(14)) return 900 + 5200 * ((t - B(8)) / (B(14) - B(8))) ** 2;
+        if (t >= B(26) && t < B(29)) return 1200 + 5000 * ((t - B(26)) / (B(29) - B(26))) ** 2;
+        if (t >= B(22) && t < B(26)) return 1100 + 700 * Math.sin((t - B(22)) * 0.9);
+        return drop ? 3600 : 1300;
+      }, s === 'intro' ? 2.4 : 1.2, 1.6);
+    }
+    if (s === 'intro' || s === 'breakdown') for (let k = 0; k < 4; k++) tr.bell(B(b) + k * beat + (k % 2) * beat * 0.5, chords[ci][k % 3] + 24, s === 'intro' ? 0.14 : 0.2);
+  }
+  // Rolls and risers into each drop.
+  const roll = (b0, b1, gap) => {
+    for (let b = b0; b < b1; b++) {
+      const u = (b - b0) / (b1 - b0);
+      const div = u < 0.34 ? 1 : u < 0.6 ? 2 : u < 0.85 ? 4 : 8;
+      for (let k = 0; k < 4 * div; k++) {
+        const t = B(b) + (k * beat) / div;
+        if (t >= gap) return;
+        tr.snare(t, 0.32 + 0.5 * u, 0.85 + 0.25 * u);
+      }
+    }
+  };
+  roll(9, 14, B(13.5));
+  roll(26, 29, B(28.5));
+  tr.sweep(B(9), B(13.5) - B(9), (u) => ({ cutoff: 400 + 9000 * u * u, gain: 0.06 + 0.5 * u * u }));
+  tr.sweep(B(26), B(28.5) - B(26), (u) => ({ cutoff: 500 + 9000 * u * u, gain: 0.05 + 0.5 * u * u }));
+  tr.sweep(B(14), bar * 2, (u) => ({ cutoff: 9000 * (1 - u) + 300, gain: 0.45 * (1 - u) }), true);
+  tr.sweep(B(29), bar * 2, (u) => ({ cutoff: 9000 * (1 - u) + 300, gain: 0.5 * (1 - u) }), true);
+  // Tail: one last hit and a crash, then the pads ring out.
+  tr.kick(B(35), 1.0); kicks.push(B(35));
+  tr.sweep(B(35), bar, (u) => ({ cutoff: 8000 * (1 - u) + 400, gain: 0.4 * (1 - u) }), true);
+
+  Track.sidechain(bassLayer.buf, kicks, 0.85);
+  Track.sidechain(padLayer.buf, kicks, 0.6);
+  Track.sidechain(leadLayer.buf, kicks, 0.5);
+  tr.mixIn(bassLayer.buf); tr.mixIn(padLayer.buf); tr.mixIn(leadLayer.buf, 0.9);
+  // Pre-drop gaps (half a bar).
+  tr.gain(B(13.5), B(14), () => 0.02);
+  tr.gain(B(28.5), B(29), () => 0.02);
+  // Fade in over the first bars; the tail fades to silence.
+  tr.gain(off, B(2), (t) => smooth((t - off) / (B(2) - off)));
+  tr.gain(B(35), B(BARS), (t) => 1 - smooth((t - B(35)) / (B(BARS) - B(35))));
+  tr.gain(B(BARS), total, () => 0);
+  tr.gain(0, off, () => 0);
+  return {
+    samples: tr.master(),
+    markers: { silence: total - 0.5, fadeIn: B(1), build: B(12), drop: B(14), breakdown: B(23) },
+    kicks,
+    sections: [['silence', 0, off], ['intro', off, B(4)], ['groove', B(4), B(8)], ['build', B(8), B(14)], ['drop', B(14), B(22)],
+      ['breakdown', B(22), B(26)], ['build', B(26), B(29)], ['drop', B(29), B(35)], ['tail', B(35), B(BARS)], ['silence', B(BARS), total]],
+  };
+}
+
 // ── Main ────────────────────────────────────────────────────────────
 mkdirSync(OUT_DIR, { recursive: true });
-const tracks = { 'house-124': house124, 'halftime-140': halftime140, 'ambient-pad': ambient, 'silence-fadein': silenceFadeIn, 'dense-128': dense128 };
+const tracks = { 'house-124': house124, 'halftime-140': halftime140, 'ambient-pad': ambient, 'silence-fadein': silenceFadeIn, 'dense-128': dense128, 'demo-sonora': demoSonora };
 const meta = {};
 for (const [name, fn] of Object.entries(tracks)) {
   const t0 = Date.now();
