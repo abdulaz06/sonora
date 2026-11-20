@@ -354,14 +354,16 @@ def calibrate(base_path, out_path):
     print(f'thresholds -> {out_path}')
 
 
-def gate(metrics_path, th_path, quiet=False):
+def gate(metrics_path, th_path, quiet=False, ref_path=None):
     m, th = json.load(open(metrics_path)), json.load(open(th_path))
+    # Sets without Ocean (hue sweeps, drift) measure exposure against Ocean of a reference set.
+    refm = json.load(open(ref_path)) if ref_path else None
     fails = {}
     for c, ps in m['combos'].items():
         t = th['combos'].get(c)
         if not t:
             continue
-        ref = ps.get(DEFAULT)
+        ref = ps.get(DEFAULT) or (refm['combos'].get(c, {}).get(DEFAULT) if refm else None)
         for p, x in ps.items():
             f = []
             if x['chroma'] < t['chroma_min']: f.append(f"chroma {x['chroma']:.3f}<{t['chroma_min']:.3f}")
@@ -391,7 +393,8 @@ if __name__ == '__main__':
     if sys.argv[1] == 'calibrate':
         calibrate(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == 'gate':
-        gate(sys.argv[2], sys.argv[3], '--quiet' in sys.argv)
+        ref = sys.argv[sys.argv.index('--ref') + 1] if '--ref' in sys.argv else None
+        gate(sys.argv[2], sys.argv[3], '--quiet' in sys.argv, ref)
     elif sys.argv[1] == 'compare':
         compare(sys.argv[2], sys.argv[3])
     else:
