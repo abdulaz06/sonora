@@ -5,7 +5,7 @@
 #   motion   6 s sequences (480x270): fine share ≤45%, background step ≤0.02
 #   cost     synced frame cost, Medium, 1080p (house-124 drop)
 # Usage: scripts/style-gates.sh <outDir>
-# Env: PALETTE (index, default 0), ONLY="sync flicker motion cost", COMBOS="ink:glow:flat voyage:void:flat …",
+# Env: PALETTE (index, default 0), TRACKS (sync tracks), ONLY="sync flicker motion cost", COMBOS="ink:glow:flat voyage:void:flat …",
 #      SEQ_ROOT (motion frames, deleted after measuring; default the OS temp dir).
 out=${1:-verify/style-gates}
 mkdir -p "$out"
@@ -18,6 +18,7 @@ combos=${COMBOS:-"ink:glow:flat ink:glow:depth ink:marble:flat ink:marble:depth 
 seqroot=${SEQ_ROOT:-${TMPDIR:-/tmp}/sonora-gates-seq}
 tracks="house-124"
 [ -f test-audio/local/ref-song.wav ] && tracks="$tracks ref-song"
+[ -n "$TRACKS" ] && tracks="$TRACKS"
 for c in $combos; do
   IFS=: read -r style look view <<< "$c"
   tag="$style $look $view"
