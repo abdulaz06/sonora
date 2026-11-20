@@ -232,8 +232,7 @@ html:not(.static) .only-static { display: none !important; }
 .style-text { width: fit-content; max-width: min(100%, 640px); }
 .style-text .line { color: var(--b90); font-size: clamp(16px, 1.2vw, 21px); line-height: 1.45; max-width: 26em; }
 .style-text .suits { margin-top: 14px; }
-.style-more { max-width: 24em; text-align: right; color: var(--b75); font-size: var(--t-small); }
-@media (max-width: 900px) { .style-more { text-align: left; } }
+.style-more { max-width: 26em; color: var(--b90); font-size: var(--t-small); background: var(--n80); border: var(--line); padding: 16px 18px; }
 .style-controls { display: flex; flex-direction: column; gap: 14px; align-items: flex-end; }
 .style-controls .grp { display: flex; gap: 14px; align-items: center; }
 .style .heavy { margin-left: 10px; color: var(--b62); }
