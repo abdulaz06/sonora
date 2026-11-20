@@ -2,6 +2,7 @@
 import '../styles/site.css';
 import interUrl from '../../../src/assets/fonts/inter-latin-opsz-normal.woff2?url';
 import monoUrl from '../../../src/assets/fonts/ibm-plex-mono-latin-500-normal.woff2?url';
+import mono400Url from '../../../src/assets/fonts/ibm-plex-mono-latin-400-normal.woff2?url';
 import { SITE_URL } from '../../site.config.mjs';
 import Nav from '../components/Nav.astro';
 
@@ -15,9 +16,11 @@ interface Props {
   /** Extra class on <html> (e.g. 'live-page'). */
   htmlClass?: string;
   nav?: boolean;
+  /** Where "Skip to content" goes. */
+  skipTo?: string;
   preloadImage?: { srcset: string; sizes: string; href: string };
 }
-const { title, description, path, og, ogAlt, page, htmlClass = '', nav = true, preloadImage } = Astro.props;
+const { title, description, path, og, ogAlt, page, htmlClass = '', nav = true, preloadImage, skipTo = '#main' } = Astro.props;
 const canonical = path === '/' ? `${SITE_URL}/` : `${SITE_URL}${path}`;
 const ogUrl = new URL(og, SITE_URL).href;
 ---
@@ -38,6 +41,7 @@ const ogUrl = new URL(og, SITE_URL).href;
     <link rel="sitemap" href="/sitemap-index.xml" />
     <link rel="preload" href={interUrl} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={monoUrl} as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href={mono400Url} as="font" type="font/woff2" crossorigin />
     {preloadImage && <link rel="preload" as="image" href={preloadImage.href} imagesrcset={preloadImage.srcset} imagesizes={preloadImage.sizes} fetchpriority="high" />}
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="sonora" />
@@ -56,7 +60,7 @@ const ogUrl = new URL(og, SITE_URL).href;
     <slot name="head" />
   </head>
   <body>
-    <a class="skip" href="#main">Skip to content</a>
+    <a class="skip" href={skipTo}>Skip to content</a>
     {nav && <Nav page={page} />}
     <slot />
   </body>

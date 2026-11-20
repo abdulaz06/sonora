@@ -33,6 +33,7 @@ const description = 'A visual instrument for whatever’s playing: a free Window
       if (stat) d.classList.add('static');
       if (reduced) d.classList.add('reduced');
       d.classList.add('nav-clear');
+      if (window.scrollY < window.innerHeight * 0.45) d.classList.add('at-hero');
     })();
   </script>
 

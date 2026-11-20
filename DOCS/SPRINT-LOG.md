@@ -1,21 +1,113 @@
-# Website, live demo, trailer, hosting — in progress
+# Website, live demo, trailer, hosting — done (deploy waits on your Vercel login)
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Site: `site/` (Astro, static). Review output: `verify/site/` (git-ignored). Trailer master: `local-media/` (git-ignored).
+
+## Summary
+
+**Live URL:** not deployed yet: the first Vercel login and link need you (steps right below, about five minutes). The site is built for **https://sonora-visual.vercel.app** (`sonora`, `sonora-app`, `sonora-visualizer` and `sonora-music` are taken on vercel.app; D77). Until then everything was verified on the local production build (`cd site && npm run build && npm run preview`, http://localhost:4321). The deploy workflow already runs on every push and builds the site on Linux (green); it deploys as soon as the three secrets exist.
+
+### Do this by hand
+1. **Vercel login and link** (from the repo):
+   ```
+   cd site
+   npx vercel login            # browser opens; sign in (GitHub is easiest)
+   npx vercel link             # set up? yes · scope: your account · link to existing? no · name: sonora-visual · directory: ./
+   cat .vercel/project.json    # PowerShell: type .vercel\project.json → note "orgId" and "projectId"
+   ```
+   If `link` offers to connect the GitHub repository, either answer is fine: `site/vercel.json` turns Vercel's own Git builds off (they would fail: no Rust there). If `sonora-visual` is taken by then, pick another name and change `SITE_URL` in `site/site.config.mjs` and the Sitemap line in `site/public/robots.txt`.
+2. **A Vercel token:** https://vercel.com/account/tokens → Create (your account, 1 year) → copy it.
+3. **Three GitHub secrets** (repo root):
+   ```
+   gh secret set VERCEL_TOKEN                   # paste the token
+   gh secret set VERCEL_ORG_ID --body <orgId>
+   gh secret set VERCEL_PROJECT_ID --body <projectId>
+   gh workflow run site.yml                     # first production deploy; the run summary shows the URL
+   ```
+   From then on: pushes to `main` that touch `site/` or the engine deploy to production, every release redeploys (so `/download` and the button move to the new installer at once), a daily run refreshes it, and other branches get preview URLs.
+4. **Web Analytics** (cookieless, no banner): Vercel → project → Analytics → Enable. The script is already in production builds only.
+5. **Repo homepage**, once the URL answers: `gh repo edit --homepage https://sonora-visual.vercel.app` (the README already links it).
+6. **Custom domain later** (optional): Vercel → project → Settings → Domains → Add; set the DNS records it shows (A `76.76.21.21` for an apex domain, or CNAME `cname.vercel-dns.com`); change `SITE_URL` in `site/site.config.mjs` and `site/public/robots.txt`; push.
+7. **YouTube** (you upload): `local-media/sonora-trailer-1080p60.mp4` (58.95 s, 1080p60, H.264 + AAC 256k, 169 MB), thumbnail `local-media/youtube-thumbnail.jpg` (1280×720).
+   - Title: `sonora — see your music (trailer)`
+   - Description:
+     ```
+     sonora is a free music visualizer for Windows. It listens to whatever your PC plays and paints it live, in time with every beat: liquid ink, threads of light, flames, hyperspace and a flight through a 3D fractal, in nine palettes.
+
+     Everything in this trailer was rendered by the engine itself, frame by frame, on an original demo track made for sonora. Nothing was added but the cuts.
+
+     Download for Windows: https://sonora-visual.vercel.app
+     Try it in your browser: https://sonora-visual.vercel.app/live
+     How it works: https://sonora-visual.vercel.app/engineering
+     Source: https://github.com/abdulaz06/sonora
+     ```
+   - Tags: `music visualizer, audio visualizer, visualizer, windows, wasapi, webgl, rust, webassembly, generative art, vj, music visualization, sonora`
+   - Afterwards you could point the README's trailer link at the YouTube URL.
+8. **LICENSE:** the repo still has none, so legally nobody may reuse the code. I didn't invent one. Pick one (MIT if you want it open, or keep "all rights reserved") and add it.
+
+### Lighthouse (local production build; Lighthouse 13.6 in Edge with the GPU; performance · accessibility · best practices · SEO)
+| page | mobile | desktop |
+|---|---|---|
+| landing `/` | 96 · 100 · 100 · 100 (FCP/LCP 0.8 s, TBT 230 ms, CLS 0; runs ranged 96–100) | **100 · 100 · 100 · 100** (FCP/LCP 0.3 s, TBT 0, CLS 0; three runs in a row) |
+| `/engineering` | 100 · 100 · 100 · 100 | 100 · 100 · 100 · 100 |
+| `/live` | 100 · 100 · 100 · 100 (phones get the fallback page) | 47 · 92 · 100 · 100 (LCP 4.0 s, TBT 2.5 s: the whole app shell, the WASM analyser and the first shader compiles on load; accessibility: the app's level meter lacks `aria-valuenow` and its dimmed menu text behind the picker; app code left untouched) |
+
+Reports: `verify/site/lighthouse/<page>-<form>.report.html`. Run again with `bash site/scripts/lighthouse.sh` against `npm run preview`.
+
+### Where to look
+- **Screenshots:** `verify/site/shots/`: every page at 1440×900, 1920×1080 and 390×844 (the landing page one shot per section with the live engine; `*-full.jpg` full pages). Sheets: `verify/site/sheet-1920.jpg`, `verify/site/mobile-sheet1.jpg`, `mobile-sheet2.jpg`.
+- **Scroll-through video:** `verify/site/scroll-through-1440.webm` (desktop, live engine, every section).
+- **Trailer:** master `local-media/sonora-trailer-1080p60.mp4`; web `site/public/media/sonora-trailer.webm` (4.4 MB VP9) and `.mp4` (4.1 MB H.264), both 720p30, behind the hero's and Set Mode's "Watch the trailer"; README `DOCS/assets/sonora-trailer.webp` (2.9 MB, the first drop). Contact sheets: `verify/site/trailer-contact.jpg`, `trailer-build.jpg`.
+- **Checks:** `verify/site/`: `reduced-motion-silk.jpg`, `nowebgl-landing-warp.jpg`, `nowebgl-live.jpg`, `live-mic-denied.jpg`, `live-tab-denied.jpg`, `live-demo-playing.jpg`; Lighthouse reports in `verify/site/lighthouse/`; app gates in `verify/site/gates/gates.log`.
+
+### What's on the site
+- **Landing** (`/`): the hero runs the live engine (Ink Glow Depth, Ocean) over a poster that is the engine's exact first frame; "it hears the song" has a live signals board (kick, snare, hats, bass, build, drop, breakdown, big hit, track change, tempo, section, intensity, timeline) driven by the real frames and event layer; five full-screen style sections with live look / view chips; nine palettes cycling, 24 custom hues and Auto Drift; Set Mode switching live with a log of why; real app screens; how it works; download with requirements and the SmartScreen note; footer (Coming to Steam, GitHub, version, © Abdul, the privacy line). Sound is off by default; the toggle plays the demo in sync.
+- **/live:** the app's own shell (menu, detail, HUD, settings with (i) cards, Set Mode, keys) on the WASM analyser, with a picker for the demo track, a file (or drop), the microphone or a browser tab; plain advice when access is denied or sharing is cancelled; phones and browsers without WebGL 2 get engine recordings and an explanation.
+- **/engineering:** the case study, with numbers from DECISIONS and this log, five real images (slow-motion evidence, 60 vs 165 fps, Voyage palettes) and an event timeline of the demo track built from the real events.
+- `/download` → the latest installer (a real 302 on Vercel, resolved at build time; the buttons refresh client-side from the GitHub API, cached in sessionStorage), `/404`, sitemap, robots, canonical URLs, OG/Twitter images per page, favicons from the Glint.
+
+### Measurements
+- **Demo frames:** 4,399 frames (73.32 s), 153 KB, 23 signals; the events on the quantised frames match the unquantised ones. Demo audio 647 KB Opus / 726 KB AAC, loaded only when sound is turned on.
+- **First load:** HTML with inline CSS, two fonts and the 17 KB poster; the landing script is 16 KB gzipped; the engine chunk (~80 KB gzipped) loads after first paint.
+- **Shader warm-up (D76):** first creation Voyage 3.1 s, Wisp 0.6 s, Silk 0.4 s; from the cache 14–57 ms. The worker compiles everything but Voyage before the page goes live (live about 5 s after load here); Voyage compiles while nothing live is on screen, or behind its own loop.
+- **Pacing (headed Edge, mouse-wheel scroll through every section and back up, live engine):** 1,073 rendered frames, median 5.6 ms, p99 22 ms; 3 frames of 50–72 ms, each at the black midpoint of a style crossfade, where the next style's GPU resources are built (14–57 ms even from the program cache). A second run: one frame over 34 ms (44 ms, Ink re-created when scrolling back up from Silk). The page scroll itself runs on the compositor and never waits for the canvas. Main-thread long tasks on load (desktop): one, 108 ms, creating the engine about 6 s in.
+- **App unchanged:** `npx tsc --noEmit` clean, `npm test` 23 passed, `npm run test:smoke` all pass; style gates (`scripts/style-gates.sh`, sync / flicker / motion, all 15 style · look · view combos, `verify/site/gates/gates.log`): sync and flicker identical to the 1.0.1 log in every combo; motion identical for Ink, Silk within ±0.01, Wisp equal to the palette sprint's signed-off summary (Flat 50 / 72%; the log on disk predates its final Wisp tweak), Voyage varies run to run (its raymarch step budget follows measured frame time, and other GPU work ran alongside). Definitive check: the same Ink Glow Depth and Wisp sequences rendered with the pre-site renderer and with the current one are byte-identical (30 frames each). The one engine change (`maxPixelRatio`) is a no-op unless a page passes it.
+
+### Unsure / for your eyes
+- **The live engine fades in about 6 s after load**: it waits 2 s, then compiles every style in a worker before showing anything (the poster is its exact first frame, so the fade doesn't jump). The alternative was multi-second freezes the first time you scroll into Voyage or Wisp. Why it waits: while the worker compiles, the GPU process is busy, and the browser's teardown of the previous page's compositor (about 1 s after navigating) blocked the main thread for up to 0.9 s behind it (found in a trace; desktop Lighthouse was 72–93 before, 100 since).
+- **Scrolling in the first seconds, while the worker compiles, can still hitch** if something repaints; after that, scrolling between sections measured clean apart from one frame per style switch (above).
+- **/live scores lower on desktop performance by nature** (the app shell, the WASM analyser and its first compiles all on load); it's fully usable, and phones get the fallback.
+- **The landing's Set Mode never picks Sumi** (a bone page between dark sections jarred); Sumi is one chip away in the Ink section, where the nav turns solid so it stays readable.
+- **Silk's app thumbnail and loop catch its drop inversion** (white frames). The site uses its own Silk loop and still, cut from the trailer, for the phone and reduced-motion fallbacks. Worth re-rendering the app's Silk media at a calmer moment some day (`npm run media`).
+- **The demo's intro reads as a "breakdown"** to the event layer when the track loops (a calm section after a full song). It's the real output, so the board shows it.
+- The README links the website and the trailer now; both answer once you've deployed.
+
+### Recommended next steps
+1. Deploy (steps above), then set the repo homepage and enable Analytics.
+2. Upload the trailer to YouTube and point the README's trailer link at it.
+3. Choose a LICENSE.
+4. A custom domain: one config line plus Vercel's Domains screen.
+5. Code signing (removes the SmartScreen step from the site and the README), then the Steam page.
 
 ## Checklist
 - [x] 0 Read CLAUDE.md, README, sprint log, decisions, DOCS/16 §8, brand, catalog, media manifest, web entry; attribution off in `.claude/settings.json`
 - [x] 1.1 `site/` Astro scaffold importing the engine from `../src` (no fork), brand tokens, self-hosted fonts
 - [x] 1.2 Demo track `demo-sonora` (generator), recorded frames via the WASM DSP (`site/scripts/prepare-demo.mjs`), Opus + AAC encodes
 - [x] 1.3 Landing: hero, signals board, five style sections, palettes, Set Mode, app, how it works, download/footer; one engine handed between sections; shader prewarm in a worker
-- [ ] 1.4 Hero poster rendered from the harness at the hero's start; app screenshots from `ui:shots`
-- [ ] 2 /live (the app shell in the browser: file / mic / tab), banners, fallbacks, permission advice
-- [ ] 3 /engineering (real numbers and images from the logs)
-- [ ] 4 Download: build-time release, client refresh, `/download` redirect; Vercel deploy Action; vercel.json
-- [ ] 5 Trailer (harness, 1080p60), web encode ≤ 5 MB, README GIF/WebP ≤ 3 MB, YouTube steps
-- [ ] 6 SEO: OG/Twitter images, favicon/icons, sitemap, robots, canonical
-- [ ] 7 Verify: Playwright shots (3 sizes × pages), scroll video, Lighthouse, pacing, reduced motion, no-WebGL, permission denial, links, app gates
-- [ ] 8 README + repo homepage; summary at the top of this section
+- [x] 1.4 Hero poster from the engine's own first frame (`site/scripts/poster.mjs`); app screens from the web build (`site/scripts/app-shots.mjs`)
+- [x] 2 /live (the app shell in the browser: demo / file / mic / tab), banners, fallbacks, permission advice
+- [x] 3 /engineering (real numbers and images from the logs)
+- [x] 4 Download: build-time release, client refresh, `/download` redirect; Vercel deploy workflow; vercel.json
+- [x] 5 Trailer (harness, 1080p60), web encodes ≤ 5 MB, README WebP ≤ 3 MB, YouTube steps
+- [x] 6 SEO: OG/Twitter images, favicon/icons, sitemap, robots, canonical
+- [x] 7 Verify: shots (3 sizes × pages), scroll video, Lighthouse, pacing, reduced motion, no-WebGL, permission denial, links, app gates
+- [x] 8 README; summary at the top of this section
+- [ ] 9 (yours) Vercel login + link + secrets → first deploy; repo homepage; Analytics; YouTube; LICENSE
+
+## Notes
+- Scripts (all in `site/scripts/`): `prepare-demo.mjs` + `record-demo.ts` (demo frames and audio, every build), `release.mjs` (latest release, every build), `poster.mjs`, `app-shots.mjs`, `eng-images.mjs`, `og.mjs`, `trailer.mjs`, `shots.mjs`, `verify-site.mjs`, `lighthouse.sh`.
+- Decisions D73–D79.
+
 
 # Palette overhaul + 1.0.1 — shipped
 

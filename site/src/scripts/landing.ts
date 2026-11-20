@@ -29,7 +29,9 @@ const EVENT_HOLD_S = 1.4;
 /** A live section counts as on screen when this much of the viewport shows it. */
 const VISIBLE_FRACTION = 0.04;
 /** Wait after load before fetching the engine (ms), so first paint stays light. */
-const ENGINE_DELAY_MS = 0;
+const ENGINE_DELAY_MS = 400;
+/** Earliest start of the shader warm-up, from navigation (ms). */
+const PREWARM_NOT_BEFORE_MS = 2000;
 /** No live section on screen for this long: compile Voyage then (ms). */
 const LATER_PREWARM_IDLE_MS = 250;
 const SOUND_URLS = { webm: '/demo/demo.webm', m4a: '/demo/demo.m4a' };
@@ -212,7 +214,13 @@ async function startDemo(sections: LiveSection[]): Promise<void> {
     return;
   }
   setupSound(() => Promise.resolve(player));
-  await new Promise((r) => setTimeout(r, ENGINE_DELAY_MS));
+  // Start compiling once the page has settled (fonts in, first frames painted):
+  // while the GPU process compiles, any repaint waits for it.
+  // Also not before the browser has torn down the previous page's compositor
+  // (about a second after navigating), which otherwise waits on the busy GPU.
+  await document.fonts.ready;
+  await new Promise((r) => setTimeout(r, Math.max(ENGINE_DELAY_MS, PREWARM_NOT_BEFORE_MS - performance.now())));
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   // Until the engine is ready every live section shows its still.
   document.documentElement.classList.add('warming');
   const goStatic = (err?: unknown): void => {
