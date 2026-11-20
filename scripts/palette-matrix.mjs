@@ -250,7 +250,11 @@ try {
     for (let h = 0; h < 360; h += opts.hues) pals.push({ name: `hue-${String(h).padStart(3, '0')}`, def: { hue: h } });
   } else if (opts.drift > 0) {
     pals = [];
-    for (let d = 0; d < 360; d += opts.drift) pals.push({ name: `drift-${String(d).padStart(3, '0')}`, def: { index: opts.base, driftDeg: d } });
+    for (let d = 0; d < 360; d += opts.drift) {
+      // A phase inside a skipped stretch (a few seconds of quick turning) is a transition: tagged, not judged.
+      const crossing = await page0.evaluate(([i, ph]) => window.__sonora.driftCrossing(i, ph), [opts.base, d]);
+      pals.push({ name: `drift-${String(d).padStart(3, '0')}${crossing ? '-crossing' : ''}`, def: { index: opts.base, driftDeg: d } });
+    }
   } else if (opts.set === 'presets') {
     pals = presets.map((p, i) => ({ name: p.name, def: { index: i } }));
   } else {

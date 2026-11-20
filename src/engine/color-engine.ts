@@ -59,6 +59,9 @@ const BANDS: [number, number][] = [[65, 140], [162, 245]];
  * custom band's, so Acid's light lime secondary (132°) is allowed at rest. */
 const DRIFT_OLIVE: [number, number] = [70, 130];
 const DRIFT_CYAN: [number, number] = BANDS[1];
+/** Lightness range over which a drifting colour switches from the small hue
+ * lift to following its hue's gamut cusp (light colours keep their chroma). */
+const DRIFT_LIGHT: [number, number] = [0.72, 0.92];
 /** Share of a forbidden stretch's width spent crossing it (phase degrees). */
 const DRIFT_CROSS = 0.12;
 /** The steep middle of a band (input degrees). */
@@ -219,6 +222,15 @@ function bandShift(c: OKLCH, dh: number): number {
  * in BAND_STEP degrees of phase, the rest stretched to fill the circle.
  * Phase 0 is turn 0 (the palette exactly as chosen). */
 export function driftTurn(p: Palette, phase: number): number {
+  return driftMap(p, phase).turn;
+}
+
+/** True while Auto Drift is crossing a forbidden stretch (a few seconds per turn). */
+export function driftCrossing(p: Palette, phase: number): boolean {
+  return driftMap(p, phase).crossing;
+}
+
+function driftMap(p: Palette, phase: number): { turn: number; crossing: boolean } {
   const P = p.primary[2], S = p.secondary[2];
   // Forbidden turns as [start, length] on the circle, relative to turn 0.
   const raw: [number, number][] = [
@@ -238,26 +250,26 @@ export function driftTurn(p: Palette, phase: number): number {
     if (last && a <= last[1]) last[1] = Math.max(last[1], b); else merged.push([a, b]);
   }
   // Turn 0 itself forbidden (shouldn't happen for a valid palette): turn plainly.
-  if (merged.some(([a, b]) => a <= 1e-9 && b > 1e-9 && !(a === 0 && b === 360)) || merged.length === 0) return wrapHue(phase);
+  if (merged.some(([a, b]) => a <= 1e-9 && b > 1e-9 && !(a === 0 && b === 360)) || merged.length === 0) return { turn: wrapHue(phase), crossing: false };
   // Each forbidden stretch is crossed in DRIFT_CROSS of its width (at least
   // BAND_STEP degrees of phase): quick, never a jump.
   const cross = merged.map(([a, b]) => Math.max(BAND_STEP, (b - a) * DRIFT_CROSS));
   const forb = merged.reduce((t, [a, b]) => t + (b - a), 0);
   const crossSum = cross.reduce((t, c) => t + c, 0);
-  if (forb >= 360 - crossSum) return wrapHue(phase);
+  if (forb >= 360 - crossSum) return { turn: wrapHue(phase), crossing: false };
   const k = (360 - crossSum) / (360 - forb);
   // Walk the circle: allowed stretches scaled by k, forbidden ones squeezed.
   let x = wrapHue(phase), turn = 0;
   for (let i = 0; i < merged.length; i++) {
     const [a, b] = merged[i];
     const allowed = (a - turn) * k;
-    if (x <= allowed) return turn + x / k;
+    if (x <= allowed) return { turn: turn + x / k, crossing: false };
     x -= allowed;
-    if (x <= cross[i]) return a + (x / cross[i]) * (b - a);
+    if (x <= cross[i]) return { turn: a + (x / cross[i]) * (b - a), crossing: true };
     x -= cross[i];
     turn = b;
   }
-  return Math.min(360, turn + x / k);
+  return { turn: Math.min(360, turn + x / k), crossing: false };
 }
 
 /** Turn a palette's hues (Auto Drift): rigidly by driftTurn(phase), so the
@@ -271,12 +283,18 @@ function shiftPalette(p: Palette, phase: number): Palette {
   const dh = driftTurn(p, phase);
   const s = (c: OKLCH, lift: boolean, band = false): OKLCH => {
     const h = band ? bandShift(c, dh) : wrapHue(c[2] + dh);
-    return [lift ? c[0] + hueLift(h) - hueLift(c[2]) : c[0], c[1], h];
+    if (!lift) return [c[0], c[1], h];
+    // Mid tones take the small hue lift; light colours follow their hue's
+    // most vivid lightness (the gamut cusp), or a light yellow turned blue
+    // would be white (Neon's accent, Solar's highlight went grey).
+    const light = smooth(DRIFT_LIGHT[0], DRIFT_LIGHT[1], c[0]);
+    const L = c[0] + hueLift(h) - hueLift(c[2]) + light * (1 - CUSP_PULL) * (cuspL(h) - cuspL(c[2]));
+    return [Math.max(0.3, Math.min(0.97, L)), c[1], h];
   };
   return {
     ...p,
     bg: s(p.bg, false), primary: s(p.primary, true), secondary: s(p.secondary, true), accent: s(p.accent, true, true),
-    highlight: s(p.highlight, false, true), paper: [p.paper[0], p.paper[1], wrapHue(p.paper[2] + dh * 0.15)],
+    highlight: s(p.highlight, true, true), paper: [p.paper[0], p.paper[1], wrapHue(p.paper[2] + dh * 0.15)],
   };
 }
 

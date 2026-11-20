@@ -16,7 +16,7 @@ import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
 import { createSourceUi, type SourceUi } from './source-ui';
 import { CAMERA_PRESETS } from '../engine/camera';
-import { PALETTES, resolvePalette, shadeOf, type ResolvedPalette } from '../engine/color-engine';
+import { driftCrossing, PALETTES, resolvePalette, shadeOf, type ResolvedPalette } from '../engine/color-engine';
 import { presetsFor } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
 import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
@@ -73,6 +73,8 @@ export interface HarnessApi {
   setPalette(p: { resolved?: ResolvedPalette; index?: number; hue?: number; driftDeg?: number; holdDrift?: boolean }): void;
   /** The palette the styles currently receive. */
   currentPalette(): ResolvedPalette;
+  /** Whether Auto Drift on preset `index` is crossing a skipped stretch at `phase`. */
+  driftCrossing(index: number, phase: number): boolean;
 }
 
 declare global {
@@ -403,6 +405,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       ce.update(0);
     },
     currentPalette: () => renderer.colorEngine.getResolved(),
+    driftCrossing: (index, phase) => driftCrossing(PALETTES[index], phase),
     time: () => source.offlineTime,
     events,
     stats: () => renderer.stats(),
