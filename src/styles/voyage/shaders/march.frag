@@ -105,6 +105,30 @@ vec3 bend(vec3 p) {
 
 float de(vec3 p) { return deIt(bend(p), u_iters) * u_lip; }
 
+// Stone colour (palette overhaul, D67): how much of the albedo is palette
+// colour, how far its value is normalised, the value it is normalised to.
+#define STONE_TINT 0.78
+#define STONE_NORM 0.6
+#define STONE_VALUE 0.5
+#define STONE_GAIN_MAX 3.0
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+
+#define SEA_TINT 0.7
+
+/** A colour at a given luminance (gain capped so dark blues stay sane). */
+vec3 atValue(vec3 c, float v) {
+  return c * clamp(v / max(dot(c, LUMA), 1e-3), 0.0, STONE_GAIN_MAX);
+}
+
+/** Mix two colours keeping chroma (distance from grey) at the ends' average. */
+vec3 keepChroma(vec3 a, vec3 b, float t) {
+  vec3 m = mix(a, b, t);
+  float la = dot(a, LUMA), lb = dot(b, LUMA), lm = dot(m, LUMA);
+  float want = mix(length(a - la), length(b - lb), t);
+  float have = length(m - lm);
+  return max(vec3(lm) + (m - lm) * min(want / max(have, 1e-4), 4.0), 0.0);
+}
+
 vec3 sky(vec3 rd) {
   float h = rd.y;
   vec3 c = mix(u_bg * 1.4 + u_c0 * 0.08, u_bg + u_c1 * 0.34, smoothstep(-0.6, 0.9, h));
@@ -160,9 +184,15 @@ void main() {
     vec4 tr = trap(bend(p));
     float edge = min(tr.x, min(tr.y, tr.z));
     float band = clamp(sqrt(tr.w), 0.0, 1.0);
-    vec3 tint = mix(u_c0, u_c1, smoothstep(0.2, 0.9, band));
-    // Stone-like albedo, tinted by the palette.
-    vec3 albedo = mix(vec3(0.66, 0.64, 0.61), tint, 0.42);
+    // Bands pick between the two core colours with a chroma-keeping blend
+    // (an RGB average of two distant hues greys out: Aurora, Neon).
+    vec3 tint = keepChroma(u_c1, u_c0, smoothstep(0.45, 0.65, band));
+    // Palette-coloured stone: the tint at a fixed value (so every palette
+    // lights the same), mixed with a little grey stone; the bands' value
+    // variation keeps the forms reading.
+    float tl = dot(tint, LUMA);
+    vec3 tintV = tint * clamp(STONE_VALUE / max(tl, 1e-3), 0.0, STONE_GAIN_MAX);
+    vec3 albedo = mix(vec3(0.66, 0.64, 0.61), mix(tint, tintV, STONE_NORM), STONE_TINT) * (0.9 + 0.2 * band);
     float dif = max(dot(n, u_sun), 0.0);
     float head = max(dot(n, -rd), 0.0);
     vec3 amb = sky(n) * 1.6;

@@ -38,7 +38,9 @@ vec3 voidBase(vec3 rd) {
   vec3 col = mix(u_bg * 0.45 + u_c2 * 0.02, u_bg * 0.7 + u_c2 * 0.09, smoothstep(0.0, 1.0, h));
   float n = snoise(rd * 1.7 + 3.0) * 0.6 + snoise(rd * 3.9 - 1.0) * 0.3;
   float n2 = snoise(rd * 2.6 + 9.0);
-  col += mix(u_c2, u_c1, 0.5 + 0.5 * n2) * pow(max(n, 0.0), 2.2) * 0.16;
+  // Nebula in the core colours (an RGB mix of the accent and a distant
+  // secondary lands on a hue the palette doesn't have).
+  col += keepChroma(u_c1, u_c0, smoothstep(-0.4, 0.4, n2)) * pow(max(n, 0.0), 2.2) * 0.16;
   return col;
 }
 
@@ -299,7 +301,7 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
       float fd = 1.0 - smoothstep(0.1, 0.6, fp);
       vec3 wn = normalize(nIn + (tA * (vnoise(rq) - 0.5) + vec3(0.0, 0.0, 1.0) * (vnoise(rq + 5.0) - 0.5)) * 0.22 * fd);
       float fres = pow(1.0 - max(dot(wn, -rd), 0.0), 4.0);
-      vec3 wcol = vec3(0.03, 0.1, 0.14) + u_c0 * 0.04;
+      vec3 wcol = mix(vec3(0.03, 0.1, 0.14), atValue(u_c1, 0.09), SEA_TINT);
       wcol = mix(wcol, atmosphere(reflect(rd, wn)) * 0.5, 0.2 + 0.6 * fres);
       wcol += u_c3 * pow(max(dot(reflect(rd, wn), u_sun), 0.0), 140.0) * 1.4;
       col = mix(col, wcol, water);
@@ -366,10 +368,13 @@ vec3 oceanWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
             + vec2(vnoise(cq * 3.1) - 0.5, vnoise(cq * 3.1 + 2.1) - 0.5) * 0.25 * fd;
   vec3 n = normalize(nIn - (tA * (hx / e + chop.x) + vec3(0.0, 0.0, 1.0) * (hz / e + chop.y)));
   float fres = pow(1.0 - max(dot(n, -rd), 0.0), 5.0);
-  vec3 deep = vec3(0.01, 0.06, 0.1) + u_c0 * 0.05;
+  // The sea takes the palette's secondary colour (the stone leads with the primary).
+  vec3 deep = mix(vec3(0.01, 0.06, 0.1) + u_c0 * 0.05, atValue(u_c1, 0.05), SEA_TINT);
   // Light through the thin crests (backlit teal), foam on steep crests.
   float crest = smoothstep(0.6, 1.7, h0);
-  vec3 sss = vec3(0.05, 0.32, 0.34) * crest * (0.5 + 0.5 * max(dot(-u_sun, rd), 0.0) + 0.4);
+  // Crest light fully in the palette: mixing the old teal with a warm
+  // secondary in RGB went olive (Ember).
+  vec3 sss = atValue(u_c1, 0.27) * crest * (0.5 + 0.5 * max(dot(-u_sun, rd), 0.0) + 0.4);
   vec3 col = deep + sss;
   float dif = max(dot(n, normalize(nIn * 0.85 + u_sun * 0.5)), 0.0);
   col *= 0.6 + 0.6 * dif;

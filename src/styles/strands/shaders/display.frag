@@ -61,7 +61,12 @@ void main() {
   }
 #elif VARIANT == 2
   // Wisp: coloured smoke trails, bright darting flames.
-  vec3 smoke = 1.0 - exp(-acc.rgb * u_gain);
+  // Hue-preserving build-up: the brightest channel follows the same
+  // 1 - exp curve as before, the others keep their ratio to it (per-channel
+  // compression pulled dense trails of any saturated colour toward grey).
+  vec3 sa = acc.rgb * u_gain;
+  float sm = max(max(sa.r, sa.g), sa.b);
+  vec3 smoke = sm > 1e-5 ? sa * ((1.0 - exp(-sm)) / sm) : sa;
   vec3 white = mix(vec3(1.0), u_c3, 0.25);
   float e = 1.0 + 0.35 * u_pulse;   // hits flare the trails on the frame
   col = u_bg * 0.5 + smoke * 1.15 * e;
