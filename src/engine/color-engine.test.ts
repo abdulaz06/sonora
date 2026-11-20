@@ -52,13 +52,15 @@ describe('colour engine', () => {
   it('olive band: core hues cross it steeply but continuously; drift starts from the preset exactly', () => {
     for (let h = 0; h < 360; h += 0.5) {
       const d = Math.abs(bandHue(h + 0.5) - bandHue(h));
-      expect(Math.min(d, 360 - d), `at ${h}`).toBeLessThan(4);   // ≤ 7× the input step, never a jump
+      expect(Math.min(d, 360 - d), `at ${h}`).toBeLessThan(4.5);   // ≤ 9× the input step, never a jump
     }
     for (let h = 0; h < 360; h += 5) {
       const p = paletteFromHue(h);
       for (const c of [p.primary, p.secondary, p.accent]) {
-        expect(c[2] <= 73.01 || c[2] >= 124.99 || c[0] > 0.75, `hue ${h}: ${c.map((x) => x.toFixed(2))}`).toBe(true);
+        expect(c[2] <= 73.01 || c[2] >= 136.99 || c[0] > 0.75, `hue ${h}: ${c.map((x) => x.toFixed(2))}`).toBe(true);
       }
+      // The primary never rests in the dull cyan band either.
+      expect(p.primary[2] <= 175.01 || p.primary[2] >= 241.99, `hue ${h}: primary ${p.primary[2].toFixed(1)}`).toBe(true);
     }
     const e = new ColorEngine();
     for (let i = 0; i < PALETTES.length; i++) {

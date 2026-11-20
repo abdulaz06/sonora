@@ -33,9 +33,9 @@ const BONE: OKLCH = [0.9285, 0.0103, 78.28];
 /** Hue-dependent lightness: how far a colour moves toward its hue's gamut
  * cusp (yellow and cyan are brightest at full chroma, blue darkest), and the
  * limits, so a turned or custom palette never goes olive or dull. */
-const CUSP_PULL = 0.3;
-const LIFT_MIN = -0.06;
-const LIFT_MAX = 0.12;
+const CUSP_PULL = 0.15;
+const LIFT_MIN = -0.04;
+const LIFT_MAX = 0.08;
 /** Lightness the hue lift is measured from. */
 const LIFT_BASE = 0.6;
 /** Shade (the primary's dark tone, e.g. Marble on paper): the primary ×
@@ -44,13 +44,16 @@ const LIFT_BASE = 0.6;
 const SHADE_K = 0.55;
 const SHADE_TURN = 28;
 const SHADE_LIFT_L = 0.64;
-/** Olive band (OKLCH hue): a core colour (primary / secondary / accent) that
- * a custom hue or Auto Drift puts here passes through it steeply, so it is
- * gold (≤ OLIVE_BAND[0] + 3) or lime (≥ OLIVE_BAND[1] − 3) and never a dark
- * yellow; light colours (highlights, Neon's yellow) are left alone. */
-const OLIVE_BAND: [number, number] = [70, 128];
-/** The steep middle of the band (input degrees). */
-const OLIVE_STEP = 8;
+/** Hue bands a custom or drifting core colour (primary / secondary /
+ * accent) passes through steeply instead of resting in: the olive band (a
+ * dark yellow or lime reads olive) and the cyan band (sRGB can't make a vivid
+ * cyan at matched lightness: Marble and Warp went dull). Inside a band the
+ * hue sits within 3° of either edge, with a steep BAND_STEP-wide crossing in
+ * the middle (continuous, so drift never jumps). Light colours (highlights,
+ * Neon's yellow) are left alone. */
+const BANDS: [number, number][] = [[70, 140], [172, 245]];
+/** The steep middle of a band (input degrees). */
+const BAND_STEP = 8;
 /** Custom palettes: accent offset from the core (a ~150° accent added up to
  * white with the core in Wisp's flames). */
 const ACCENT_OFFSET = 70;
@@ -153,32 +156,42 @@ function vivid(l: number, h: number, cMax: number, share: number): OKLCH {
   return [L, Math.min(cMax, maxChroma(L, h) * share), wrapHue(h)];
 }
 
-function inBand(h: number): boolean {
+/** In the olive band (a secondary or accent must not rest there). */
+function inOlive(h: number): boolean {
   const x = wrapHue(h);
-  return x > OLIVE_BAND[0] && x < OLIVE_BAND[1];
+  return x > BANDS[0][0] && x < BANDS[0][1];
 }
 
-/** Hue through the olive band: identity outside it; inside, 3° of gold, a
- * steep OLIVE_STEP-wide crossing, 3° of lime (continuous, so drift never
- * jumps). `snap` (a still palette: the custom picker) skips the crossing. */
+/** Hue through the bands: identity outside them. `snap` (a still palette:
+ * the custom picker) skips the steep crossing and picks the nearer edge. */
 export function bandHue(h: number, snap = false): number {
   const x = wrapHue(h);
-  const [a, b] = OLIVE_BAND;
-  if (x <= a || x >= b) return x;
-  const mid = (a + b) / 2, s0 = mid - (snap ? 0 : OLIVE_STEP / 2), s1 = mid + (snap ? 0 : OLIVE_STEP / 2);
-  if (x < s0) return a + ((x - a) / (s0 - a)) * 3;
-  if (x >= s1) return b - 3 + ((x - s1) / (b - s1)) * 3;
-  return a + 3 + ((x - s0) / OLIVE_STEP) * (b - a - 6);
+  for (const [a, b] of BANDS) {
+    if (x <= a || x >= b) continue;
+    const mid = (a + b) / 2, s0 = mid - (snap ? 0 : BAND_STEP / 2), s1 = mid + (snap ? 0 : BAND_STEP / 2);
+    if (x < s0) return a + ((x - a) / (s0 - a)) * 3;
+    if (x >= s1) return b - 3 + ((x - s1) / (b - s1)) * 3;
+    return a + 3 + ((x - s0) / BAND_STEP) * (b - a - 6);
+  }
+  return x;
 }
 
-/** bandHue for a colour, faded out for light colours (a light yellow isn't olive). */
-function bandFor(c: OKLCH, h: number): number {
-  const w = 1 - smooth(0.75, 0.85, c[0]);
-  if (w <= 0) return wrapHue(h);
-  let d = bandHue(h) - wrapHue(h);
+function angDiff(a: number, b: number): number {
+  let d = wrapHue(a) - wrapHue(b);
   if (d > 180) d -= 360;
   if (d < -180) d += 360;
-  return wrapHue(h + d * w);
+  return d;
+}
+
+/** A slot's hue turned by dh through the bands, relative to where it starts
+ * (a preset colour that sits in a band stays exactly itself at dh = 0), faded
+ * out for light colours (a light yellow isn't olive, a light cyan isn't dull). */
+function bandShift(c: OKLCH, dh: number): number {
+  const w = 1 - smooth(0.75, 0.85, c[0]);
+  const plain = c[2] + dh;
+  if (w <= 0) return wrapHue(plain);
+  const turned = c[2] + dh + angDiff(bandHue(plain), plain) - angDiff(bandHue(c[2]), c[2]);
+  return wrapHue(plain + angDiff(turned, plain) * w);
 }
 
 /** Turn a palette's hues by dh (Auto Drift), keeping each colour vivid: the
@@ -187,7 +200,7 @@ function bandFor(c: OKLCH, h: number): number {
 function shiftPalette(p: Palette, dh: number): Palette {
   if (dh === 0) return p;
   const s = (c: OKLCH, lift: boolean): OKLCH => {
-    const h = lift ? bandFor(c, c[2] + dh) : wrapHue(c[2] + dh);
+    const h = lift ? bandShift(c, dh) : wrapHue(c[2] + dh);
     return [lift ? c[0] + hueLift(h) - hueLift(c[2]) : c[0], c[1], h];
   };
   return {
@@ -198,21 +211,23 @@ function shiftPalette(p: Palette, dh: number): Palette {
 }
 
 /** Coordinated palette from a single hue (custom picker): the same structure
- * as the presets, an analogous core (secondary 35° away), a contrasting accent
- * (70° the other way, or this way if that lands in the olive band) and a
- * lighter highlight leaning toward yellow (warm) or cyan (cool). Core hues in
- * the olive band become gold or lime (bandHue). */
+ * as the presets. Primary: the hue, moved out of the olive band (gold or
+ * lime) and the cyan band (teal or azure); when it moved, the picked hue is
+ * kept as the secondary (a cyan pick still has cyan), otherwise the secondary
+ * sits 35° away (the side away from the olive band). Accent: 70° the other
+ * way (this way if that lands in the olive band). Highlight: lighter, leaning
+ * toward yellow for warm cores and toward cyan for cool ones. */
 export function paletteFromHue(hue: number): Palette {
-  const h = bandHue(hue, true);
-  const dist = (a: number, b: number): number => Math.abs(((a - b + 540) % 360) - 180);
-  const target = dist(h, 95) < dist(h, 195) ? 95 : 195;
-  let dh = target - h;
-  if (dh > 180) dh -= 360;
-  if (dh < -180) dh += 360;
-  const hh = h + Math.sign(dh) * Math.min(15, Math.abs(dh));
-  const primary = vivid(0.62, h, 0.22, 0.95);
-  const secondary = vivid(0.55, bandHue(inBand(h + 35) && !inBand(h - 35) ? h - 35 : h + 35, true), 0.2, 0.9);
-  const accent = vivid(0.66, bandHue(inBand(h - ACCENT_OFFSET) ? h + ACCENT_OFFSET : h - ACCENT_OFFSET, true), 0.2, 0.9);
+  const h0 = wrapHue(hue);
+  const h = bandHue(h0, true);
+  const moved = Math.abs(angDiff(h, h0)) > 12;
+  const sec = moved && !inOlive(h0) ? h0 : inOlive(h + 35) && !inOlive(h - 35) ? h - 35 : h + 35;
+  const acc = inOlive(h - ACCENT_OFFSET) ? h + ACCENT_OFFSET : h - ACCENT_OFFSET;
+  const warm = h < 90 || h >= 300;
+  const hh = warm ? h + Math.max(-15, Math.min(15, angDiff(95, h))) : h + Math.max(-15, Math.min(15, angDiff(195, h)));
+  const primary = vivid(0.6, h, 0.22, 0.95);
+  const secondary = vivid(0.55, sec === h0 ? h0 : bandHue(sec, true), 0.2, 0.9);
+  const accent = vivid(0.64, bandHue(acc, true), 0.2, 0.9);
   const highlight: OKLCH = [0.88, Math.min(0.12, maxChroma(0.88, hh) * 0.9), wrapHue(hh)];
   return pal('Custom', [0.14, 0.02, h], primary, secondary, accent, highlight);
 }
