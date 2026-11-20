@@ -10,9 +10,10 @@
 <p align="center">
   <a href="https://github.com/abdulaz06/sonora/releases/latest"><img alt="Download the latest release for Windows" src="https://img.shields.io/github/v/release/abdulaz06/sonora?label=download%20for%20windows&style=for-the-badge&color=ECE7DF&labelColor=08080A"></a>
 </p>
-<p align="center"><sub>website: <em>coming soon</em> · demo: <em>new 1.0 demo coming soon</em> · <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI">early version (v0.1) demo</a></sub></p>
+<p align="center"><a href="https://sonora-visual.vercel.app"><strong>sonora-visual.vercel.app</strong></a> · <a href="https://sonora-visual.vercel.app/live">try it live in your browser</a> · <a href="https://sonora-visual.vercel.app/media/sonora-trailer.mp4">watch the trailer</a> · <a href="https://sonora-visual.vercel.app/engineering">how it works</a></p>
 
-<p align="center"><img src="src/assets/media/ink-1280.webp" alt="Ink, glowing liquid ink on a 3D surface" width="900"></p>
+<p align="center"><a href="https://sonora-visual.vercel.app/media/sonora-trailer.mp4"><img src="DOCS/assets/sonora-trailer.webp" alt="The sonora trailer: the drop of the demo track across Warp, Ink and Silk" width="900"></a></p>
+<p align="center"><sub>rendered by the engine on an original demo track · <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI">early version (v0.1) demo</a></sub></p>
 
 ## Styles
 
@@ -25,6 +26,13 @@ Five art styles, each with its own looks and views. Every frame below is a real 
 | <img src="src/assets/media/warp-640.webp" alt="Warp"><br>**Warp** — hyperspace that follows the song’s pace | <img src="src/assets/media/voyage-640.webp" alt="Voyage"><br>**Voyage** — a flight through a 3D fractal | <img src="src/assets/media/voyage-city-640.webp" alt="Voyage City"><br>**Voyage** · City — a curved world wraps around it |
 
 Looks: Ink (Glow, Marble, Sumi), Wisp Depth (Ground, Tunnel), Voyage (Void, City, Ocean). Views: **Depth** (a 3D camera that glides, banks on beats and lurches on drops) or **Flat** (a 2D canvas) for Ink, Silk and Wisp. Aura and Halo from v0.1 live under *Show classic styles*.
+
+## What’s new in 1.0.1
+
+- **Nine palettes on keys 1–9**, tuned in OKLCH to stay vivid in every style, look and view: Ocean, Aurora, Ember, Neon, Crimson, Solar, Violet, Sunset, Acid. Voyage now takes the palette across the whole fractal, its sky and its sea; Wisp's smoke stays coloured; custom colours and colour drift never go muddy, and palette changes fade without passing through grey.
+- **Smoother Ink.** Drops grow into the flow instead of popping in, Marble's fine lines no longer break up, and Ink looks the same at any refresh rate.
+- **Frame rate matches the display** by default (every frame on 144 or 165 Hz screens), with even half / third rates, and an optional FPS counter (`P`).
+- **The website**, with the engine running live on an original demo track, a [try-it-live page](https://sonora-visual.vercel.app/live) (a file, the microphone or a browser tab) and the [engineering story](https://sonora-visual.vercel.app/engineering).
 
 ## What’s new in 1.0
 
@@ -111,4 +119,3 @@ Rust (cpal WASAPI loopback, a platform-free DSP crate, wasm-bindgen, the Windows
 
 - Steam release
 - More styles
-- A new demo video and the website

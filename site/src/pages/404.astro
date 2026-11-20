@@ -1,0 +1,15 @@
+---
+import Base from '../layouts/Base.astro';
+import Footer from '../components/Footer.astro';
+---
+<Base title="nothing playing here — sonora" description="This page doesn’t exist." path="/404" og="/og/home.jpg" ogAlt="sonora" page="other">
+  <main id="main" class="solid" style="min-height:80vh;display:flex;align-items:center">
+    <div class="wrap" style="padding-top:120px;padding-bottom:80px">
+      <p class="kicker label"><span class="n">404</span><span class="line"></span>silence</p>
+      <h1 class="display" style="font-size:var(--t-hero);max-width:9em">nothing playing here.</h1>
+      <p class="lede" style="margin-top:24px">The page you asked for doesn’t exist. The music is this way.</p>
+      <p style="margin-top:32px;display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn--primary" href="/">sonora home</a><a class="btn" href="/live">Try it live</a></p>
+    </div>
+  </main>
+  <Footer />
+</Base>

@@ -1,0 +1,90 @@
+name: site
+
+# Builds the website (site/) and deploys it to Vercel as a prebuilt output.
+# Vercel's build image has no Rust, and the site needs the WASM analyser and
+# the demo frames recorded through it, so the build runs here (DECISIONS D74).
+# Production: pushes to main that touch the site or the engine, every release,
+# and a daily refresh. Preview: every other branch.
+# Needs the repository secrets VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID
+# (DOCS/SPRINT-LOG.md, "Website"); without them it only checks that the site builds.
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'site/**'
+      - 'src/**'
+      - 'crates/**'
+      - 'scripts/gen-test-audio.mjs'
+      - 'test-audio/tracks.json'
+      - 'DOCS/brand/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'Cargo.lock'
+      - '.github/workflows/site.yml'
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: site-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PRODUCTION: ${{ github.ref == 'refs/heads/main' || github.event_name != 'push' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            site/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+
+      - name: Install
+        run: |
+          npm ci
+          npm ci --prefix site
+
+      - name: WASM analyser
+        run: npm run build:wasm
+
+      - name: Build only (no Vercel secrets yet)
+        if: env.VERCEL_TOKEN == ''
+        working-directory: site
+        run: |
+          echo "::notice::VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID are not set: building without deploying."
+          npm run build
+
+      - name: Deploy to Vercel
+        if: env.VERCEL_TOKEN != ''
+        working-directory: site
+        run: |
+          if [ "$PRODUCTION" = "true" ]; then ENV=production; FLAG=--prod; else ENV=preview; FLAG=; fi
+          npx --yes vercel@66 pull --yes --environment=$ENV --token=$VERCEL_TOKEN
+          npx --yes vercel@66 build $FLAG --token=$VERCEL_TOKEN
+          url=$(npx --yes vercel@66 deploy --prebuilt $FLAG --token=$VERCEL_TOKEN)
+          echo "Deployed: $url"
+          echo "### Deployed ($ENV): $url" >> "$GITHUB_STEP_SUMMARY"

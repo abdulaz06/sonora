@@ -60,3 +60,8 @@ verify/
 
 # Original reference recordings (large, local only)
 local-reference/
+
+# Trailer masters and other large local media
+local-media/
+# The site's web trailer (Safari fallback, < 5 MB) is the one mp4 that ships
+!site/public/media/sonora-trailer.mp4

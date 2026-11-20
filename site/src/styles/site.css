@@ -135,6 +135,7 @@ html.light-scene .nav { background: var(--night); border-bottom-color: var(--b12
 .nav-links a:not(.btn):hover, .nav-links a[aria-current='page'] { color: var(--bone); }
 .nav .btn { height: 36px; padding: 0 14px; }
 @media (max-width: 860px) { .nav-links .hide-sm { display: none; } }
+@media (max-width: 520px) { .nav-links .hide-xs { display: none; } .nav { height: 56px; } .nav .lockup { height: 19px; } }
 
 /* ── Live stage ── */
 .stage {

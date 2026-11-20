@@ -11,7 +11,7 @@ const home = page === 'home';
     <a class="hide-sm" href={home ? '#styles' : '/#styles'}>Styles</a>
     <a class="hide-sm" href={home ? '#palettes' : '/#palettes'}>Palettes</a>
     <a class="hide-sm" href="/engineering" aria-current={page === 'engineering' ? 'page' : undefined}>Engineering</a>
-    <a href="/live" aria-current={page === 'live' ? 'page' : undefined}>Try it live</a>
+    <a class="hide-xs" href="/live" aria-current={page === 'live' ? 'page' : undefined}>Try it live</a>
     <a class="btn btn--primary" href={release.url} data-dl>Download</a>
   </nav>
 </header>

@@ -1,6 +1,6 @@
 // Sonora website: static Astro build that imports the real engine from ../src
 // (Vite underneath, so GLSL ?raw imports, import.meta.glob media and the
-// wasm-pack package work as they do in the app). See DOCS/DECISIONS.md D80–D83.
+// wasm-pack package work as they do in the app). See DOCS/DECISIONS.md D73–D79.
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'astro/config';
