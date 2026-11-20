@@ -114,6 +114,8 @@ export interface RendererOptions {
   seed?: number;
   /** Keep the drawing buffer for readback (verification harness). */
   preserveDrawingBuffer?: boolean;
+  /** Cap on devicePixelRatio for the backing store (website canvases; default: none). */
+  maxPixelRatio?: number;
 }
 
 export interface Renderer {
@@ -156,8 +158,8 @@ export interface Renderer {
   stats(): RendererStats;
 }
 
-function sizeCanvas(canvas: HTMLCanvasElement): void {
-  const dpr = window.devicePixelRatio || 1;
+function sizeCanvas(canvas: HTMLCanvasElement, maxPixelRatio = Infinity): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, maxPixelRatio);
   let w = Math.max(1, Math.round(canvas.clientWidth * dpr));
   let h = Math.max(1, Math.round(canvas.clientHeight * dpr));
   const long = Math.max(w, h);
@@ -194,7 +196,8 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   gl.bindVertexArray(null);
 
   // ── Post pipelines ──
-  sizeCanvas(canvas);
+  const maxPixelRatio = options.maxPixelRatio ?? Infinity;
+  sizeCanvas(canvas, maxPixelRatio);
   const legacyPost = new PostProcessPipeline(
     gl,
     buildProgram(gl, fullscreenVertSrc, postBloomFragSrc),
@@ -274,7 +277,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   function step(rawDt: number): void {
     const dt = Math.min(Math.max(rawDt, 0), MAX_DT);
     time += dt;
-    sizeCanvas(canvas);
+    sizeCanvas(canvas, maxPixelRatio);
 
     // Crossfade between styles
     const fadeRate = 2 / STYLE_FADE_SECONDS;
