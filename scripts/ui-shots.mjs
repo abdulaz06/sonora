@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = 5199;
+const PORT = Number(process.env.SONORA_HARNESS_PORT || 5199);
 const SIZES = (process.env.UI_SIZES || '1920x1080,1366x768,2560x1440').split(',').map((s) => s.split('x').map(Number));
 const OUT = join(ROOT, 'verify', 'ui');
 const base = `http://localhost:${PORT}/web.html`;
@@ -56,7 +56,7 @@ const STATES = {
 };
 
 const names = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(STATES);
-const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: 'node_modules/.vite-verify' } });
+const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], { cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: process.env.SONORA_VITE_CACHE || 'node_modules/.vite-verify' } });
 const kill = () => { try { execFileSync('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* gone */ } };
 try {
   for (let i = 0; i < 100; i++) { try { if ((await fetch(base)).ok) break; } catch { /* not yet */ } await wait(400); }

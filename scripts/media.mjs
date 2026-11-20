@@ -19,7 +19,7 @@ import { chromium } from 'playwright';
 import { PLAN, withDefaults } from './media-plan.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = 5199;
+const PORT = Number(process.env.SONORA_HARNESS_PORT || 5199);
 const MEDIA = process.env.SONORA_MEDIA_DIR || join(ROOT, 'media');
 const FPS = 30;
 const LOOP_W = 1024, LOOP_H = 576;
@@ -33,7 +33,7 @@ const entries = PLAN.map(withDefaults).filter((e) => names.length === 0
 
 async function startServer() {
   const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
-    cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: 'node_modules/.vite-verify' },
+    cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: process.env.SONORA_VITE_CACHE || 'node_modules/.vite-verify' },
   });
   for (let i = 0; i < 100; i++) {
     try { if ((await fetch(`http://localhost:${PORT}/web.html`)).ok) return server; } catch { /* not yet */ }
