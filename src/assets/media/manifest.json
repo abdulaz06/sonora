@@ -449,26 +449,6 @@
     "responsiveness": 0.6
    }
   },
-  "pal-ink-10": {
-   "kind": "palette",
-   "style": "ink",
-   "look": "glow",
-   "view": "depth",
-   "stills": {
-    "480": "pal-ink-10-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 10,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
   "pal-ink-2": {
    "kind": "palette",
    "style": "ink",
@@ -609,26 +589,6 @@
     "responsiveness": 0.6
    }
   },
-  "pal-ink-9": {
-   "kind": "palette",
-   "style": "ink",
-   "look": "glow",
-   "view": "depth",
-   "stills": {
-    "480": "pal-ink-9-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 9,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
   "pal-silk-0": {
    "kind": "palette",
    "style": "silk",
@@ -663,26 +623,6 @@
     "track": "house-124",
     "time": 54,
     "palette": 1,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
-  "pal-silk-10": {
-   "kind": "palette",
-   "style": "silk",
-   "look": "silk",
-   "view": "flat",
-   "stills": {
-    "480": "pal-silk-10-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 10,
     "light": "auto",
     "camera": null,
     "quality": "medium",
@@ -829,26 +769,6 @@
     "responsiveness": 0.6
    }
   },
-  "pal-silk-9": {
-   "kind": "palette",
-   "style": "silk",
-   "look": "silk",
-   "view": "flat",
-   "stills": {
-    "480": "pal-silk-9-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 9,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
   "pal-voyage-0": {
    "kind": "palette",
    "style": "voyage",
@@ -883,26 +803,6 @@
     "track": "house-124",
     "time": 54,
     "palette": 1,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
-  "pal-voyage-10": {
-   "kind": "palette",
-   "style": "voyage",
-   "look": "void",
-   "view": "flat",
-   "stills": {
-    "480": "pal-voyage-10-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 10,
     "light": "auto",
     "camera": null,
     "quality": "medium",
@@ -1049,26 +949,6 @@
     "responsiveness": 0.6
    }
   },
-  "pal-voyage-9": {
-   "kind": "palette",
-   "style": "voyage",
-   "look": "void",
-   "view": "flat",
-   "stills": {
-    "480": "pal-voyage-9-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 9,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
   "pal-warp-0": {
    "kind": "palette",
    "style": "warp",
@@ -1103,26 +983,6 @@
     "track": "house-124",
     "time": 54,
     "palette": 1,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
-  "pal-warp-10": {
-   "kind": "palette",
-   "style": "warp",
-   "look": "warp",
-   "view": "flat",
-   "stills": {
-    "480": "pal-warp-10-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 10,
     "light": "auto",
     "camera": null,
     "quality": "medium",
@@ -1269,26 +1129,6 @@
     "responsiveness": 0.6
    }
   },
-  "pal-warp-9": {
-   "kind": "palette",
-   "style": "warp",
-   "look": "warp",
-   "view": "flat",
-   "stills": {
-    "480": "pal-warp-9-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 9,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
   "pal-wisp-0": {
    "kind": "palette",
    "style": "wisp",
@@ -1323,26 +1163,6 @@
     "track": "house-124",
     "time": 54,
     "palette": 1,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
-  "pal-wisp-10": {
-   "kind": "palette",
-   "style": "wisp",
-   "look": "ground",
-   "view": "flat",
-   "stills": {
-    "480": "pal-wisp-10-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 10,
     "light": "auto",
     "camera": null,
     "quality": "medium",
@@ -1483,26 +1303,6 @@
     "track": "house-124",
     "time": 54,
     "palette": 8,
-    "light": "auto",
-    "camera": null,
-    "quality": "medium",
-    "responsiveness": 0.6
-   }
-  },
-  "pal-wisp-9": {
-   "kind": "palette",
-   "style": "wisp",
-   "look": "ground",
-   "view": "flat",
-   "stills": {
-    "480": "pal-wisp-9-480.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 54,
-    "palette": 9,
     "light": "auto",
     "camera": null,
     "quality": "medium",
