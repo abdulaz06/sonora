@@ -103,6 +103,14 @@ async function waitForServer(url, ms = 60000) {
   throw new Error('vite did not start');
 }
 
+// A server left on this port (e.g. from a killed run) would serve stale, cached
+// modules: refuse to start rather than render old code.
+try {
+  await fetch(`http://localhost:${PORT}/web.html`);
+  console.error(`port ${PORT} is already in use (a leftover harness server?): stop it or set PALETTE_PORT`);
+  process.exit(2);
+} catch { /* free */ }
+
 const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
   cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: 'node_modules/.vite-verify' },
 });
