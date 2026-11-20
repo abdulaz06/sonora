@@ -24,6 +24,7 @@
 //   --pacing            real-time frame pacing on the display (renderer's own rAF loop):
 //                       interval mean / p99 and held frames per cap (match, 1/2, 60)
 //   --dt-sweep          frame-rate independence (forwards to scripts/dt-sweep.mjs)
+//   --palette-matrix    every palette × style / look / view + colour metrics (scripts/palette-matrix.mjs)
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -31,6 +32,12 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
+// --palette-matrix has its own script (renders every palette × style / look / view).
+if (process.argv.includes('--palette-matrix')) {
+  const rest = process.argv.slice(2).filter((x) => x !== '--palette-matrix');
+  const r = spawnSync(process.execPath, [join(dirname(fileURLToPath(import.meta.url)), 'palette-matrix.mjs'), ...rest], { stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
 // --dt-sweep has its own script (it renders each rate and runs the image metrics).
 if (process.argv.includes('--dt-sweep')) {
   const rest = process.argv.slice(2).filter((x) => x !== '--dt-sweep');

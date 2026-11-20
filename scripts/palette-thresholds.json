@@ -1,0 +1,143 @@
+{
+ "_note": "calibrated on the baseline (pre-overhaul palettes); see DOCS/SPRINT-LOG.md",
+ "combos": {
+  "ink-glow-depth": {
+   "chroma_min": 0.0785,
+   "grey_max": 0.186,
+   "off_max": 0.15,
+   "olive_max": 0.203,
+   "sep_min": 9.0
+  },
+  "ink-glow-flat": {
+   "chroma_min": 0.0759,
+   "grey_max": 0.19,
+   "off_max": 0.123,
+   "olive_max": 0.241,
+   "sep_min": 8.6
+  },
+  "ink-marble-depth": {
+   "chroma_min": 0.1019,
+   "grey_max": 0.1,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 8.2
+  },
+  "ink-marble-flat": {
+   "chroma_min": 0.1024,
+   "grey_max": 0.1,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 8.5
+  },
+  "ink-sumi-depth": {
+   "chroma_min": 0.0062,
+   "grey_max": 1.0,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 21.3
+  },
+  "ink-sumi-flat": {
+   "chroma_min": 0.0066,
+   "grey_max": 1.0,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 22.0
+  },
+  "ink-glow-flat-light": {
+   "chroma_min": 0.0332,
+   "grey_max": 0.734,
+   "off_max": 0.135,
+   "olive_max": 0.05,
+   "sep_min": 16.4
+  },
+  "ink-marble-flat-light": {
+   "chroma_min": 0.0642,
+   "grey_max": 0.152,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 10.0
+  },
+  "ink-sumi-flat-dark": {
+   "chroma_min": 0.0052,
+   "grey_max": 1.0,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 16.3
+  },
+  "silk-flat": {
+   "chroma_min": 0.0655,
+   "grey_max": 0.37,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 22.0
+  },
+  "silk-depth": {
+   "chroma_min": 0.0683,
+   "grey_max": 0.35,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 22.5
+  },
+  "silk-flat-light": {
+   "chroma_min": 0.0206,
+   "grey_max": 0.915,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 30.0
+  },
+  "wisp-flat": {
+   "chroma_min": 0.0522,
+   "grey_max": 0.31,
+   "off_max": 0.143,
+   "olive_max": 0.125,
+   "sep_min": 21.6
+  },
+  "wisp-ground": {
+   "chroma_min": 0.0508,
+   "grey_max": 0.259,
+   "off_max": 0.178,
+   "olive_max": 0.113,
+   "sep_min": 21.4
+  },
+  "wisp-tunnel": {
+   "chroma_min": 0.0528,
+   "grey_max": 0.191,
+   "off_max": 0.223,
+   "olive_max": 0.102,
+   "sep_min": 23.0
+  },
+  "warp": {
+   "chroma_min": 0.0934,
+   "grey_max": 0.143,
+   "off_max": 0.247,
+   "olive_max": 0.066,
+   "sep_min": 11.1
+  },
+  "voyage-void": {
+   "chroma_min": 0.0465,
+   "grey_max": 0.302,
+   "off_max": 0.126,
+   "olive_max": 0.054,
+   "sep_min": 11.6
+  },
+  "voyage-city": {
+   "chroma_min": 0.0532,
+   "grey_max": 0.232,
+   "off_max": 0.25,
+   "olive_max": 0.092,
+   "sep_min": 12.5
+  },
+  "voyage-ocean": {
+   "chroma_min": 0.0532,
+   "grey_max": 0.216,
+   "off_max": 0.17,
+   "olive_max": 0.051,
+   "sep_min": 12.5
+  }
+ },
+ "expo_tol": {
+  "L": 0.07,
+  "Lall": 0.07
+ },
+ "ab_min": 10.0
+}

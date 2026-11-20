@@ -168,12 +168,14 @@ export class ColorEngine {
   private resolved: ResolvedPalette;
   private fromResolved: ResolvedPalette;
   private current: Palette;
+  /** Harness only: a palette given as ready RGB, shown instead of the presets. */
+  private override: ResolvedPalette | null = null;
 
   constructor() {
     this.from = PALETTES[0];
     this.to = PALETTES[0];
     this.current = PALETTES[0];
-    this.resolved = resolve(PALETTES[0]);
+    this.resolved = resolvePalette(PALETTES[0]);
     this.fromResolved = this.resolved;
   }
 
@@ -205,6 +207,12 @@ export class ColorEngine {
 
   setAutoDrift(on: boolean): void { this.autoDrift = on; }
 
+  /** Harness only: show this palette (RGB) instead of the presets; null clears. */
+  setOverride(p: ResolvedPalette | null): void { this.override = p; if (p) this.resolved = p; }
+
+  /** Harness only: jump Auto Drift to a hue offset (degrees). */
+  setDriftPhase(deg: number): void { this.driftPhase = wrapHue(deg); }
+
   setDriftPeriod(seconds: number): void {
     this.driftPeriod = Math.max(MIN_DRIFT_PERIOD_S, Math.min(MAX_DRIFT_PERIOD_S, seconds));
   }
@@ -214,8 +222,9 @@ export class ColorEngine {
     if (this.autoDrift) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
     this.current = shiftPalette(this.basePalette(), this.driftDegrees);
     // Crossfade in RGB (an HSL crossfade sweeps through unrelated hues).
-    const target = resolve(shiftPalette(this.to, this.driftDegrees));
+    const target = resolvePalette(shiftPalette(this.to, this.driftDegrees));
     this.resolved = this.progress >= 1 ? target : lerpResolved(this.fromResolved, target, smoothT(this.progress));
+    if (this.override) this.resolved = this.override;
   }
 
   /** Active palette (with transition and Auto Drift applied). */
@@ -260,7 +269,7 @@ function lerpResolved(a: ResolvedPalette, b: ResolvedPalette, t: number): Resolv
   };
 }
 
-function resolve(p: Palette): ResolvedPalette {
+export function resolvePalette(p: Palette): ResolvedPalette {
   return {
     bg: hslToRgb(p.bg),
     paper: hslToRgb(p.paper),

@@ -1,3 +1,29 @@
+# Palette overhaul + 1.0.1 — in progress
+
+> Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
+> Frames: `C:/Users/abdul/sonora-palette-frames/<set>/` (outside OneDrive, delete at the end); sheets + metrics: `verify/palettes/<set>/`.
+
+## Checklist
+- [x] 0 Read CLAUDE.md, sprint log, decisions, DOCS/16, brand, colour engine, every palette-reading shader, PALETTE-RESEARCH.md + images; attribution off in `.claude/settings.json`
+- [ ] 1.1 Palette matrix tool (`npm run verify -- --palette-matrix`, `scripts/palette-matrix.mjs`): every palette × 19 style/look/view combos × 2 tracks (house-124, ref-song), 6 shots each; batch flicker gates (`--flicker`)
+- [ ] 1.2 Colour metrics (`scripts/palette-metrics.py`): chroma, M, grey share, off-palette, olive, exposure L/L95, separation; contact sheets per palette / per combo / overview
+- [ ] 1.3 Baseline: current 11 palettes, matrix + flicker gates (every palette × combo) + Ink/Voyage gates at the default palette
+- [ ] 1.4 Calibrate thresholds on the baseline (good: Ocean/Neon/Crimson/Violet; bad: Ivory / Black, Aurora in Voyage); write them here
+- [ ] 1.5 Diagnose: Voyage grey stone, distant-hue mixing, olive yellows, HSL lightness; anything else
+- [ ] 2.1 OKLCH palettes in the engine (gamut map by chroma), the 9-palette set, duotones removed
+- [ ] 2.2 Prove every palette in every combo (metrics + flicker); fix or replace failures
+- [ ] 2.3 `paletteFromHue` (analogous core + accent, OKLCH), 15° sweep; Auto Drift in OKLCH, crossfade without a grey dip
+- [ ] 3.1 Voyage stone carries palette colour (all backdrops), before/after + gates
+- [ ] 3.2 Ink: Marble with the accent as ink B, Sumi tint; slot changes only if a palette fails (before/after)
+- [ ] 3.3 Strands / Wisp / Warp: additive build-up stays saturated; gates
+- [ ] 4.1 Settings migration by name (v8) + test; Set Mode duotone logic removed
+- [ ] 4.2 Picker swatches (core + accent), palette thumbnails/media regenerated, (i) text, UI shots
+- [ ] 4.3 Docs: CLAUDE.md, DOCS/16 colour section, PALETTE-RESEARCH.md "What the real engine showed", decisions
+- [ ] 5 Remove "Ink: previous behaviour" + legacy path, `../sonora-baseline` worktree; re-run Ink gates (no change)
+- [ ] 6.1 Full gate run, review package `verify/palettes/review/` (sheets, before/after, Voyage, clips, Auto Drift cycle)
+- [ ] 6.2 Desktop build runs; summary at the top of this section; stop and wait for "Ship it"
+- [ ] 6.3 (on "Ship it") 1.0.1 version bump, release notes, tag, release assets + latest.json checked
+
 # Ink smoothness fix (spawn pops, jagged lines, frame pacing) — done (awaiting review)
 
 ## Summary

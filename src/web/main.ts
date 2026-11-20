@@ -16,6 +16,7 @@ import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
 import { createSourceUi, type SourceUi } from './source-ui';
 import { CAMERA_PRESETS } from '../engine/camera';
+import { PALETTES, resolvePalette, type ResolvedPalette } from '../engine/color-engine';
 import { presetsFor } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
 import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
@@ -66,6 +67,12 @@ export interface HarnessApi {
   hitLog(): { t: number; bass: number; mid: number; high: number }[];
   /** Camera state (debugging frame-rate independence). */
   cam(): Record<string, unknown>;
+  /** Palette research: the preset list as ready RGB. */
+  palettes(): { name: string; resolved: ResolvedPalette }[];
+  /** Palette research: show any palette (RGB), a custom hue, or Auto Drift at a phase. */
+  setPalette(p: { resolved?: ResolvedPalette; index?: number; hue?: number; driftDeg?: number }): void;
+  /** The palette the styles currently receive. */
+  currentPalette(): ResolvedPalette;
 }
 
 declare global {
@@ -384,6 +391,17 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       return { position: pick('position'), yaw: pick('yaw'), pitch: pick('pitch'), roll: pick('roll'), center: pick('center'), viewHeight: pick('viewHeight'), t: pick('t'), time: source.offlineTime, hits: hits.length };
     },
     seedText(title: string): void { renderer.events.notifyTrackChange({ title }); },
+    palettes: () => PALETTES.map((p) => ({ name: p.name, resolved: resolvePalette(p) })),
+    setPalette(p) {
+      const ce = renderer.colorEngine;
+      ce.setOverride(p.resolved ?? null);
+      if (p.index !== undefined) ce.setPalette(p.index, true);
+      if (p.hue !== undefined) { ce.setCustomHue(p.hue); ce.update(10); }
+      ce.setAutoDrift(p.driftDeg !== undefined);
+      if (p.driftDeg !== undefined) ce.setDriftPhase(p.driftDeg);
+      ce.update(0);
+    },
+    currentPalette: () => renderer.colorEngine.getResolved(),
     time: () => source.offlineTime,
     events,
     stats: () => renderer.stats(),
