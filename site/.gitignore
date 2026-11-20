@@ -1,0 +1,8 @@
+node_modules
+dist
+.astro
+.vercel
+# Generated at build time (scripts/prepare-demo.mjs, scripts/release.mjs)
+public/demo/
+src/generated/
+.scratch/

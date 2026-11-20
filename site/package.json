@@ -1,0 +1,21 @@
+{
+  "name": "sonora-site",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "prepare:demo": "node scripts/prepare-demo.mjs",
+    "release": "node scripts/release.mjs",
+    "dev": "npm run prepare:demo && astro dev",
+    "build": "npm run prepare:demo && npm run release && astro build",
+    "preview": "astro preview --port 4321",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@astrojs/sitemap": "^3.7.6",
+    "@astrojs/vercel": "^11.0.22",
+    "astro": "^7.4.13",
+    "typescript": "~5.6"
+  }
+}

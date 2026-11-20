@@ -1,0 +1,24 @@
+---
+/**
+ * Pre-rendered media for a live section, shown only when the page runs
+ * without the live engine (html.static): the still, and the loop when the
+ * section comes into view (never under reduced motion).
+ */
+import { mediaFor } from '../../../src/app/catalog';
+interface Props { media: string; id?: string; eager?: boolean; still?: boolean; videoOnly?: boolean }
+const { media, id, eager = false, still = false, videoOnly = false } = Astro.props;
+const stillUrl = (() => {
+  const m = mediaFor(media);
+  if (m.still) return m;
+  return { still: '', stillSmall: '', loop: undefined, alt: '' };
+})();
+const files = import.meta.glob('../../../src/assets/media/pal-*-480.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
+const pal = files[`../../../src/assets/media/${media}-480.webp`];
+const src = pal ?? stillUrl.still;
+const small = pal ?? stillUrl.stillSmall;
+const loop = still || pal ? undefined : stillUrl.loop;
+---
+<div class="fb" id={id} aria-hidden="true">
+  {!videoOnly && <img src={src} srcset={small !== src ? `${small} 640w, ${src} 1280w` : undefined} sizes="100vw" alt="" loading={eager ? 'eager' : 'lazy'} decoding="async" data-fb-img />}
+  {loop && <video muted loop playsinline preload="none" data-src={loop} poster={videoOnly ? undefined : src} data-fb-video></video>}
+</div>

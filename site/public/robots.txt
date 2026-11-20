@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://sonora-visual.vercel.app/sitemap-index.xml

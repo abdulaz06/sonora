@@ -1,0 +1,25 @@
+---
+import Lockup from './Lockup.astro';
+import { release } from '../lib/release';
+interface Props { page: 'home' | 'live' | 'engineering' | 'other' }
+const { page } = Astro.props;
+const home = page === 'home';
+---
+<header class="nav" data-nav>
+  <a href="/" aria-label="sonora, home"><Lockup class="lockup" title="sonora" /></a>
+  <nav class="nav-links" aria-label="Main">
+    <a class="hide-sm" href={home ? '#styles' : '/#styles'}>Styles</a>
+    <a class="hide-sm" href={home ? '#palettes' : '/#palettes'}>Palettes</a>
+    <a class="hide-sm" href="/engineering" aria-current={page === 'engineering' ? 'page' : undefined}>Engineering</a>
+    <a href="/live" aria-current={page === 'live' ? 'page' : undefined}>Try it live</a>
+    <a class="btn btn--primary" href={release.url} data-dl>Download</a>
+  </nav>
+</header>
+<script>
+  const nav = document.querySelector<HTMLElement>('[data-nav]');
+  if (nav) {
+    const solid = (): void => { nav.classList.toggle('is-solid', window.scrollY > 24 && !document.documentElement.classList.contains('nav-clear')); };
+    solid();
+    window.addEventListener('scroll', solid, { passive: true });
+  }
+</script>

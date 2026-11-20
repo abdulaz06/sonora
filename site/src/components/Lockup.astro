@@ -1,0 +1,7 @@
+---
+import lockup from '../../../DOCS/brand/sonora-lockup-bone.svg?raw';
+interface Props { class?: string; title?: string }
+const { class: cls = '', title = 'sonora' } = Astro.props;
+const svg = lockup.replace('<svg ', `<svg role="img" aria-label="${title}" class="${cls}" `);
+---
+<Fragment set:html={svg} />

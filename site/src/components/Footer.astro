@@ -1,0 +1,18 @@
+---
+import { release } from '../lib/release';
+import { GITHUB_URL } from '../../site.config.mjs';
+const year = new Date().getFullYear();
+---
+<footer class="foot solid">
+  <div class="wrap foot-in">
+    <p class="micro privacy">The app and the live page analyse sound on your device; no audio ever leaves it. This site counts visits (cookieless), but never hears your audio.</p>
+    <nav class="micro" aria-label="Footer">
+      <a href="/live">try it live</a>
+      <a href="/engineering">engineering</a>
+      <a href={GITHUB_URL}>github</a>
+      <a href={`${GITHUB_URL}/releases`} data-dl-version>v{release.version}</a>
+      <span>coming to steam</span>
+      <span>© {year} Abdul</span>
+    </nav>
+  </div>
+</footer>
