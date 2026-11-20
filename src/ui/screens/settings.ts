@@ -206,8 +206,10 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       t.media.el.append(h('i', { class: 'pal-chip', style: { background: swatchCss(p) } }));
       pals.append(t.el);
     });
-    const custom = h('button', { class: 's-thumb', type: 'button', 'aria-pressed': String(s.paletteIndex < 0) },
-      h('div', { class: 's-media', style: { background: swatchCss(paletteFromHue(s.customHue)) } }), h('span', { class: 's-thumb-row' }, h('span', { class: 's-thumb-title' }, 'Custom')));
+    const custom = h('button', { class: 's-thumb pal-thumb', type: 'button', 'aria-pressed': String(s.paletteIndex < 0) },
+      h('div', { class: 's-media', style: { background: paletteFromHue(s.customHue).preview, position: 'relative' } },
+        h('i', { class: 'pal-chip', style: { background: swatchCss(paletteFromHue(s.customHue)) } })),
+      h('span', { class: 's-thumb-row' }, h('span', { class: 's-thumb-title' }, 'Custom')));
     custom.addEventListener('click', () => ctl.setCustomHue(s.customHue));
     pals.append(custom);
     const palName = s.paletteIndex >= 0 ? PALETTES[s.paletteIndex]?.name ?? '' : 'Custom';
