@@ -206,7 +206,12 @@ function angDiff(a: number, b: number): number {
  * yellow is olive. */
 function bandShift(c: OKLCH, dh: number): number {
   const plain = c[2] + dh;
-  return wrapHue(plain + angDiff(bandHue(plain), plain) - angDiff(bandHue(c[2]), c[2]));
+  // The colour's own offset at rest fades out over the first 40° of turn, so
+  // further round the bands are avoided exactly (a colour resting in the cyan
+  // band would otherwise carry that offset into the olive band).
+  const away = Math.abs(angDiff(dh, 0));
+  const rest = angDiff(bandHue(c[2]), c[2]) * (1 - smooth(0, 40, away));
+  return wrapHue(plain + angDiff(bandHue(plain), plain) - rest);
 }
 
 /** Drift phase (0..360, uniform in time) → the hue turn actually applied:

@@ -86,6 +86,18 @@ describe('colour engine', () => {
         if ((pri > 72 && pri < 128) || (sec > 72 && sec < 128)) inOlive += 0.5;
         if (pri > 165 && pri < 242) inCyan += 0.5;
       }
+      // Accent and highlight: away from rest, never resting in the olive band
+      // (styles dim them, and a dim yellow is olive).
+      const e = new ColorEngine();
+      e.setPalette(PALETTES.indexOf(p), true);
+      e.setAutoDrift(true);
+      let olive = 0;
+      for (let ph = 45; ph < 315; ph += 1) {
+        e.setDriftPhase(ph);
+        e.update(0);
+        for (const c of [e.getPalette().accent, e.getPalette().highlight]) if (c[2] > 72 && c[2] < 128) olive++;
+      }
+      expect(olive, `${p.name} accent/highlight in the olive band`).toBeLessThanOrEqual(30);
       expect(360 - prev, p.name).toBeLessThan(6);   // the turn comes round to 360 (= 0)
       // Only the quick crossings (12% of each forbidden stretch's width).
       expect(inOlive, p.name).toBeLessThanOrEqual(24);
