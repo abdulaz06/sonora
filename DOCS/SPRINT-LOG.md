@@ -65,14 +65,26 @@ Every palette passes every colour gate (chroma, grey, off-palette, olive, exposu
 | Voyage Void | 100/100 → 100/100 (rise 35.8/80.1 → 32.6/71.9%) | 1.33 · 0.079 → 1.00 · 0.075 | 74/75 → 74/76% | 0.0133 → 0.0153 |
 | Voyage City / Ocean | 100/100 → 100/100 (rise −1 to −3 points) | 0.50 / 0.83 → 0.50 / 0.67 | 78/75 → 77/75% | 0.033 → 0.025 |
 
-DRIFT_HUE_PLACEHOLDER
+### Custom hue and Auto Drift (`verify/palettes/hues/`, `…/drift*/`)
+- **Custom hue, every 15° (24 × 19 combos × 2 tracks):** all 24 pass every colour gate. The primary skips the olive band (a pick at 65–140° becomes gold ~66° or lime ~138°) and the dull cyan band (162–245° → teal ~160° or azure ~243°, with the picked cyan kept as the secondary); the accent sits 70° away on the side that doesn't cross the olive band.
+- **Auto Drift, every 30° of phase (12 × 19 × 2), from Ocean, Neon and Solar:** Ocean passes every phase (its one failing sample is tagged as a transition: the highlight mid-way through its quick band crossing). Solar misses by hairlines at 4 phases (Marble content chroma 0.101 vs floor 0.102; at one phase Marble / Warp exposure +0.08 vs ±0.07). **Neon fails at 5 of 12 phases:** turned 90–150° its wide triad becomes orange / blue-violet / teal / gold and the teal and gold flames and veins add up to olive in Wisp and Voyage (12–28%); at 270–300° Warp's streaks are dull (chroma 0.068–0.077 vs 0.093). Not fixed — see "Unsure".
+- Crossings: Auto Drift turns the palette rigidly and passes quickly (12% of the stretch's width of phase, a few seconds) through turns that would rest the primary or secondary in the olive span or the primary in the cyan band; samples taken inside a crossing are tagged `-crossing` and not judged.
+- Crossfades between presets: OKLCH, never below chroma 0.103 (RGB dipped to 0.008, Ocean ↔ Solar).
 
-COST_PLACEHOLDER
+### Frame cost (interleaved, 3 rounds, 1080p Medium, house-124 drop, median; `scripts/palette-cost.mjs`)
+1.0 → now: Ink Glow Depth 1.50 → 1.50 ms, Glow Flat 1.34 → 1.33, Marble Depth 1.61 → 1.60, Sumi Depth 1.38 → 1.40, Silk Flat 2.87 → 2.92, Wisp Flat 1.35 → 1.35, Ground 1.46 → 1.47, Tunnel 1.22 → 1.24, Warp 1.43 → 1.43, Voyage Void 2.98 → 2.98, City 3.11 → 3.13, Ocean 2.94 → 3.03. Unchanged within noise (largest +0.10 ms, Voyage Ocean's palette sea).
+
+### Beat sync per palette (house-124, every style / look / view)
+Every palette keeps ≥ 90% of kicks seen in every look (lowest: Silk 91%, as in 1.0); Sumi by region 100% for every palette.
+
+### Desktop build
+`npm run tauri build` (updater artifacts off): `sonora_1.0.0_x64-setup.exe` (17.5 MB) and the MSI build; the release exe starts, opens its window, runs 12 s, settings v8 (no `inkLegacy`), closes cleanly. (The local settings file was already v8, so the v7 → v8 path is covered by the unit test, not this run.)
 
 ### Unsure / for your eyes
 - **Voyage's sea and stone now carry the palette strongly** (a violet sea with Ocean, an amber sea with Ember / Solar, a lime one with Acid). It's what the brief asked for, but it changes Voyage's character more than any other style; the before/after sheet shows it.
 - **Wisp Flat's fine-detail share rises 2 points** (48 → 50%, 70 → 72%; the ≤45% gate already failed at 1.0). Saturated trails show more texture; half of the hue-preserving build-up is the compromise (fully: +3; none: the old grey).
 - **Custom hue and drift skip two narrow regions:** a custom pick in the olive band becomes gold or lime, one in the cyan band teal or azure (the picked cyan stays as the secondary), and Auto Drift passes those turns quickly instead of resting there. sRGB simply has no vivid dark yellow and no vivid mid-light cyan; resting there failed the gates in every style.
+- **Auto Drift on Neon** still fails at 5 of 12 phases (olive gold + teal mixes in Wisp / Voyage at 90–150°, dull Warp streaks at 270–300°). Neon's colours span a wide triad (magenta / cyan / yellow); turned rigidly they land on complementary pairs whose light adds up to olive. Options: drift Neon-like wide palettes over a narrower range, or turn only their core and keep the accent; I didn't want to pick for you. Every preset at rest, every custom hue, and drift on Ocean pass.
 - **Silk's 1-frame step** (the drop inversion cut) still exceeds 0.12, for every palette, exactly as in 1.0 (flash-guarded and deliberate).
 - **The olive metric** was widened after looking at frames (dark yellows from 75°, lightness-dependent); the baseline was recalibrated with it before the final set was judged.
 
@@ -85,16 +97,16 @@ COST_PLACEHOLDER
 - [x] 1.5 Diagnose: Voyage grey stone, distant-hue mixing, olive yellows, HSL lightness; anything else
 - [x] 2.1 OKLCH palettes in the engine (gamut map by chroma), the 9-palette set, duotones removed
 - [x] 2.2 Prove every palette in every combo (metrics + flicker); fix or replace failures
-- [ ] 2.3 `paletteFromHue` (analogous core + accent, OKLCH), 15° sweep; Auto Drift in OKLCH, crossfade without a grey dip
+- [x] 2.3 `paletteFromHue` (analogous core + accent, OKLCH), 15° sweep; Auto Drift in OKLCH, crossfade without a grey dip
 - [x] 3.1 Voyage stone carries palette colour (all backdrops), before/after + gates
 - [x] 3.2 Ink: Marble with the accent as ink B, Sumi tint; slot changes only if a palette fails (before/after)
 - [x] 3.3 Strands / Wisp / Warp: additive build-up stays saturated; gates
 - [x] 4.1 Settings migration by name (v8) + test; Set Mode duotone logic removed
-- [ ] 4.2 Picker swatches (core + accent), palette thumbnails/media regenerated, (i) text, UI shots
-- [ ] 4.3 Docs: CLAUDE.md, DOCS/16 colour section, PALETTE-RESEARCH.md "What the real engine showed", decisions
+- [x] 4.2 Picker swatches (core + accent), palette thumbnails/media regenerated, (i) text, UI shots
+- [x] 4.3 Docs: CLAUDE.md, DOCS/16 colour section, PALETTE-RESEARCH.md "What the real engine showed", decisions
 - [x] 5 Remove "Ink: previous behaviour" + legacy path, `../sonora-baseline` worktree; re-run Ink gates (no change)
-- [ ] 6.1 Full gate run, review package `verify/palettes/review/` (sheets, before/after, Voyage, clips, Auto Drift cycle)
-- [ ] 6.2 Desktop build runs; summary at the top of this section; stop and wait for "Ship it"
+- [x] 6.1 Full gate run, review package `verify/palettes/review/` (sheets, before/after, Voyage, clips, Auto Drift cycle)
+- [x] 6.2 Desktop build runs; summary at the top of this section; stop and wait for "Ship it"
 - [ ] 6.3 (on "Ship it") 1.0.1 version bump, release notes, tag, release assets + latest.json checked
 
 ## Notes
