@@ -49,8 +49,8 @@ const SHADE_LIFT_L = 0.64;
  * dark yellow or lime reads olive) and the cyan band (sRGB can't make a vivid
  * cyan at matched lightness: Marble and Warp went dull). Inside a band the
  * hue sits within 3° of either edge, with a steep BAND_STEP-wide crossing in
- * the middle (continuous, so drift never jumps). Light colours (highlights,
- * Neon's yellow) are left alone. */
+ * the middle (continuous, so drift never jumps). A preset colour that sits
+ * in a band at rest (Neon's yellow, Aurora's cyan) stays exactly itself. */
 const BANDS: [number, number][] = [[65, 140], [162, 245]];
 /** Auto Drift turns the whole palette rigidly and passes quickly through the
  * turns where its primary or secondary would sit in this olive span (their
@@ -185,10 +185,11 @@ export function bandHue(h: number, snap = false): number {
   return x;
 }
 
-/** Does the shorter arc from hue a to hue b touch the olive band? */
+/** Does the shorter arc from hue a to hue b enter the olive band? (The
+ * start is skipped: a gold core sits on the band's edge.) */
 function arcHitsOlive(a: number, b: number): boolean {
   const d = angDiff(b, a);
-  for (let i = 0; i <= 16; i++) if (inOlive(a + (d * i) / 16)) return true;
+  for (let i = 1; i <= 16; i++) if (Math.abs((d * i) / 16) > 4 && inOlive(a + (d * i) / 16)) return true;
   return false;
 }
 
@@ -200,14 +201,12 @@ function angDiff(a: number, b: number): number {
 }
 
 /** A slot's hue turned by dh through the bands, relative to where it starts
- * (a preset colour that sits in a band stays exactly itself at dh = 0), faded
- * out for light colours (a light yellow isn't olive, a light cyan isn't dull). */
+ * (a preset colour that sits in a band stays exactly itself at dh = 0). Light
+ * colours too: styles dim them (flames, veins, trails), and a dimmed light
+ * yellow is olive. */
 function bandShift(c: OKLCH, dh: number): number {
-  const w = 1 - smooth(0.75, 0.85, c[0]);
   const plain = c[2] + dh;
-  if (w <= 0) return wrapHue(plain);
-  const turned = c[2] + dh + angDiff(bandHue(plain), plain) - angDiff(bandHue(c[2]), c[2]);
-  return wrapHue(plain + angDiff(turned, plain) * w);
+  return wrapHue(plain + angDiff(bandHue(plain), plain) - angDiff(bandHue(c[2]), c[2]));
 }
 
 /** Drift phase (0..360, uniform in time) → the hue turn actually applied:
@@ -259,7 +258,8 @@ export function driftTurn(p: Palette, phase: number): number {
 /** Turn a palette's hues (Auto Drift): rigidly by driftTurn(phase), so the
  * analogous core stays together; the chromatic slots follow the hue lift (a
  * blue palette turned to gold brightens instead of going dull), and the accent
- * still steps through the bands on its own (relative to where it starts).
+ * and highlight still step through the bands on their own (relative to where
+ * they start).
  * Paper takes only a whisper of the turn. */
 function shiftPalette(p: Palette, phase: number): Palette {
   if (phase === 0) return p;
@@ -271,7 +271,7 @@ function shiftPalette(p: Palette, phase: number): Palette {
   return {
     ...p,
     bg: s(p.bg, false), primary: s(p.primary, true), secondary: s(p.secondary, true), accent: s(p.accent, true, true),
-    highlight: s(p.highlight, false), paper: [p.paper[0], p.paper[1], wrapHue(p.paper[2] + dh * 0.15)],
+    highlight: s(p.highlight, false, true), paper: [p.paper[0], p.paper[1], wrapHue(p.paper[2] + dh * 0.15)],
   };
 }
 
