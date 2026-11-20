@@ -13,7 +13,6 @@
  * so it can sit alongside Halo Spectrum and Flow-Ink as a switchable mode.
  */
 
-import { hslToRgb } from '../../engine/color-engine';
 import { buildProgram } from '../../engine/gl-utils';
 import { FlowField } from '../../primitives/flow-field';
 import { GlowOrbSystem } from '../../primitives/glow-orbs';
@@ -182,10 +181,10 @@ export function createAuraStyle(deps: StyleDeps): VisualStyle {
         colorEngine, generative,
       } = ctx;
 
-      const pal = colorEngine.getPalette();
-      const highlightRgb = hslToRgb(pal.highlight) as [number, number, number];
-      const secondaryRgb = hslToRgb(pal.secondary) as [number, number, number];
-      const accentRgb = hslToRgb(pal.accent) as [number, number, number];
+      const pal = colorEngine.getResolved();
+      const highlightRgb = pal.highlight;
+      const secondaryRgb = pal.secondary;
+      const accentRgb = pal.accent;
       const ringColors3 = colorEngine.getRingColors();
 
       // ── Flow field ──

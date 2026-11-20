@@ -8,13 +8,34 @@
 import { invoke } from '@tauri-apps/api/core';
 
 import { DEFAULT_CAMERA_VIEW, FLAT_ZOOM_MAX, FLAT_ZOOM_MIN, type CameraView } from '../engine/camera';
-import { DEFAULT_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S } from '../engine/color-engine';
+import { DEFAULT_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES, paletteIndexByName } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
 import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
 /** Bump when a default changes in a way saved settings must not override. */
-export const SETTINGS_VERSION = 7;
+export const SETTINGS_VERSION = 8;
+
+/** The palette list before v8, in index order (saves stored the index). */
+const PALETTES_V7 = ['Ocean', 'Aurora', 'Ember', 'Neon', 'Crimson', 'Gold', 'Violet',
+  'Ember / Black', 'Ivory / Black', 'Cold / Black', 'Crimson / Black'];
+/** v8: old palettes that are gone, by name → the palette that replaces them. */
+const PALETTE_RENAMES: Record<string, string> = {
+  'Gold': 'Solar', 'Ember / Black': 'Ember', 'Crimson / Black': 'Crimson', 'Cold / Black': 'Ocean', 'Ivory / Black': 'Ocean',
+};
+
+/** A saved palette index from a settings file of `version`, as a current
+ * index: before v8 the index is looked up by name; -1 (custom) is kept;
+ * anything unknown becomes the default palette. */
+export function migratePaletteIndex(index: number, version: number): number {
+  if (index === -1) return -1;
+  if (!Number.isInteger(index)) return DEFAULT_SETTINGS.paletteIndex;
+  if (version >= 8) return index >= 0 && index < PALETTES.length ? index : DEFAULT_SETTINGS.paletteIndex;
+  const old = PALETTES_V7[index];
+  if (!old) return DEFAULT_SETTINGS.paletteIndex;
+  const i = paletteIndexByName(PALETTE_RENAMES[old] ?? old);
+  return i >= 0 ? i : DEFAULT_SETTINGS.paletteIndex;
+}
 
 /** Settings each style keeps for itself (v5): changing one style never
  * changes another. Colours can be shared with `matchColours`. */
@@ -357,7 +378,7 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
   const desc = STYLES.find((d) => d.id === out.mode);
   if (desc?.category === 'classic' && !out.showClassic) out.mode = DEFAULT_STYLE;
   if (typeof r.paletteIndex === 'number' && Number.isFinite(r.paletteIndex)) {
-    out.paletteIndex = r.paletteIndex;
+    out.paletteIndex = migratePaletteIndex(r.paletteIndex, version);
   }
   if (typeof r.customHue === 'number' && Number.isFinite(r.customHue)) {
     out.customHue = clamp(r.customHue, 0, 360);
@@ -393,7 +414,7 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     const p = rs?.[id];
     // v5: before per-style settings, every style shared one set: start each
     // style from it so nobody loses their choices.
-    styles[id] = parseStylePrefs(p, stylePrefsOf(out));
+    styles[id] = parseStylePrefs(p, stylePrefsOf(out), version);
   }
   out.styles = styles;
 
@@ -450,14 +471,14 @@ export function defaultStylePrefs(): StylePrefs {
   return stylePrefsOf(DEFAULT_SETTINGS);
 }
 
-function parseStylePrefs(raw: unknown, fallback: StylePrefs): StylePrefs {
+function parseStylePrefs(raw: unknown, fallback: StylePrefs, version: number): StylePrefs {
   if (!raw || typeof raw !== 'object') return { ...fallback, camera: { ...fallback.camera } };
   const p = raw as Record<string, unknown>;
   const num = (v: unknown, lo: number, hi: number, d: number): number =>
     (typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : d);
   const c = (p.camera && typeof p.camera === 'object' ? p.camera : {}) as Record<string, unknown>;
   return {
-    paletteIndex: typeof p.paletteIndex === 'number' && Number.isInteger(p.paletteIndex) ? p.paletteIndex : fallback.paletteIndex,
+    paletteIndex: typeof p.paletteIndex === 'number' && Number.isInteger(p.paletteIndex) ? migratePaletteIndex(p.paletteIndex, version) : fallback.paletteIndex,
     customHue: num(p.customHue, 0, 360, fallback.customHue),
     autoDrift: typeof p.autoDrift === 'boolean' ? p.autoDrift : fallback.autoDrift,
     driftPeriod: num(p.driftPeriod, MIN_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, fallback.driftPeriod),

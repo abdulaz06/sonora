@@ -26,8 +26,6 @@ const FALLBACK_INTERVALS = 3;
 const HISTORY = 3;
 /** Width of the energy match (smaller = stricter). */
 const MATCH_SIGMA = 0.24;
-/** Chance to pick a duotone palette when palettes change. */
-const DUOTONE_P = 0.18;
 
 export interface SetMode {
   isOn(): boolean;
@@ -72,10 +70,8 @@ export function createSetMode(ctl: Controller, onChange: (on: boolean) => void, 
     const depth = piece.views.length > 1 ? rand() < (piece.style === 'ink' ? 0.35 + 0.5 * e : 0.5) : piece.views[0] === 'depth';
     let palette: number | null = null;
     if (s.setMode.palettes) {
-      const duo = PALETTES.map((p, i) => ({ p, i })).filter(({ p }) => p.duotone);
-      const full = PALETTES.map((p, i) => ({ p, i })).filter(({ p }) => !p.duotone);
-      const list = (rand() < DUOTONE_P ? duo : full).filter(({ i }) => i !== s.paletteIndex);
-      palette = list[Math.floor(rand() * list.length)]?.i ?? null;
+      const list = PALETTES.map((_, i) => i).filter((i) => i !== s.paletteIndex);
+      palette = list[Math.floor(rand() * list.length)] ?? null;
     }
     return { piece, depth, palette };
   }

@@ -32,7 +32,6 @@
  *   - fade_in_out          → overall visibility
  */
 
-import { hslToRgb } from '../../engine/color-engine';
 import { EnvelopeFollower, MEDIUM } from '../../engine/envelope';
 import { buildProgram } from '../../engine/gl-utils';
 import { STYLE_VARIANTS } from '../visual-style';
@@ -231,9 +230,8 @@ export function createHaloStyle(deps: StyleDeps): VisualStyle {
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.disable(gl.BLEND);
 
-      const palette    = colorEngine.getPalette();
       const ringColors = colorEngine.getRingColors();
-      const accent     = hslToRgb(palette.accent);
+      const accent     = colorEngine.getResolved().accent;
 
       gl.useProgram(prog);
       gl.uniform2f (u.resolution,   canvas.width, canvas.height);

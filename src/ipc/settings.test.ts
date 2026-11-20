@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { capIsEven, DEFAULT_SETTINGS, fpsCapChoices, mergeWithDefaults, SETTINGS_VERSION } from './settings';
+import { PALETTES } from '../engine/color-engine';
+import { capIsEven, DEFAULT_SETTINGS, fpsCapChoices, mergeWithDefaults, migratePaletteIndex, SETTINGS_VERSION } from './settings';
 
 describe('settings migration', () => {
   it('fresh install: defaults, first run pending', () => {
@@ -86,6 +87,36 @@ describe('settings migration', () => {
     expect([v7.showFps, v7.fpsCorner]).toEqual([true, 'bottom-left']);
     // The temporary Ink A/B switch is gone; an old save's value is dropped.
     expect('inkLegacy' in v7).toBe(false);
+  });
+
+  it('v7 to v8: palettes migrate by name, not index', () => {
+    const name = (i: number): string => (i < 0 ? 'custom' : PALETTES[i].name);
+    // Old order: Ocean, Aurora, Ember, Neon, Crimson, Gold, Violet, Ember / Black,
+    // Ivory / Black, Cold / Black, Crimson / Black.
+    const expected = ['Ocean', 'Aurora', 'Ember', 'Neon', 'Crimson', 'Solar', 'Violet', 'Ember', 'Ocean', 'Ocean', 'Crimson'];
+    expected.forEach((n, old) => expect(name(migratePaletteIndex(old, 7))).toBe(n));
+    expect(migratePaletteIndex(-1, 7)).toBe(-1);                    // custom hue kept
+    expect(migratePaletteIndex(42, 7)).toBe(DEFAULT_SETTINGS.paletteIndex);   // unknown → default
+    expect(migratePaletteIndex(3, 8)).toBe(3);                      // current saves untouched
+    expect(migratePaletteIndex(99, 8)).toBe(DEFAULT_SETTINGS.paletteIndex);
+    const s = mergeWithDefaults({
+      settingsVersion: 7, paletteIndex: 5, customHue: 120, autoDrift: true,
+      styles: {
+        ink: { paletteIndex: 8, customHue: 10, autoDrift: true, driftPeriod: 300 },
+        silk: { paletteIndex: -1, customHue: 200, autoDrift: false },
+        warp: { paletteIndex: 10 },
+        voyage: { paletteIndex: 6 },
+      },
+    });
+    expect(name(s.paletteIndex)).toBe('Solar');
+    expect(name(s.styles.ink!.paletteIndex)).toBe('Ocean');
+    expect([s.styles.ink!.customHue, s.styles.ink!.autoDrift, s.styles.ink!.driftPeriod]).toEqual([10, true, 300]);
+    expect(s.styles.silk!.paletteIndex).toBe(-1);
+    expect(s.styles.silk!.customHue).toBe(200);
+    expect(name(s.styles.warp!.paletteIndex)).toBe('Crimson');
+    expect(name(s.styles.voyage!.paletteIndex)).toBe('Violet');
+    // A v8 save is read as is.
+    expect(mergeWithDefaults({ settingsVersion: 8, paletteIndex: 7 }).paletteIndex).toBe(7);
   });
 
   it('frame-rate choices pace evenly on the measured display', () => {

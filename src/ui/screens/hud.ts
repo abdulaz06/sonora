@@ -8,7 +8,7 @@ import { describe, mediaFor, STYLE_INFO } from '../../app/catalog';
 import type { Controller } from '../../app/controller';
 import type { Platform } from '../../app/platform';
 import { nowPlaying, type MediaInfo } from '../../app/stores';
-import { PALETTES } from '../../engine/color-engine';
+import { PALETTES, paletteFromHue, swatchCss } from '../../engine/color-engine';
 import { getStyle } from '../../styles/registry';
 import { button, icon, thumb, toast } from '../ds/components';
 import { append, h } from '../ds/dom';
@@ -81,9 +81,9 @@ export function createHud(ctl: Controller, platform: Platform, on: HudHandlers):
     }
     const r = h('div', { class: 'qs-row pal' });
     PALETTES.slice(0, 9).forEach((p, i) => {
-      const t = thumb({ media: mediaFor(`pal-${id}-${i}`, `pal-ink-${i}`), title: `${i + 1} ${p.name.replace(' / Black', ' duo')}`, selected: s.paletteIndex === i, hoverPlay: false, onClick: () => ctl.setPalette(i) });
+      const t = thumb({ media: mediaFor(`pal-${id}-${i}`, `pal-ink-${i}`), title: `${i + 1} ${p.name}`, selected: s.paletteIndex === i, hoverPlay: false, onClick: () => ctl.setPalette(i) });
       t.el.classList.add('pal-thumb');
-      t.media.el.append(h('i', { class: 'pal-chip', style: { background: p.preview } }));
+      t.media.el.append(h('i', { class: 'pal-chip', style: { background: swatchCss(p) } }));
       r.append(t.el);
     });
     qs.append(h('div', { class: 'qs-grp' }, h('div', { style: { display: 'flex', justifyContent: 'space-between' } }, h('span', { class: 's-label' }, 'palette'), h('span', { class: 's-micro' }, `keys 1–9 · ${s.matchColours ? 'all styles' : `for ${info.label.toLowerCase()}`}`)), r));
@@ -109,7 +109,7 @@ export function createHud(ctl: Controller, platform: Platform, on: HudHandlers):
     smBtn.setAttribute('aria-pressed', String(s.setMode.on));
     smLabel.hidden = !s.setMode.on || hud.hidden;
     const p = s.paletteIndex >= 0 ? PALETTES[s.paletteIndex] : null;
-    swatch.style.background = p ? p.preview : `hsl(${s.customHue} 70% 52%)`;
+    swatch.style.background = swatchCss(p ?? paletteFromHue(s.customHue));
     np.className = `np-overlay s-root ${s.nowPlaying.position}${np.classList.contains('show') ? ' show' : ''}`;
     if (qs.classList.contains('open')) buildQuick();
   }

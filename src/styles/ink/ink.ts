@@ -537,7 +537,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
       const light = ctx.light;
       const vIdx = VARIANT_INDEX[variant] ?? 0;
       const inkA = pal.primary;
-      const inkB = pal.duotone ? pal.secondary : pal.accent;
+      const inkB = pal.accent;
       const spark = pal.highlight;
       const fogColor: [number, number, number] = light
         ? [pal.paper[0] * 0.97, pal.paper[1] * 0.97, pal.paper[2] * 0.97]

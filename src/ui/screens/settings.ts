@@ -11,7 +11,7 @@ import type { Controller } from '../../app/controller';
 import type { Platform } from '../../app/platform';
 import { audioStatus } from '../../app/stores';
 import { FLAT_ZOOM_MAX, FLAT_ZOOM_MIN } from '../../engine/camera';
-import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES } from '../../engine/color-engine';
+import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES, paletteFromHue, swatchCss } from '../../engine/color-engine';
 import type { QualityPreset } from '../../engine/quality';
 import { fpsCapChoices, fpsLabel, SET_MODE_INTERVALS, type Corner } from '../../ipc/settings';
 import { getStyle, presetsFor } from '../../styles/registry';
@@ -60,7 +60,7 @@ const INFO = {
   classic: (): InfoContent => ({ title: 'classic styles', body: ['Adds Aura and Halo, the original visuals from sonora 0.1, to the menu.'] }),
   palette: (style: string, match: boolean): InfoContent => ({
     title: 'palette', scope: match ? 'all styles' : `for ${style}`,
-    body: ['The set of colours the visual paints with. Split swatches are two-tone palettes: one colour and black.',
+    body: ['The set of colours the visual paints with. Each swatch shows the main colour and, in its corner, the contrasting colour used for details.',
       'Number keys 1–9 switch palettes while the visual plays. Custom builds a palette around any colour you pick.'],
   }),
   drift: (style: string, match: boolean): InfoContent => ({
@@ -201,13 +201,13 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
     // Colour: swatches applied to a thumbnail of this style.
     const pals = h('div', { class: 'st-pals' });
     PALETTES.forEach((p, i) => {
-      const t = thumb({ media: mediaFor(`pal-${id}-${i}`, `pal-ink-${i}`), title: p.name.replace(' / Black', ' duo'), selected: s.paletteIndex === i, hoverPlay: false, onClick: () => ctl.setPalette(i) });
+      const t = thumb({ media: mediaFor(`pal-${id}-${i}`, `pal-ink-${i}`), title: p.name, selected: s.paletteIndex === i, hoverPlay: false, onClick: () => ctl.setPalette(i) });
       t.el.classList.add('pal-thumb');
-      t.media.el.append(h('i', { class: 'pal-chip', style: { background: p.duotone ? `linear-gradient(135deg, ${p.preview} 50%, #08080A 50%)` : p.preview } }));
+      t.media.el.append(h('i', { class: 'pal-chip', style: { background: swatchCss(p) } }));
       pals.append(t.el);
     });
     const custom = h('button', { class: 's-thumb', type: 'button', 'aria-pressed': String(s.paletteIndex < 0) },
-      h('div', { class: 's-media', style: { background: `hsl(${s.customHue} 60% 42%)` } }), h('span', { class: 's-thumb-row' }, h('span', { class: 's-thumb-title' }, 'Custom')));
+      h('div', { class: 's-media', style: { background: swatchCss(paletteFromHue(s.customHue)) } }), h('span', { class: 's-thumb-row' }, h('span', { class: 's-thumb-title' }, 'Custom')));
     custom.addEventListener('click', () => ctl.setCustomHue(s.customHue));
     pals.append(custom);
     const palName = s.paletteIndex >= 0 ? PALETTES[s.paletteIndex]?.name ?? '' : 'Custom';

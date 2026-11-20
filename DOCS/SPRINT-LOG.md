@@ -24,6 +24,37 @@
 - [ ] 6.2 Desktop build runs; summary at the top of this section; stop and wait for "Ship it"
 - [ ] 6.3 (on "Ship it") 1.0.1 version bump, release notes, tag, release assets + latest.json checked
 
+## Notes
+
+### Baseline (current 11 palettes, before any change) — `verify/palettes/baseline/`
+Matrix: 11 palettes × 19 combos (Ink Glow/Marble/Sumi × Depth/Flat, Glow/Marble light, Sumi dark, Silk Flat/Depth/light, Wisp Flat/Ground/Tunnel, Warp, Voyage Void/City/Ocean) × house-124 + ref-song, 6 shots each (build, 4-frame drop strip, calm), 640×360, medium quality, seeded. Metrics per frame on the content pixels (lit on dark looks, ink on paper looks and during Silk's inversion cut).
+
+**Calibrated thresholds** (`scripts/palette-thresholds.json`, `python scripts/palette-metrics.py calibrate|gate`). Good references: Ocean, Neon, Crimson, Violet (Neon left out in Voyage — measured to fail there by the same mechanism as Aurora, below). Per combo: chroma ≥ 0.85 × the lowest good palette; grey share ≤ highest good + 10 points; off-palette ≤ highest good + 10 points; olive ≤ highest good + 5 points; k-means separation ≥ 0.8 × lowest good. Exposure: content L and whole-frame L within ±0.07 of Ocean in the same combo (widest loved palette: Neon in Voyage City, +0.06). Ink A vs B ΔE×100 ≥ 10 (loved minimum: Violet 11.7).
+
+| combo | chroma ≥ | grey ≤ | off ≤ | olive ≤ | sep ≥ |
+|---|---|---|---|---|---|
+| ink-glow-depth | 0.079 | 19% | 15% | 20% | 9 |
+| ink-glow-flat | 0.076 | 19% | 12% | 24% | 9 |
+| ink-marble-depth / flat | 0.102 | 10% | 10% | 5% | 8 |
+| ink-sumi-depth / flat (ink on bone by design) | 0.006 / 0.007 | 100% | 10% | 5% | 21 |
+| ink-glow-flat-light | 0.033 | 73% | 14% | 5% | 16 |
+| ink-marble-flat-light | 0.064 | 15% | 10% | 5% | 10 |
+| ink-sumi-flat-dark | 0.005 | 100% | 10% | 5% | 16 |
+| silk-flat / depth | 0.066 / 0.068 | 37% / 35% | 10% | 5% | 22 |
+| silk-flat-light | 0.021 | 92% | 10% | 5% | 30 |
+| wisp-flat / ground / tunnel | 0.052 / 0.051 / 0.053 | 31 / 26 / 19% | 14 / 18 / 22% | 12 / 11 / 10% | 22 |
+| warp | 0.093 | 14% | 25% | 7% | 11 |
+| voyage-void / city / ocean | 0.046 / 0.053 / 0.053 | 30 / 23 / 22% | 13 / 25 / 17% | 5 / 9 / 5% | 12 |
+
+Gate result on the baseline: Ocean, Ember, Crimson, Violet pass everywhere. Ivory / Black fails all 19 combos (grey 78–100%). Aurora fails Voyage ×3 (grey 56–57%, chroma 0.038–0.042) plus Marble/Warp exposure (+0.09–0.10 L). Neon fails Voyage ×3 (grey 44–48%, off-palette 29–37%). Gold fails 16 (olive 14–53%, Marble/Warp exposure). Ember / Black, Cold / Black, Crimson / Black fail Wisp (grey 36–72%: low-chroma highlights turn the flame cores white).
+
+**Diagnosis (research findings vs measurements)**
+1. *Voyage's grey stone desaturates every palette* — confirmed. Content chroma for the loved palettes in Voyage 0.079–0.091 vs 0.13–0.16 in Warp and 0.14–0.20 in Marble; Ocean is 12–20% grey there. The stone albedo is `mix(grey 0.64, tint, 0.42)`: computed albedo chroma is only 0.06–0.11 for any palette.
+2. *Distant primary/secondary hues mix toward grey* — confirmed. RGB midpoint chroma loss: Aurora −70% (0.055), Neon −35%, the rest ≤4%. On the stone that leaves Aurora 0.016 and Neon 0.051 albedo chroma: Voyage grey 56% / 48%. Warp's additive streak overlap gives Aurora 16% grey (others 0–4%).
+3. *Yellows go olive when darkened* — confirmed. Gold is 14–53% olive (yellow hue darker than L 0.62) in every look; its primary darkened by Marble-light / Sumi (×0.55) lands at OKLCH L 0.52 h 84. Also: Neon's and Aurora's yellow accents read olive where Glow's ink B is thin (15–20% of Glow's content).
+4. *HSL lightness makes brightness uneven* — confirmed. OKLCH L of the primaries spans 0.548 (Violet) to 0.801 (Gold); Gold/Aurora/Ivory render +0.07–0.12 brighter (whole-frame L) in Marble and Warp than Ocean.
+5. *Also found:* Ink Glow Depth's flicker swings depend on the palette (dense-128, Punchy): Ocean 2.33/s, Violet 2.42, but Neon 2.58, Aurora 2.75, Gold 2.50 (step 0.126), Ivory 2.83, Ember / Cold / Black 2.67 — over the 2.5 gate; bright accents make Glow's hits jump more. Silk's 1-frame step 0.62–0.77 is its deliberate drop inversion cut (flash-guarded, a known issue since 1.0, every palette alike). Sumi's palette tint is effectively invisible (content chroma 0.006–0.009). City / Ocean backdrops keep fixed colours (warm windows, teal sea): Ocean is 15% off-palette in City.
+
 # Ink smoothness fix (spawn pops, jagged lines, frame pacing) — done (awaiting review)
 
 ## Summary

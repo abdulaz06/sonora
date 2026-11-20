@@ -1,13 +1,25 @@
 /**
- * Colour system — curated dark, cinematic palettes, duotones, a custom hue,
- * and Auto Drift (a slow, near-imperceptible hue rotation applied on top of
- * whatever palette is active).
+ * Colour system: nine curated palettes, a custom hue, and Auto Drift (a slow
+ * hue rotation applied on top of whatever palette is active).
  *
- * Every palette has five ink slots (bg, primary, secondary, accent, highlight)
- * plus `paper`, the background used by light (ink-on-paper) variants. Styles
- * should read `getResolved()` for ready-to-upload RGB; classic styles still
- * use `getPalette()` / `getRingColors*()`.
+ * Every palette has five slots (bg, primary, secondary, accent, highlight)
+ * plus `paper`, the background used by light (ink-on-paper) variants. Slots
+ * are defined in OKLCH (perceptual lightness, chroma, hue) and converted to
+ * sRGB with gamut mapping by chroma reduction (see oklch.ts). Styles read
+ * `getResolved()` for ready-to-upload RGB.
+ *
+ * Design rules (DOCS/16 §8, measured with the palette matrix):
+ *  - analogous core: primary and secondary about 20-60° apart, so blends in
+ *    every style (additive strands, Voyage's stone) stay saturated;
+ *  - one contrasting accent that works as a small detail and as Ink's large
+ *    second ink;
+ *  - highlight: a lighter version of the core, warm cores shifted toward
+ *    yellow, cool cores toward cyan;
+ *  - high chroma, primary lightness matched across palettes (exposure and
+ *    flicker behave the same), dark palette-tinted background, bone paper.
  */
+
+import { maxChroma, mixOklch, oklchToSrgb, srgbToOklab, oklabToOklch, type OKLCH } from './oklch';
 
 // ── Tuning ──────────────────────────────────────────────────────
 /** Default Auto Drift period: one full hue cycle (s). */
@@ -16,30 +28,31 @@ export const MIN_DRIFT_PERIOD_S = 60;
 export const MAX_DRIFT_PERIOD_S = 600;
 /** Palette crossfade speed (1 / seconds). */
 const TRANSITION_SPEED = 0.35;
-/** Brand bone, the base for paper backgrounds. */
-const BONE: HSL = { h: 36, s: 0.22, l: 0.9 };
-
-export interface HSL {
-  h: number; // 0-360
-  s: number; // 0-1
-  l: number; // 0-1
-}
+/** Brand bone, the base for paper backgrounds (OKLCH of the old HSL 36/0.22/0.9). */
+const BONE: OKLCH = [0.9285, 0.0103, 78.28];
+/** Hue-dependent lightness: how far a colour moves toward its hue's gamut
+ * cusp (yellow and cyan are brightest at full chroma, blue darkest), and the
+ * limits, so a turned or custom palette never goes olive or dull. */
+const CUSP_PULL = 0.3;
+const LIFT_MIN = -0.06;
+const LIFT_MAX = 0.12;
+/** Lightness the hue lift is measured from. */
+const LIFT_BASE = 0.6;
 
 export type RGB = [number, number, number];
 
 export interface Palette {
   name: string;
-  /** CSS preview colour for the picker UI. */
+  /** Picker swatch colours (CSS): the core and the accent. */
   preview: string;
-  /** Duotone palettes keep every ink slot on (nearly) one hue. */
-  duotone: boolean;
-  bg: HSL;
-  primary: HSL;
-  secondary: HSL;
-  accent: HSL;
-  highlight: HSL;
+  previewAccent: string;
+  bg: OKLCH;
+  primary: OKLCH;
+  secondary: OKLCH;
+  accent: OKLCH;
+  highlight: OKLCH;
   /** Paper background for light variants. */
-  paper: HSL;
+  paper: OKLCH;
 }
 
 export interface ResolvedPalette {
@@ -49,111 +62,137 @@ export interface ResolvedPalette {
   secondary: RGB;
   accent: RGB;
   highlight: RGB;
-  duotone: boolean;
 }
 
-const h = (hh: number, s: number, l: number): HSL => ({ h: hh, s, l });
+const css = (c: OKLCH): string => {
+  const [r, g, b] = oklchToSrgb(c);
+  return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
+};
 
-function duo(name: string, preview: string, hue: number, sat: number, light = 0.56): Palette {
-  return {
-    name, preview, duotone: true,
-    bg: h(hue, sat * 0.35, 0.025),
-    primary: h(hue, sat, light),
-    secondary: h(hue + 6, sat * 0.95, light * 0.62),
-    accent: h(hue - 8, sat * 0.9, Math.min(0.82, light + 0.18)),
-    highlight: h(hue - 4, sat * 0.55, 0.88),
-    paper: h(hue, Math.min(0.2, sat * 0.18), 0.9),
-  };
+function pal(name: string, bg: OKLCH, primary: OKLCH, secondary: OKLCH, accent: OKLCH, highlight: OKLCH, paper: OKLCH = BONE): Palette {
+  return { name, preview: css(primary), previewAccent: css(accent), bg, primary, secondary, accent, highlight, paper };
 }
 
-// ── Preset palettes ─────────────────────────────────────────────
-// The first seven keep the exact hues and order of v0.1 so saved choices and
-// names mean the same thing ("Ember" is the v0.1 Ember). Flow Ink maps them
-// as: ink A = primary, ink B = accent, sparkle = highlight.
-const legacy = (name: string, preview: string, bg: HSL, primary: HSL, secondary: HSL, accent: HSL, highlight: HSL): Palette =>
-  ({ name, preview, duotone: false, bg, primary, secondary, accent, highlight, paper: BONE });
-
+// ── Preset palettes (keys 1-9) ──────────────────────────────────
+// Ocean, Ember, Neon, Crimson and Violet are v0.1's colours exactly (their
+// old HSL values converted to OKLCH). Ink maps ink A = primary, ink B =
+// accent, sparkle = highlight.
 export const PALETTES: Palette[] = [
-  legacy('Ocean', '#3b82f6', h(240, 0.3, 0.04), h(220, 0.7, 0.55), h(260, 0.5, 0.45), h(180, 0.6, 0.5), h(200, 0.8, 0.7)),
-  legacy('Aurora', '#22c55e', h(270, 0.2, 0.04), h(150, 0.6, 0.5), h(280, 0.5, 0.5), h(60, 0.7, 0.55), h(180, 0.7, 0.65)),
-  legacy('Ember', '#f97316', h(10, 0.3, 0.04), h(15, 0.8, 0.5), h(35, 0.7, 0.45), h(350, 0.6, 0.45), h(45, 0.9, 0.6)),
-  legacy('Neon', '#d946ef', h(260, 0.25, 0.03), h(300, 0.8, 0.55), h(180, 0.9, 0.5), h(60, 0.95, 0.55), h(330, 0.85, 0.65)),
-  legacy('Crimson', '#e11d48', h(350, 0.3, 0.04), h(350, 0.8, 0.5), h(15, 0.65, 0.5), h(320, 0.7, 0.55), h(5, 0.85, 0.65)),
-  legacy('Gold', '#f59e0b', h(30, 0.3, 0.04), h(42, 0.85, 0.55), h(25, 0.75, 0.48), h(55, 0.9, 0.6), h(50, 0.95, 0.72)),
-  legacy('Violet', '#8b5cf6', h(270, 0.25, 0.04), h(270, 0.7, 0.55), h(300, 0.5, 0.45), h(240, 0.6, 0.55), h(280, 0.75, 0.7)),
-  duo('Ember / Black', '#f07a1a', 24, 0.92, 0.55),
-  duo('Ivory / Black', '#e6dccb', 38, 0.28, 0.82),
-  duo('Cold / Black', '#4f8fe6', 214, 0.78, 0.56),
-  duo('Crimson / Black', '#d8263f', 352, 0.82, 0.48),
+  pal('Ocean', [0.1329, 0.0141, 284.31], [0.5716, 0.1737, 262.35], [0.4569, 0.1735, 293.7], [0.7702, 0.1213, 194.93], [0.7925, 0.0987, 231.59]),
+  pal('Aurora', [0.14, 0.02, 200], [0.7, 0.15, 165], [0.65, 0.115, 195], [0.6, 0.2, 300], [0.88, 0.12, 170]),
+  pal('Ember', [0.142, 0.0098, 33.14], [0.6259, 0.1978, 36.83], [0.6548, 0.1307, 69.52], [0.522, 0.1732, 16.58], [0.8471, 0.1549, 89.45]),
+  pal('Neon', [0.1249, 0.0104, 301.7], [0.6685, 0.2799, 328.16], [0.8714, 0.1478, 194.78], [0.9519, 0.2028, 109.7], [0.687, 0.1997, 352.66]),
+  pal('Crimson', [0.1391, 0.0118, 6.31], [0.5907, 0.2277, 21.33], [0.6084, 0.1667, 38.18], [0.6267, 0.2212, 344.54], [0.6832, 0.174, 27.75]),
+  pal('Solar', [0.15, 0.02, 60], [0.76, 0.165, 70], [0.68, 0.19, 48], [0.62, 0.21, 10], [0.92, 0.12, 90]),
+  pal('Violet', [0.1387, 0.0122, 308.25], [0.5475, 0.2295, 301.97], [0.5541, 0.1989, 327.85], [0.4896, 0.2058, 275.67], [0.7023, 0.1775, 313.42]),
+  pal('Sunset', [0.14, 0.025, 330], [0.64, 0.24, 355], [0.55, 0.24, 315], [0.72, 0.18, 55], [0.86, 0.09, 50]),
+  pal('Acid', [0.14, 0.025, 150], [0.76, 0.22, 145], [0.84, 0.2, 122], [0.62, 0.27, 335], [0.94, 0.14, 115]),
 ];
+
+/** Picker swatch (CSS background): the core with a corner of the accent, two flat areas. */
+export function swatchCss(p: Palette): string {
+  return `linear-gradient(135deg, ${p.preview} 62%, ${p.previewAccent} 62%)`;
+}
+
+/** Index of a preset by name (settings migrate by name), or -1. */
+export function paletteIndexByName(name: string): number {
+  return PALETTES.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
+}
 
 // ── Helpers ─────────────────────────────────────────────────────
 function wrapHue(x: number): number {
   return ((x % 360) + 360) % 360;
 }
 
-function lerpHSL(a: HSL, b: HSL, t: number): HSL {
-  let dh = b.h - a.h;
+/** Lightness at which each hue reaches its largest chroma (5° table). */
+const CUSP_L: number[] = (() => {
+  const out: number[] = [];
+  for (let h = 0; h < 360; h += 5) {
+    let bestL = 0.5, bestC = 0;
+    for (let l = 0.3; l <= 0.98; l += 0.01) {
+      const c = maxChroma(l, h);
+      if (c > bestC) { bestC = c; bestL = l; }
+    }
+    out.push(bestL);
+  }
+  return out;
+})();
+
+function cuspL(h: number): number {
+  const x = wrapHue(h) / 5, i = Math.floor(x) % CUSP_L.length, f = x - Math.floor(x);
+  return CUSP_L[i] + (CUSP_L[(i + 1) % CUSP_L.length] - CUSP_L[i]) * f;
+}
+
+/** Extra lightness a colour of hue h needs to stay vivid (yellows, cyans up; blues down). */
+export function hueLift(h: number): number {
+  return Math.max(LIFT_MIN, Math.min(LIFT_MAX, CUSP_PULL * (cuspL(h) - LIFT_BASE)));
+}
+
+function vivid(l: number, h: number, cMax: number, share: number): OKLCH {
+  const L = l + hueLift(h);
+  return [L, Math.min(cMax, maxChroma(L, h) * share), wrapHue(h)];
+}
+
+/** Turn a palette's hues by dh (Auto Drift), keeping each colour vivid: the
+ * chromatic slots follow the hue lift so a blue palette turned to yellow
+ * brightens instead of going olive. Paper takes only a whisper of the turn. */
+function shiftPalette(p: Palette, dh: number): Palette {
+  if (dh === 0) return p;
+  const s = (c: OKLCH, lift: boolean): OKLCH => {
+    const h = wrapHue(c[2] + dh);
+    return [lift ? c[0] + hueLift(h) - hueLift(c[2]) : c[0], c[1], h];
+  };
+  return {
+    ...p,
+    bg: s(p.bg, false), primary: s(p.primary, true), secondary: s(p.secondary, true), accent: s(p.accent, true),
+    highlight: s(p.highlight, false), paper: [p.paper[0], p.paper[1], wrapHue(p.paper[2] + dh * 0.15)],
+  };
+}
+
+/** Coordinated palette from a single hue (custom picker): the same structure
+ * as the presets, an analogous core (+35°), a split-complementary accent
+ * (+150°) and a lighter highlight leaning toward yellow (warm) or cyan (cool). */
+export function paletteFromHue(hue: number): Palette {
+  const h = wrapHue(hue);
+  const dist = (a: number, b: number): number => Math.abs(((a - b + 540) % 360) - 180);
+  const target = dist(h, 95) < dist(h, 195) ? 95 : 195;
+  let dh = target - h;
   if (dh > 180) dh -= 360;
   if (dh < -180) dh += 360;
-  return { h: wrapHue(a.h + dh * t), s: a.s + (b.s - a.s) * t, l: a.l + (b.l - a.l) * t };
+  const hh = h + Math.sign(dh) * Math.min(15, Math.abs(dh));
+  const primary = vivid(0.62, h, 0.22, 0.95);
+  const secondary = vivid(0.55, h + 35, 0.2, 0.9);
+  const accent = vivid(0.66, h + 150, 0.2, 0.9);
+  const highlight: OKLCH = [0.88, Math.min(0.12, maxChroma(0.88, hh) * 0.9), wrapHue(hh)];
+  return pal('Custom', [0.14, 0.02, h], primary, secondary, accent, highlight);
 }
 
 function lerpPalette(a: Palette, b: Palette, t: number): Palette {
+  const m = (x: OKLCH, y: OKLCH): OKLCH => {
+    // A near-grey end has no meaningful hue: take the other end's.
+    const xx: OKLCH = x[1] < 0.02 ? [x[0], x[1], y[2]] : x;
+    const yy: OKLCH = y[1] < 0.02 ? [y[0], y[1], x[2]] : y;
+    return mixOklch(xx, yy, t);
+  };
   return {
     name: t < 0.5 ? a.name : b.name,
     preview: t < 0.5 ? a.preview : b.preview,
-    duotone: t < 0.5 ? a.duotone : b.duotone,
-    bg: lerpHSL(a.bg, b.bg, t),
-    primary: lerpHSL(a.primary, b.primary, t),
-    secondary: lerpHSL(a.secondary, b.secondary, t),
-    accent: lerpHSL(a.accent, b.accent, t),
-    highlight: lerpHSL(a.highlight, b.highlight, t),
-    paper: lerpHSL(a.paper, b.paper, t),
+    previewAccent: t < 0.5 ? a.previewAccent : b.previewAccent,
+    bg: m(a.bg, b.bg), primary: m(a.primary, b.primary), secondary: m(a.secondary, b.secondary),
+    accent: m(a.accent, b.accent), highlight: m(a.highlight, b.highlight), paper: m(a.paper, b.paper),
   };
 }
 
-function shiftPalette(p: Palette, dh: number): Palette {
-  if (dh === 0) return p;
-  const s = (c: HSL): HSL => ({ h: wrapHue(c.h + dh), s: c.s, l: c.l });
-  // Paper only takes a whisper of the drift so it stays "paper".
+export function resolvePalette(p: Palette): ResolvedPalette {
   return {
-    ...p,
-    bg: s(p.bg), primary: s(p.primary), secondary: s(p.secondary), accent: s(p.accent),
-    highlight: s(p.highlight), paper: { ...p.paper, h: wrapHue(p.paper.h + dh * 0.15) },
+    bg: oklchToSrgb(p.bg), paper: oklchToSrgb(p.paper), primary: oklchToSrgb(p.primary),
+    secondary: oklchToSrgb(p.secondary), accent: oklchToSrgb(p.accent), highlight: oklchToSrgb(p.highlight),
   };
 }
 
-/** Coordinated palette from a single hue (custom picker). */
-export function paletteFromHue(hue: number): Palette {
-  const hh = wrapHue(hue);
-  return {
-    name: 'Custom',
-    preview: `hsl(${hh.toFixed(0)}, 70%, 52%)`,
-    duotone: false,
-    bg: h(hh, 0.3, 0.028),
-    primary: h(hh, 0.72, 0.5),
-    secondary: h(hh + 28, 0.55, 0.36),
-    accent: h(hh - 24, 0.65, 0.56),
-    highlight: h(hh, 0.5, 0.86),
-    paper: BONE,
-  };
-}
-
-export function hslToRgb(hsl: HSL): RGB {
-  const hh = wrapHue(hsl.h);
-  const { s, l } = hsl;
-  const c = (1 - Math.abs(2 * l - 1)) * s;
-  const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
-  const m = l - c / 2;
-  let r = 0, g = 0, b = 0;
-  if (hh < 60) { r = c; g = x; }
-  else if (hh < 120) { r = x; g = c; }
-  else if (hh < 180) { g = c; b = x; }
-  else if (hh < 240) { g = x; b = c; }
-  else if (hh < 300) { r = x; b = c; }
-  else { r = c; b = x; }
-  return [r + m, g + m, b + m];
+/** sRGB → OKLCH (classic styles derive ring colours from the resolved primary). */
+function toOklch(c: RGB): OKLCH {
+  return oklabToOklch(srgbToOklab(c));
 }
 
 // ── Engine ──────────────────────────────────────────────────────
@@ -166,7 +205,6 @@ export class ColorEngine {
   private driftPeriod = DEFAULT_DRIFT_PERIOD_S;
   private driftPhase = 0; // degrees
   private resolved: ResolvedPalette;
-  private fromResolved: ResolvedPalette;
   private current: Palette;
   /** Harness only: a palette given as ready RGB, shown instead of the presets. */
   private override: ResolvedPalette | null = null;
@@ -176,7 +214,6 @@ export class ColorEngine {
     this.to = PALETTES[0];
     this.current = PALETTES[0];
     this.resolved = resolvePalette(PALETTES[0]);
-    this.fromResolved = this.resolved;
   }
 
   get paletteIndex(): number { return this._paletteIndex; }
@@ -190,7 +227,6 @@ export class ColorEngine {
     const idx = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
     if (idx === this._paletteIndex && this.progress >= 1) return;
     this._paletteIndex = idx;
-    this.fromResolved = this.resolved;
     this.from = this.basePalette();
     this.to = PALETTES[idx];
     this.progress = immediate ? 1 : 0;
@@ -199,7 +235,6 @@ export class ColorEngine {
 
   setCustomHue(hue: number): void {
     this._paletteIndex = -1;
-    this.fromResolved = this.resolved;
     this.from = this.basePalette();
     this.to = paletteFromHue(hue);
     this.progress = 0.85;
@@ -220,63 +255,46 @@ export class ColorEngine {
   update(dt: number): void {
     if (this.progress < 1) this.progress = Math.min(1, this.progress + TRANSITION_SPEED * dt);
     if (this.autoDrift) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
+    // The crossfade runs in OKLCH along the shorter hue arc (basePalette):
+    // chroma never dips through grey, as an RGB crossfade between distant hues does.
     this.current = shiftPalette(this.basePalette(), this.driftDegrees);
-    // Crossfade in RGB (an HSL crossfade sweeps through unrelated hues).
-    const target = resolvePalette(shiftPalette(this.to, this.driftDegrees));
-    this.resolved = this.progress >= 1 ? target : lerpResolved(this.fromResolved, target, smoothT(this.progress));
-    if (this.override) this.resolved = this.override;
+    this.resolved = this.override ?? resolvePalette(this.current);
   }
 
   /** Active palette (with transition and Auto Drift applied). */
   getPalette(): Palette { return this.current; }
 
-  /** Active palette as linear-ish RGB triples, ready for uniforms. */
+  /** Active palette as RGB triples, ready for uniforms. */
   getResolved(): ResolvedPalette { return this.resolved; }
 
   private basePalette(): Palette {
-    return this.progress >= 1 ? this.to : lerpPalette(this.from, this.to, this.progress);
+    return this.progress >= 1 ? this.to : lerpPalette(this.from, this.to, smoothT(this.progress));
   }
 
   /** Inner / middle / outer gradient from the primary colour (classic styles). */
   getRingColors(): [RGB, RGB, RGB] {
-    const base = this.current.primary;
-    const inner: HSL = { h: base.h - 10, s: base.s * 0.9, l: Math.min(0.75, base.l + 0.15) };
-    const outer: HSL = { h: base.h + 15, s: base.s * 0.85, l: Math.max(0.2, base.l - 0.12) };
-    return [hslToRgb(inner), hslToRgb(base), hslToRgb(outer)];
+    const [inner, mid, outer] = this.ringEnds();
+    return [oklchToSrgb(inner), oklchToSrgb(mid), oklchToSrgb(outer)];
   }
 
   getRingColorsN(count: number): RGB[] {
-    const base = this.current.primary;
-    if (count <= 1) return [hslToRgb(base)];
-    const inner: HSL = { h: wrapHue(base.h - 10), s: base.s * 0.9, l: Math.min(0.75, base.l + 0.15) };
-    const outer: HSL = { h: wrapHue(base.h + 15), s: base.s * 0.85, l: Math.max(0.2, base.l - 0.12) };
+    const [inner, mid, outer] = this.ringEnds();
+    if (count <= 1) return [oklchToSrgb(mid)];
     const out: RGB[] = new Array(count);
-    for (let i = 0; i < count; i++) out[i] = hslToRgb(lerpHSL(inner, outer, i / (count - 1)));
+    for (let i = 0; i < count; i++) out[i] = oklchToSrgb(mixOklch(inner, outer, i / (count - 1)));
     return out;
+  }
+
+  private ringEnds(): [OKLCH, OKLCH, OKLCH] {
+    const base = toOklch(this.resolved.primary);
+    return [
+      [Math.min(0.85, base[0] + 0.1), base[1] * 0.9, wrapHue(base[2] - 10)],
+      base,
+      [Math.max(0.3, base[0] - 0.1), base[1] * 0.85, wrapHue(base[2] + 15)],
+    ];
   }
 }
 
 function smoothT(t: number): number {
   return t * t * (3 - 2 * t);
-}
-
-function lerpResolved(a: ResolvedPalette, b: ResolvedPalette, t: number): ResolvedPalette {
-  const l = (x: RGB, y: RGB): RGB => [x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t];
-  return {
-    bg: l(a.bg, b.bg), paper: l(a.paper, b.paper), primary: l(a.primary, b.primary),
-    secondary: l(a.secondary, b.secondary), accent: l(a.accent, b.accent), highlight: l(a.highlight, b.highlight),
-    duotone: t < 0.5 ? a.duotone : b.duotone,
-  };
-}
-
-export function resolvePalette(p: Palette): ResolvedPalette {
-  return {
-    bg: hslToRgb(p.bg),
-    paper: hslToRgb(p.paper),
-    primary: hslToRgb(p.primary),
-    secondary: hslToRgb(p.secondary),
-    accent: hslToRgb(p.accent),
-    highlight: hslToRgb(p.highlight),
-    duotone: p.duotone,
-  };
 }
