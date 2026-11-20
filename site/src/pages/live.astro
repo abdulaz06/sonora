@@ -1,0 +1,121 @@
+---
+import Base from '../layouts/Base.astro';
+import Lockup from '../components/Lockup.astro';
+import { mediaFor } from '../../../src/app/catalog';
+import { release, metaLabel } from '../lib/release';
+const title = 'try sonora live — in your browser';
+const description = 'The sonora engine in your browser: play the demo, drop an audio file, use the microphone, or share a tab’s sound. Nothing is uploaded; the analysis runs on your device.';
+const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-marble'].map((n) => ({ n, ...mediaFor(n) }));
+---
+<Base title={title} description={description} path="/live" og="/og/live.jpg" ogAlt="Silk, threads of light, with the sonora lockup and the words try it live" page="live" htmlClass="live-page" nav={false}>
+  <style is:global>
+    html.live-page, html.live-page body { height: 100%; overflow: hidden; background: #08080a; }
+    #canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    .lv-strip {
+      position: fixed; z-index: 2400; left: 50%; top: 18px; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 0; border: 1px solid var(--b12); background: rgba(8, 8, 10, 0.86);
+      font-family: var(--f-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--b62);
+      transition: opacity 400ms var(--ease);
+    }
+    .lv-strip > * { padding: 9px 12px; border-right: 1px solid var(--b12); white-space: nowrap; }
+    .lv-strip > *:last-child { border-right: 0; }
+    .lv-strip a { color: var(--bone); }
+    .lv-strip a:hover { background: rgba(236, 231, 223, 0.08); }
+    body.lv-visual .lv-strip { opacity: 0; pointer-events: none; }
+    body.lv-visual.lv-chrome .lv-strip { opacity: 0; }
+    @media (max-width: 900px) { .lv-strip .hide-md { display: none; } }
+
+    .lv-sheet { position: fixed; inset: 0; z-index: 2600; display: none; align-items: center; justify-content: center; background: rgba(8, 8, 10, 0.72); padding: 24px; }
+    .lv-sheet.open { display: flex; }
+    .lv-card { width: min(640px, 100%); background: var(--night); border: 1px solid var(--b12); }
+    .lv-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--b12); }
+    .lv-head .x { width: 32px; height: 32px; display: grid; place-items: center; color: var(--b62); }
+    .lv-head .x:hover { color: var(--bone); }
+    .lv-title { padding: 22px 20px 18px; }
+    .lv-title .h2 { font-size: clamp(26px, 2.3vw, 38px); }
+    .lv-opt { display: grid; grid-template-columns: 200px 1fr; gap: 16px; width: 100%; text-align: left; padding: 16px 20px; border-top: 1px solid var(--b12); color: var(--b62); transition: background-color 140ms var(--ease); }
+    .lv-opt:hover { background: rgba(236, 231, 223, 0.06); }
+    .lv-opt b { font-family: var(--f-mono); font-size: 11.5px; font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bone); display: flex; gap: 10px; align-items: center; }
+    .lv-opt b svg { width: 14px; height: 14px; flex: none; }
+    .lv-opt span { font-size: 14px; line-height: 1.5; }
+    .lv-opt[disabled] { opacity: 0.45; pointer-events: none; }
+    .lv-note { padding: 14px 20px; border-top: 1px solid var(--b12); font-size: 13px; color: var(--b62); display: none; }
+    .lv-note.show { display: block; color: var(--bone); background: rgba(236, 231, 223, 0.06); }
+    .lv-foot { padding: 14px 20px 18px; border-top: 1px solid var(--b12); display: grid; gap: 6px; }
+    .lv-drop { position: fixed; inset: 0; z-index: 2700; display: none; align-items: center; justify-content: center; background: rgba(8, 8, 10, 0.82); }
+    body.lv-dragging .lv-drop { display: flex; }
+    @media (max-width: 600px) { .lv-opt { grid-template-columns: 1fr; gap: 6px; } }
+
+    .lv-fallback { display: none; position: fixed; inset: 0; overflow: auto; background: var(--night); z-index: 3000; }
+    html.lv-static .lv-fallback { display: block; }
+    html.lv-static #canvas, html.lv-static .lv-strip { display: none; }
+    .lv-fb-in { max-width: 1200px; margin: 0 auto; padding: clamp(28px, 6vh, 72px) var(--gutter); }
+    .lv-fb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 36px; }
+    .lv-fb-grid figure { margin: 0; border: 1px solid var(--b12); }
+    .lv-fb-grid video, .lv-fb-grid img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+    .lv-fb-grid figcaption { padding: 8px 10px; }
+    @media (max-width: 700px) { .lv-fb-grid { grid-template-columns: 1fr 1fr; } }
+  </style>
+
+  <script is:inline>
+    (function () {
+      var phone = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820;
+      var gl2 = false;
+      try { var c = document.createElement('canvas'); gl2 = !!c.getContext('webgl2') && !!c.getContext('webgl2').getExtension('EXT_color_buffer_float'); } catch (e) {}
+      if (/[?&]nowebgl/.test(location.search)) gl2 = false;
+      if (phone || !gl2) {
+        document.documentElement.classList.add('lv-static');
+        document.documentElement.dataset.why = phone ? 'phone' : 'webgl';
+      }
+    })();
+  </script>
+
+  <h1 class="vh">Try sonora live in your browser</h1>
+  <canvas id="canvas" aria-label="sonora, live visual"></canvas>
+
+  <div class="lv-strip" id="lv-strip">
+    <a href="/" aria-label="Back to the sonora home page">← home</a>
+    <span class="hide-md">nothing is uploaded</span>
+    <a href={release.url} data-dl title="The desktop app reads your system audio directly">Download for Windows</a>
+  </div>
+
+  <div class="lv-sheet open" id="lv-sheet" role="dialog" aria-modal="true" aria-labelledby="lv-h">
+    <div class="lv-card">
+      <div class="lv-head"><span class="label bone">try it live</span><button class="x" type="button" data-close aria-label="Close"><svg viewBox="0 0 12 12" width="12" height="12"><path d="M1 1l10 10M11 1 1 11" stroke="currentColor" stroke-width="1.3"/></svg></button></div>
+      <div class="lv-title"><h2 class="h2" id="lv-h">what should sonora listen to?</h2></div>
+      <button class="lv-opt" type="button" data-src="demo"><b><svg viewBox="0 0 14 14"><path d="M3 2v10l9-5z" fill="currentColor"/></svg>The demo track</b><span>An original 73-second piece made for sonora, with sound. Builds, drops, a breakdown.</span></button>
+      <button class="lv-opt" type="button" data-src="file"><b><svg viewBox="0 0 14 14"><path d="M7 1v8M3.5 5.5 7 9l3.5-3.5M1.5 12.5h11" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>An audio file</b><span>Pick one, or drop it anywhere on the page: mp3, wav, ogg, m4a, flac.</span></button>
+      <button class="lv-opt" type="button" data-src="mic"><b><svg viewBox="0 0 14 14"><rect x="5" y="1" width="4" height="8" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M2.5 7a4.5 4.5 0 0 0 9 0M7 11.5V13" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>Microphone</b><span>Music playing in the room, or a line-in on your sound card.</span></button>
+      <button class="lv-opt" type="button" data-src="tab"><b><svg viewBox="0 0 14 14"><rect x="1" y="2.5" width="12" height="9" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M1 5h12" stroke="currentColor" stroke-width="1.3"/></svg>A browser tab</b><span data-tab-line>Share another tab’s sound to visualise Spotify Web, YouTube or SoundCloud playing there. In the picker choose the tab and keep “Also share tab audio” on. Chrome and Edge on desktop.</span></button>
+      <p class="lv-note" id="lv-note" role="status" aria-live="polite"></p>
+      <div class="lv-foot">
+        <p class="micro">nothing is uploaded: the analysis runs on your device, in WebAssembly.</p>
+        <p class="micro">the desktop app reads your system audio directly, no sharing needed. <a class="bone" href={release.url} data-dl>download for windows →</a></p>
+      </div>
+    </div>
+  </div>
+  <div class="lv-drop" aria-hidden="true"><p class="h2">drop audio to play</p></div>
+
+  <section class="lv-fallback" aria-labelledby="fb-h">
+    <div class="lv-fb-in">
+      <a href="/" aria-label="sonora, home"><Lockup class="hero-lockup" title="sonora" /></a>
+      <h2 class="h1" id="fb-h" style="margin-top:28px;max-width:14em" data-fb-title>the live engine needs a desktop browser.</h2>
+      <p class="lede" style="margin-top:18px" data-fb-body>On a phone the visuals would run hot and drain the battery, so here they are as recordings from the engine. Open this page on a computer with Chrome, Edge or Firefox to play your own music through it.</p>
+      <p style="margin-top:26px;display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn--primary" href={release.url} data-dl>Download for Windows</a><a class="btn" href="/">Back to sonora</a></p>
+      <p class="micro" style="margin-top:12px" data-dl-meta>{metaLabel(release)}</p>
+      <div class="lv-fb-grid">
+        {loops.map((l) => (
+          <figure>
+            <video muted loop playsinline autoplay preload="metadata" poster={l.stillSmall} aria-label={`${l.n.replace('-', ' ')}, recorded from the engine`}>{l.loop && <source src={l.loop} type="video/webm" />}</video>
+            <figcaption class="micro">{l.n.replace('-', ' · ')}</figcaption>
+          </figure>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <script>
+    import { bootLive } from '../live/main';
+    void bootLive();
+  </script>
+</Base>

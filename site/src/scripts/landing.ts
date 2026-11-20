@@ -248,6 +248,12 @@ async function startDemo(sections: LiveSection[]): Promise<void> {
   // Hero: warm the fluid up behind the poster, then fade the engine in.
   st.show(HERO_SCENE, true);
   await st.warm(HERO_START_S, HERO_WARM_S);
+  // ?poster: hand the warmed-up frame to scripts/poster.mjs (the hero poster is this exact frame).
+  if (/[?&]poster/.test(location.search)) {
+    st.renderer.step(1 / 30);
+    (window as unknown as { __poster?: string }).__poster = st.renderer.canvas.toDataURL('image/png');
+    return;
+  }
   // Voyage compiles later, while nothing live is on screen (or while its own
   // section shows the loop). Until then its section plays the loop.
   let voyageState: 'cold' | 'warming' | 'ready' = 'cold';

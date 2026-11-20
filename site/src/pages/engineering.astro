@@ -1,0 +1,258 @@
+---
+import Base from '../layouts/Base.astro';
+import Footer from '../components/Footer.astro';
+import demo from '../generated/demo.json';
+import { GITHUB_URL } from '../../site.config.mjs';
+
+const title = 'how sonora works — the engineering story';
+const description = 'Turning sound into musical signals, one Rust crate compiled to native and WebAssembly, GPU fluids, particles and raymarched fractals, and the harness that checks every frame is in time.';
+const dur = demo.seconds;
+const ev = (demo.events as { type: string; t: number }[]).filter((e) => e.type !== 'bigHit')
+  .map((e, i, all) => ({ ...e, row: i > 0 && e.t - all[i - 1].t < 8 ? 1 : 0 }));
+const secs = (demo.sections as [string, number, number][]).filter(([n]) => n !== 'silence');
+const W = 1000;
+const x = (t: number): number => (t / dur) * W;
+const toc = [
+  ['problem', 'the problem'], ['analysis', 'analysis'], ['mapping', 'the mapping layer'], ['events', 'events'], ['crate', 'one crate, two targets'],
+  ['rendering', 'rendering'], ['harness', 'the harness'], ['ink', 'the ink investigation'], ['colour', 'colour'], ['site', 'this website'], ['limits', 'limitations'],
+];
+---
+<Base title={title} description={description} path="/engineering" og="/og/engineering.jpg" ogAlt="Marble ink at 60 and 165 frames per second, before and after the fix, with the sonora lockup" page="engineering">
+  <style>
+    .eng-hero { padding: clamp(120px, 20vh, 220px) 0 clamp(40px, 7vh, 80px); border-bottom: var(--line); }
+    .eng-hero .h1 { max-width: 13em; font-size: clamp(42px, 5.6vw, 104px); }
+    .eng-hero .lede { margin-top: 28px; max-width: 40em; }
+    .facts { display: grid; grid-template-columns: repeat(5, 1fr); border: var(--line); margin-top: clamp(40px, 6vh, 64px); }
+    .facts > div { padding: 18px; border-right: var(--line); }
+    .facts > div:last-child { border-right: 0; }
+    .facts .v { font-family: var(--f-display); font-weight: 600; font-size: clamp(26px, 2.4vw, 42px); letter-spacing: -0.03em; color: var(--bone); line-height: 1; margin-bottom: 10px; }
+    .eng { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: clamp(32px, 5vw, 96px); padding: clamp(48px, 8vh, 96px) 0 0; }
+    .toc { position: sticky; top: 96px; align-self: start; display: grid; gap: 10px; }
+    .toc a { color: var(--b62); }
+    .toc a:hover { color: var(--bone); }
+    article { max-width: 760px; }
+    article section { padding-bottom: clamp(56px, 9vh, 104px); }
+    article h2 { margin: 10px 0 24px; }
+    article h3 { margin: 36px 0 12px; }
+    article p { margin: 0 0 18px; color: var(--b75); }
+    article p strong, article li strong { color: var(--bone); font-weight: 600; }
+    article ul { margin: 0 0 18px; padding-left: 0; list-style: none; display: grid; gap: 10px; }
+    article li { padding-left: 22px; position: relative; color: var(--b75); }
+    article li::before { content: ''; position: absolute; left: 0; top: 0.72em; width: 10px; height: 1px; background: var(--b40); }
+    article code { font-family: var(--f-mono); font-size: 0.86em; color: var(--bone); background: rgba(236, 231, 223, 0.07); padding: 1px 5px; }
+    .wide { width: min(100vw - 2 * var(--gutter), 1200px); margin: 30px 0 34px; }
+    figure { margin: 30px 0 34px; }
+    figure img, figure svg { width: 100%; height: auto; border: var(--line); background: #000; }
+    figcaption { margin-top: 12px; }
+    .tbl { width: 100%; border-collapse: collapse; margin: 22px 0 28px; font-size: var(--t-small); }
+    .tbl th, .tbl td { text-align: left; padding: 10px 12px; border-bottom: var(--line); vertical-align: top; }
+    .tbl th { font-family: var(--f-mono); font-size: var(--t-micro); font-weight: 500; letter-spacing: 0.12em; text-transform: uppercase; color: var(--b62); }
+    .tbl td { color: var(--b75); }
+    .tbl td:first-child { color: var(--bone); white-space: nowrap; }
+    .tbl-wrap { overflow-x: auto; }
+    .pull { border-left: 1px solid var(--bone); padding: 4px 0 4px 20px; margin: 28px 0; font-family: var(--f-display); font-weight: 600; font-size: clamp(20px, 1.7vw, 28px); letter-spacing: -0.02em; line-height: 1.25; color: var(--bone); }
+    @media (max-width: 1000px) {
+      .eng { grid-template-columns: 1fr; }
+      .toc { position: static; grid-template-columns: repeat(2, 1fr); }
+      .facts { grid-template-columns: repeat(2, 1fr); }
+      .facts > div { border-bottom: var(--line); }
+      .wide { width: 100%; }
+    }
+  </style>
+
+  <main id="main" class="solid">
+    <header class="eng-hero">
+      <div class="wrap">
+        <p class="kicker label"><span class="n">engineering</span><span class="line"></span>case study</p>
+        <h1 class="h1">how sonora hears a song and paints it in time.</h1>
+        <p class="lede">sonora is a Windows music visualizer: it listens to whatever the PC plays and draws it live. Making that feel musical, instead of a meter that twitches with the volume, took an analysis layer that thinks in musical signals, a renderer that reacts on the frame of the hit, and a test harness that refuses to call anything done until it can measure it. This is how each part works, with the numbers from the project’s own logs.</p>
+        <div class="facts">
+          <div><div class="v">60</div><p class="micro">analysis frames per second of audio</p></div>
+          <div><div class="v">1</div><p class="micro">rust crate, native and webassembly</p></div>
+          <div><div class="v">≥ 90%</div><p class="micro">of kicks visibly answered, every look</p></div>
+          <div><div class="v">1.2–3.1 ms</div><p class="micro">frame cost at 1080p, laptop gpu</p></div>
+          <div><div class="v">0</div><p class="micro">bytes of audio leave the machine</p></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="eng">
+        <nav class="toc micro" aria-label="On this page">
+          {toc.map(([id, label], i) => <a href={`#${id}`}>{String(i + 1).padStart(2, '0')} · {label}</a>)}
+        </nav>
+        <article>
+          <section id="problem">
+            <p class="label">01 · the problem</p>
+            <h2 class="h2">raw fft looks dead.</h2>
+            <p>The obvious music visualizer takes an FFT of the audio and draws the magnitudes: bars, rings, a waveform. It works on a four-on-the-floor house track for about ten seconds. Then you notice that the picture only ever does one thing, and only when the kick hits.</p>
+            <p>The reasons are measurable. On a loud modern master the band energies sit near their ceiling all the time, so “bigger when louder” barely moves. The high bands carry about a hundredth of the bass band’s energy, so anything driven by hats or vocals never fires. And a magnitude has no idea where it is in the song: a breakdown and an intro look the same, and a drop is just a louder frame.</p>
+            <p class="pull">The fix is not better drawing. It is a layer between the FFT and the visuals that turns sound into a few signals a designer can actually use.</p>
+          </section>
+
+          <section id="analysis">
+            <p class="label">02 · analysis</p>
+            <h2 class="h2">from samples to features, sixty times a second.</h2>
+            <p>The analysis is a platform-free Rust crate, <code>sonora-dsp</code>. Mono samples go into a 4096-point FFT with a hop of one sixtieth of a second of audio (the hop is derived from the sample rate, so 44.1 and 48 kHz both give exactly 60 frames per second of audio time). Each frame produces seven bands from sub-bass to air, spectral shape, onsets, and a beat.</p>
+            <ul>
+              <li><strong>Per-band adaptive normalisation.</strong> Each band is divided by its own slowly decaying running peak (30 s half-life) with an absolute floor. Hats and vocals finally register next to the bass, and a quiet song moves as much as a loud one.</li>
+              <li><strong>Beat tracking.</strong> Autocorrelation of a smoothed onset function with a log-Gaussian tempo prior around 120 BPM, and a phase that runs freely and is pulled toward onset peaks like a phase-locked loop instead of being reset. It locks the 124 BPM test track exactly; a 140 BPM half-time track reads as 70 in its drop, which is a fair reading of half time.</li>
+            </ul>
+          </section>
+
+          <section id="mapping">
+            <p class="label">03 · the mapping layer</p>
+            <h2 class="h2">four signals on three timescales.</h2>
+            <p>Styles never read the FFT. They read the mapping layer: a handful of signals, each with a job and a timescale, so that slow things stay slow and accents stay sharp.</p>
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>signal</th><th>timescale</th><th>what it does</th></tr></thead>
+              <tbody>
+                <tr><td>fade in / out</td><td>macro · rises in ~3.3 s, falls in ~6.7 s</td><td>The scene’s silence gate. A stopped track fades the picture instead of cutting it.</td></tr>
+                <tr><td>intensity</td><td>macro · 4 s attack, 6 s release</td><td>How much is going on: loudness against the track’s own recent peak, motion density, active bands. Sets size, density, speed.</td></tr>
+                <tr><td>presence × 7</td><td>meso · 200 ms attack, 1.5 s release</td><td>Sustained activity per band: a held bass line, a dense mid. Shapes ongoing motion without pulsing on every transient.</td></tr>
+                <tr><td>hits × 7</td><td>micro · 80 ms decay</td><td>Transients per band: the kick, the snare, the hat. The frame-accurate accents.</td></tr>
+              </tbody>
+            </table></div>
+            <p>One rule came out of a flicker bug: <strong>responsiveness drives motion, never brightness</strong>. At “Punchy”, the fast follower passed frame-to-frame noise from real music into anything that set brightness, and Ink strobed. Now the Responsiveness setting only scales motion (kick strength, pushes, punches), while brightness and density read a fixed, slower follower (120 ms attack, 700 ms release), and hit brightening has fixed headroom per style.</p>
+          </section>
+
+          <section id="events">
+            <p class="label">04 · events</p>
+            <h2 class="h2">drops, builds and track changes.</h2>
+            <p>On top of the signals, an event layer names what is happening: <strong>build</strong>, <strong>drop</strong>, <strong>breakdown</strong>, <strong>big hit</strong> and <strong>track change</strong>. It runs once per analysis frame (not per rendered frame), so for the same audio it gives the same events on any machine and in any browser. Every state uses evidence integrators with separate enter and exit levels, so nothing flickers on and off.</p>
+            <ul>
+              <li>A <strong>drop</strong> is a sharp jump in loudness and low end within 0.9 s, but only when something armed it: a build, a short gap inside the music, or a long stretch without kick. Then it can’t fire again for 10 s.</li>
+              <li>A <strong>build</strong> is rising tension held for two seconds: the mid level climbing over four seconds with the highs, or highs without bass.</li>
+              <li>A <strong>track change</strong> is at least 1.5 s of silence followed by sound, or a real one from the Windows media session when a player reports it.</li>
+            </ul>
+            <figure class="wide">
+              <svg viewBox={`0 0 ${W} 176`} role="img" aria-label="The website's demo track: sections and the events the event layer found">
+                <rect width={W} height="176" fill="#08080A" />
+                {secs.map(([n, a, b], i) => (
+                  <g>
+                     <rect x={x(a)} y="82" width={x(b) - x(a)} height="40" fill="#ECE7DF" fill-opacity={n.startsWith('drop') ? 0.22 : n.startsWith('build') ? 0.12 : 0.05} />
+                    <line x1={x(a)} x2={x(a)} y1="82" y2="122" stroke="#ECE7DF" stroke-opacity=".25" />
+                    <text x={x(a) + 6} y="138" fill="#ECE7DF" fill-opacity=".55" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="1">{(i === 4 ? 'break' : n).toUpperCase()}</text>
+                  </g>
+                ))}
+                {ev.map((e) => (
+                  <g>
+                    <line x1={x(e.t)} x2={x(e.t)} y1={e.row ? 52 : 26} y2="122" stroke="#ECE7DF" stroke-width="1.5" />
+                    <text x={x(e.t) + 5} y={e.row ? 48 : 22} fill="#ECE7DF" font-family="IBM Plex Mono, monospace" font-size="10" letter-spacing="1">{e.type === 'trackChange' ? 'TRACK' : e.type.toUpperCase()}</text>
+                    <text x={x(e.t) + 5} y={e.row ? 64 : 38} fill="#ECE7DF" fill-opacity=".5" font-family="IBM Plex Mono, monospace" font-size="9">{e.t.toFixed(1)}s</text>
+                  </g>
+                ))}
+                <text x="0" y="166" fill="#ECE7DF" fill-opacity=".4" font-family="IBM Plex Mono, monospace" font-size="9">0:00</text>
+                <text x={W} y="166" text-anchor="end" fill="#ECE7DF" fill-opacity=".4" font-family="IBM Plex Mono, monospace" font-size="9">{Math.floor(dur / 60)}:{String(Math.round(dur % 60)).padStart(2, '0')}</text>
+              </svg>
+              <figcaption class="micro">The demo track on this site, in steady looping playback: generator sections below, events the event layer found above. The early “breakdown” is honest output: a calm intro after a full song reads as one.</figcaption>
+            </figure>
+          </section>
+
+          <section id="crate">
+            <p class="label">05 · one crate, two targets</p>
+            <h2 class="h2">the same frames on the desktop and in a browser.</h2>
+            <p>The desktop app feeds the crate from WASAPI loopback (through <code>cpal</code>), so it hears whatever Windows plays without a virtual cable. The same crate compiles to WebAssembly with <code>wasm-bindgen</code> (about 316 KB) and runs in an AudioWorklet pipeline in the browser. Frames cross the boundary as JSON produced by the same <code>serde_json</code> as the desktop’s event payload, so the shape is identical by construction.</p>
+            <p>A parity check runs the native build and the WebAssembly build over the same track and compares every field of every frame. The only differences are single rounding quanta of 0.001, from MSVC’s and WebAssembly’s maths libraries disagreeing in the last digit. That is what makes the browser a faithful test bench: the verification harness, the media pipeline, the live page and this site all see what the app sees.</p>
+            <p>The desktop side also had to survive real hardware: plugging speakers into a jack could re-route the endpoint without changing its name, and WASAPI loopback delivers no packets during silence. The capture now reopens itself after three seconds without samples, and analyses silence at the normal rate after 120 ms, so the picture decays instead of freezing.</p>
+          </section>
+
+          <section id="rendering">
+            <p class="label">06 · rendering</p>
+            <h2 class="h2">raw webgl 2, one technique per style.</h2>
+            <p>The renderer is TypeScript and raw WebGL 2, no engine. Every style gets the mapping signals, this frame’s events, a world camera, the resolved palette and a quality level, and draws into a float scene target. A shared post pass adds threshold mip bloom, a hue-preserving tonemap (the brightest channel is tonemapped and the colour scaled with it, so saturated colours above 1.0 stay coloured instead of going white), slow auto exposure, grain and vignette.</p>
+            <h3 class="h3">ink</h3>
+            <p>Ink started as textbook stable fluids: semi-Lagrangian advection and a pressure projection on a periodic grid. It looked good and was badly out of time. Measured, only 9% of kicks produced a visible change: the analysis caught 95–100% of them within ~30 ms, but an incompressible solver takes hundreds of milliseconds to turn a splat into motion, and the pressure projection deletes a radial splat outright (it is pure divergence).</p>
+            <p>The Ink that shipped keeps the flow and drops the physics. Velocity is a curl-noise field; ink is advected softly in fixed 1/60 s steps, and between steps the display samples the ink along the flow, so motion is smooth at any refresh. Dye stores palette slots rather than colours, so a palette change recolours ink already on screen. Each hit lands as a seed on the frame of the kick and spreads to full size over 50–100 ms, carried by a CPU copy of the same curl field so it enters the flow instead of popping in.</p>
+            <h3 class="h3">silk, wisp, warp</h3>
+            <p>One GPU particle engine, its state in RGBA32F textures written with multiple render targets, drives three styles. <strong>Silk</strong> pulls up to millions of points into threads that accumulate additively into density; its Depth view lays the simulation on the camera’s ground plane and gives each particle a height. <strong>Wisp</strong> is three flame agents shedding smoke rings on the bass, over a lit ground or down an endless tunnel with its own chase camera. <strong>Warp</strong> streaks stars past at a speed that follows the song’s intensity, slows to 10% in breakdowns and jumps on drops.</p>
+            <h3 class="h3">voyage</h3>
+            <p>A raymarched Mandelbox (scale 2.9, chosen after measuring the free space inside candidate scales). A JavaScript copy of the distance estimator lays waypoints ahead of the camera so every point of the path keeps at least a quarter of the preferred clearance, and the camera rides a Catmull-Rom spline through them. The march runs at half resolution with a Halton jitter; a resolve pass reprojects the previous frame through the hit depth and clamps it to the current neighbourhood. Brightening is accepted immediately, so bass lands on the hit frame. The world never moves on beats; the camera does.</p>
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>style · look</th><th>technique</th><th>frame cost</th></tr></thead>
+              <tbody>
+                <tr><td>ink · glow · depth</td><td>curl-noise flow, fixed-step advection, 3D height field</td><td>1.50 ms</td></tr>
+                <tr><td>silk · flat</td><td>GPU particles, additive density</td><td>2.92 ms</td></tr>
+                <tr><td>wisp · flat / ground / tunnel</td><td>flame agents, smoke particles</td><td>1.35 / 1.47 / 1.24 ms</td></tr>
+                <tr><td>warp</td><td>GPU particle streaks</td><td>1.43 ms</td></tr>
+                <tr><td>voyage · void / city / ocean</td><td>raymarched Mandelbox, temporal upscale</td><td>2.98 / 3.13 / 3.03 ms</td></tr>
+              </tbody>
+            </table></div>
+            <p class="micro">Synced frame cost (GPU and CPU), 1080p, Medium quality, median of three interleaved rounds at the drop of the house test track, on a laptop AMD Radeon RX 7700S.</p>
+            <p>Every deliberate flash (Silk’s inversion cut, drop flares) asks a WCAG 2.3.1 flash guard first: at most three per second, otherwise the effect is skipped. Independently, a GPU luminance probe counts large swings in what actually reached the screen, from any source, and damps the frame when more than three happen in a second.</p>
+          </section>
+
+          <section id="harness">
+            <p class="label">07 · the harness</p>
+            <h2 class="h2">nothing is done until it’s measured.</h2>
+            <p>A verification harness renders any style in a real browser on the real GPU, in audio time with a fixed step, against procedurally generated test tracks whose kicks are known to the sample. Because time is simulated, every render is deterministic and independent of the machine’s frame rate. It gates:</p>
+            <div class="tbl-wrap"><table class="tbl">
+              <thead><tr><th>gate</th><th>what it measures</th><th>bar</th></tr></thead>
+              <tbody>
+                <tr><td>sync</td><td>per known kick, the largest luminance change within 133 ms, whole screen and per region</td><td>≥ 90% of kicks seen</td></tr>
+                <tr><td>flicker</td><td>large brightness swings either way on a loud, dense track at Punchy</td><td>≤ 2.5 swings/s, one-frame step ≤ 0.12, ≤ 6% blown out</td></tr>
+                <tr><td>motion</td><td>share of frame-to-frame change in fine detail vs large shapes; background stillness</td><td>fine share ≤ 45%, background step p99 ≤ 0.02</td></tr>
+                <tr><td>pop score</td><td>new ink not explained by the flow or a brightness change, per 1/60 s</td><td>compared before / after</td></tr>
+                <tr><td>dt sweep</td><td>the same seeded passage at 60, 120 and 165 fps must agree</td><td>sync, flicker, motion, pop within tolerance</td></tr>
+                <tr><td>pacing</td><td>real-time frame intervals on the actual display</td><td>no held frames</td></tr>
+              </tbody>
+            </table></div>
+            <p>Today Ink Glow sees 100% of kicks on both the house track and a real song, Marble 100 / 96%, Voyage 100%, Silk 91–96%. The same harness renders every thumbnail and loop in the app.</p>
+          </section>
+
+          <section id="ink">
+            <p class="label">08 · the ink investigation</p>
+            <h2 class="h2">four bugs that looked like one.</h2>
+            <p>After the 1.0 release, Ink felt wrong on the developer’s 165 Hz display in a way still frames couldn’t show: blobs “teleporting” in, lines that jagged and broke in fast flow, and a general stutter. The evidence was two 240 fps slow-motion phone recordings of the screen.</p>
+            <figure>
+              <img src="/eng/pop-evidence.webp" width="1400" height="131" alt="Six frames from a 240 fps slow-motion recording: a mint blob appears in empty space and reaches full size in about 21 ms" loading="lazy" decoding="async" />
+              <figcaption class="micro">Slow-motion evidence, 1/240 s per frame: a highlight blob grows from 0 to 4.3% of the frame in about 21 ms, in empty space.</figcaption>
+            </figure>
+            <p>Taking it apart one factor at a time found four separate causes:</p>
+            <ul>
+              <li><strong>Frame pacing.</strong> The frame cap defaulted to 60 on a 165 Hz display. No offered cap divided 165, so frames were held for 3-3-3-2 refreshes: judder. A real-time pacing check confirmed it (cap 60: alternating 3 and 2 refreshes per frame; match display: 0 held frames in 1319). The default is now “match display”, with caps that divide the measured refresh evenly.</li>
+              <li><strong>Frame-rate dependence.</strong> Five places assumed 60 fps. A hit landed over three <em>frames</em> (18 ms at 165 fps instead of 50); a one-frame push was 2.75× weaker; and the ink was resampled, and so blurred, once per rendered frame, roughly twice as much per second at 165 fps (Glow’s median kick brightening fell from 47% to 39%). Everything timed now runs in seconds, and advection runs in fixed steps.</li>
+              <li><strong>Spawn pops.</strong> Besides the frame-counted landing, a hit’s second and third shares landed at its original spot after the first had already flowed on. Pop score at 165 fps (p99): Glow 7.29 → 1.63, Marble 1.33 → 0.09, Sumi 4.79 → 1.92.</li>
+              <li><strong>Jagged lines.</strong> Of ten candidate factors (dye resolution, sharpening, three display filters, smoother sampling of the blurred field, advection scheme, grain, dither, veins), only Marble’s veins moved the numbers: a sine of the ink ratio packs several lines into one pixel where the flow stretches, and they alias into crawling saw-teeth. Veins thinner than a pixel now fade to their average tone (Marble Depth fine-detail change 11.2% → 5.6% with them off).</li>
+            </ul>
+            <figure class="wide">
+              <img src="/eng/marble-60-165.webp" width="1400" height="788" alt="Four renders of the same Marble passage: before the fix at 60 and 165 fps look different; after the fix they match" loading="lazy" decoding="async" />
+              <figcaption class="micro">The same seeded Marble passage. Top: before the fix, at 60 fps (as tuned) and 165 fps, visibly different. Bottom: after, at 60 and 165 fps (pixel difference 17.5 → 5.0).</figcaption>
+            </figure>
+          </section>
+
+          <section id="colour">
+            <p class="label">09 · colour</p>
+            <h2 class="h2">nine palettes, tuned in oklch.</h2>
+            <p>The 1.0 palettes were HSL colours, and a colour matrix (every palette × 19 style / look / view combinations × two tracks, measured per frame) showed what the eye suspected: Voyage’s stone was a fixed grey mixed with a tint, so every palette came out at 0.06–0.11 chroma there; palettes whose two core colours sit far apart on the wheel averaged to grey in RGB (Aurora was 57% grey in Voyage); dark yellows read olive; and HSL lightness made some palettes far brighter than others.</p>
+            <p>The 1.0.1 set is defined in OKLCH and checked by gates calibrated on the palettes people liked: content chroma, grey share, off-palette and olive share, exposure against Ocean, and colour separation. Voyage’s stone now blends the core colours without losing chroma (Ocean: chroma 0.055 → 0.094, grey 20 → 4%). Palette changes crossfade in OKLCH along the shorter hue arc: the old RGB crossfade dipped to chroma 0.008 between Ocean and Solar; the new one never goes below 0.103. A custom hue skips the two bands sRGB can’t make vivid (dark yellow becomes gold or lime, mid cyan becomes teal or azure).</p>
+            <figure>
+              <img src="/eng/voyage-palettes.webp" width="1000" height="844" alt="Voyage in three palettes before and after the colour work: greyed stone before, saturated after" loading="lazy" decoding="async" />
+              <figcaption class="micro">Voyage · Void in Ocean, Aurora and Ember: 1.0 (left) and 1.0.1 (right).</figcaption>
+            </figure>
+          </section>
+
+          <section id="site">
+            <p class="label">10 · this website</p>
+            <h2 class="h2">the real engine, without a microphone.</h2>
+            <p>The live sections of the home page run the actual renderer from the app’s source, not a video. The demo track was generated for the site, analysed by the WebAssembly build of the same crate at build time, and stored as a quantised frame stream: 23 signals, 8 or 16 bits each, about 153 KB for 73 seconds. The track is analysed twice in a row and the second pass kept, so the analyser’s adaptive state at the loop point is exactly what looping playback hears. The events found on the quantised frames match the unquantised ones.</p>
+            <p>One engine serves the whole page: a single fixed canvas that each section hands a scene as it scrolls into view, rendering only while a live section is on screen. Compiling Voyage’s raymarcher the first time blocks for about three seconds, so every style is first compiled in a Web Worker on an OffscreenCanvas while nothing live is showing; the GPU process caches the programs, and switching sections then takes milliseconds (Voyage: ~3 s → ~40 ms). Phones, low-power devices, browsers without WebGL 2 and reduced-motion settings get the pre-rendered loops or stills instead.</p>
+          </section>
+
+          <section id="limits">
+            <p class="label">11 · limitations</p>
+            <h2 class="h2">what it doesn’t do.</h2>
+            <ul>
+              <li><strong>The analysis is heuristic.</strong> Hits are band transients, not separated instruments; a low-band hit usually is a kick but isn’t proven to be one. Builds and drops are rules with hysteresis tuned on electronic music. The dense test track’s first drop, which has no gap before it, isn’t flagged as a drop.</li>
+              <li><strong>Capture is Windows-only.</strong> System audio comes from WASAPI loopback. In a browser the only ways in are a file, the microphone, or sharing a tab’s sound (Chrome and Edge).</li>
+              <li><strong>The installer isn’t code-signed yet</strong>, so Windows SmartScreen asks before the first run.</li>
+              <li><strong>Known gate misses.</strong> Wisp Flat’s fine-detail share is 48–50% against the 45% bar. Silk’s drop inversion cut is a deliberate, flash-guarded one-frame change of 0.64–0.77. Auto Drift on Neon, whose colours span a wide triad, fails the colour gates at 5 of 12 phases.</li>
+            </ul>
+            <p>The source, the decisions log and the harness are on <a class="link-arrow" href={GITHUB_URL}>GitHub</a>.</p>
+          </section>
+        </article>
+      </div>
+    </div>
+  </main>
+  <Footer />
+</Base>
