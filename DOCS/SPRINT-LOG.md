@@ -1,3 +1,22 @@
+# Website, live demo, trailer, hosting — in progress
+
+> Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
+> Site: `site/` (Astro, static). Review output: `verify/site/` (git-ignored). Trailer master: `local-media/` (git-ignored).
+
+## Checklist
+- [x] 0 Read CLAUDE.md, README, sprint log, decisions, DOCS/16 §8, brand, catalog, media manifest, web entry; attribution off in `.claude/settings.json`
+- [x] 1.1 `site/` Astro scaffold importing the engine from `../src` (no fork), brand tokens, self-hosted fonts
+- [x] 1.2 Demo track `demo-sonora` (generator), recorded frames via the WASM DSP (`site/scripts/prepare-demo.mjs`), Opus + AAC encodes
+- [x] 1.3 Landing: hero, signals board, five style sections, palettes, Set Mode, app, how it works, download/footer; one engine handed between sections; shader prewarm in a worker
+- [ ] 1.4 Hero poster rendered from the harness at the hero's start; app screenshots from `ui:shots`
+- [ ] 2 /live (the app shell in the browser: file / mic / tab), banners, fallbacks, permission advice
+- [ ] 3 /engineering (real numbers and images from the logs)
+- [ ] 4 Download: build-time release, client refresh, `/download` redirect; Vercel deploy Action; vercel.json
+- [ ] 5 Trailer (harness, 1080p60), web encode ≤ 5 MB, README GIF/WebP ≤ 3 MB, YouTube steps
+- [ ] 6 SEO: OG/Twitter images, favicon/icons, sitemap, robots, canonical
+- [ ] 7 Verify: Playwright shots (3 sizes × pages), scroll video, Lighthouse, pacing, reduced motion, no-WebGL, permission denial, links, app gates
+- [ ] 8 README + repo homepage; summary at the top of this section
+
 # Palette overhaul + 1.0.1 — shipped
 
 **Release:** https://github.com/abdulaz06/sonora/releases/tag/v1.0.1 — NSIS + MSI installers (unsigned), their updater signatures, and `latest.json` (version 1.0.1, both platform URLs on v1.0.1, signatures identical to the uploaded `.sig` files, signed with key EB16D8600B108A21 — the key and endpoint a 1.0.0 install checks, so "Check for updates" offers 1.0.1). Release and CI workflows green.
