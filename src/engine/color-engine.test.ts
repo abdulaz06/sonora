@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ColorEngine, PALETTES, paletteFromHue, resolvePalette, shadeOf, type RGB } from './color-engine';
+import { bandHue, ColorEngine, PALETTES, paletteFromHue, resolvePalette, shadeOf, type RGB } from './color-engine';
 import { oklabToOklch, srgbToOklab } from './oklch';
 
 /** v0.1 HSL → RGB, to prove the kept palettes did not move. */
@@ -46,6 +46,28 @@ describe('colour engine', () => {
     for (let h = 60; h <= 120; h += 5) {
       const sh = oklabToOklch(srgbToOklab(shadeOf(resolvePalette(paletteFromHue(h)).primary)));
       expect(sh[2] < 75 || sh[2] > 125 || sh[0] > 0.62, `hue ${h}: shade at ${sh[2].toFixed(0)}°`).toBe(true);
+    }
+  });
+
+  it('olive band: core hues cross it steeply but continuously; drift starts from the preset exactly', () => {
+    for (let h = 0; h < 360; h += 0.5) {
+      const d = Math.abs(bandHue(h + 0.5) - bandHue(h));
+      expect(Math.min(d, 360 - d), `at ${h}`).toBeLessThan(4);   // ≤ 7× the input step, never a jump
+    }
+    for (let h = 0; h < 360; h += 5) {
+      const p = paletteFromHue(h);
+      for (const c of [p.primary, p.secondary, p.accent]) {
+        expect(c[2] <= 73.01 || c[2] >= 124.99 || c[0] > 0.75, `hue ${h}: ${c.map((x) => x.toFixed(2))}`).toBe(true);
+      }
+    }
+    const e = new ColorEngine();
+    for (let i = 0; i < PALETTES.length; i++) {
+      e.setPalette(i, true);
+      e.setAutoDrift(true);
+      e.setDriftPhase(0);
+      e.update(0);
+      expect(e.getResolved().primary).toEqual(resolvePalette(PALETTES[i]).primary);
+      e.setAutoDrift(false);
     }
   });
 

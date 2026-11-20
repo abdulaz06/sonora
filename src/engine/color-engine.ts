@@ -44,6 +44,16 @@ const LIFT_BASE = 0.6;
 const SHADE_K = 0.55;
 const SHADE_TURN = 28;
 const SHADE_LIFT_L = 0.64;
+/** Olive band (OKLCH hue): a core colour (primary / secondary / accent) that
+ * a custom hue or Auto Drift puts here passes through it steeply, so it is
+ * gold (≤ OLIVE_BAND[0] + 3) or lime (≥ OLIVE_BAND[1] − 3) and never a dark
+ * yellow; light colours (highlights, Neon's yellow) are left alone. */
+const OLIVE_BAND: [number, number] = [70, 128];
+/** The steep middle of the band (input degrees). */
+const OLIVE_STEP = 8;
+/** Custom palettes: accent offset from the core (a ~150° accent added up to
+ * white with the core in Wisp's flames). */
+const ACCENT_OFFSET = 70;
 
 export type RGB = [number, number, number];
 
@@ -143,13 +153,41 @@ function vivid(l: number, h: number, cMax: number, share: number): OKLCH {
   return [L, Math.min(cMax, maxChroma(L, h) * share), wrapHue(h)];
 }
 
+function inBand(h: number): boolean {
+  const x = wrapHue(h);
+  return x > OLIVE_BAND[0] && x < OLIVE_BAND[1];
+}
+
+/** Hue through the olive band: identity outside it; inside, 3° of gold, a
+ * steep OLIVE_STEP-wide crossing, 3° of lime (continuous, so drift never
+ * jumps). `snap` (a still palette: the custom picker) skips the crossing. */
+export function bandHue(h: number, snap = false): number {
+  const x = wrapHue(h);
+  const [a, b] = OLIVE_BAND;
+  if (x <= a || x >= b) return x;
+  const mid = (a + b) / 2, s0 = mid - (snap ? 0 : OLIVE_STEP / 2), s1 = mid + (snap ? 0 : OLIVE_STEP / 2);
+  if (x < s0) return a + ((x - a) / (s0 - a)) * 3;
+  if (x >= s1) return b - 3 + ((x - s1) / (b - s1)) * 3;
+  return a + 3 + ((x - s0) / OLIVE_STEP) * (b - a - 6);
+}
+
+/** bandHue for a colour, faded out for light colours (a light yellow isn't olive). */
+function bandFor(c: OKLCH, h: number): number {
+  const w = 1 - smooth(0.75, 0.85, c[0]);
+  if (w <= 0) return wrapHue(h);
+  let d = bandHue(h) - wrapHue(h);
+  if (d > 180) d -= 360;
+  if (d < -180) d += 360;
+  return wrapHue(h + d * w);
+}
+
 /** Turn a palette's hues by dh (Auto Drift), keeping each colour vivid: the
  * chromatic slots follow the hue lift so a blue palette turned to yellow
  * brightens instead of going olive. Paper takes only a whisper of the turn. */
 function shiftPalette(p: Palette, dh: number): Palette {
   if (dh === 0) return p;
   const s = (c: OKLCH, lift: boolean): OKLCH => {
-    const h = wrapHue(c[2] + dh);
+    const h = lift ? bandFor(c, c[2] + dh) : wrapHue(c[2] + dh);
     return [lift ? c[0] + hueLift(h) - hueLift(c[2]) : c[0], c[1], h];
   };
   return {
@@ -160,10 +198,12 @@ function shiftPalette(p: Palette, dh: number): Palette {
 }
 
 /** Coordinated palette from a single hue (custom picker): the same structure
- * as the presets, an analogous core (+35°), a split-complementary accent
- * (+150°) and a lighter highlight leaning toward yellow (warm) or cyan (cool). */
+ * as the presets, an analogous core (secondary 35° away), a contrasting accent
+ * (70° the other way, or this way if that lands in the olive band) and a
+ * lighter highlight leaning toward yellow (warm) or cyan (cool). Core hues in
+ * the olive band become gold or lime (bandHue). */
 export function paletteFromHue(hue: number): Palette {
-  const h = wrapHue(hue);
+  const h = bandHue(hue, true);
   const dist = (a: number, b: number): number => Math.abs(((a - b + 540) % 360) - 180);
   const target = dist(h, 95) < dist(h, 195) ? 95 : 195;
   let dh = target - h;
@@ -171,8 +211,8 @@ export function paletteFromHue(hue: number): Palette {
   if (dh < -180) dh += 360;
   const hh = h + Math.sign(dh) * Math.min(15, Math.abs(dh));
   const primary = vivid(0.62, h, 0.22, 0.95);
-  const secondary = vivid(0.55, h + 35, 0.2, 0.9);
-  const accent = vivid(0.66, h + 150, 0.2, 0.9);
+  const secondary = vivid(0.55, bandHue(inBand(h + 35) && !inBand(h - 35) ? h - 35 : h + 35, true), 0.2, 0.9);
+  const accent = vivid(0.66, bandHue(inBand(h - ACCENT_OFFSET) ? h + ACCENT_OFFSET : h - ACCENT_OFFSET, true), 0.2, 0.9);
   const highlight: OKLCH = [0.88, Math.min(0.12, maxChroma(0.88, hh) * 0.9), wrapHue(hh)];
   return pal('Custom', [0.14, 0.02, h], primary, secondary, accent, highlight);
 }
