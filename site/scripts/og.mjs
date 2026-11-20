@@ -19,13 +19,17 @@ const b64 = (p) => readFileSync(p).toString('base64');
 const inter = b64(join(ROOT, 'src', 'assets', 'fonts', 'inter-latin-opsz-normal.woff2'));
 const mono = b64(join(ROOT, 'src', 'assets', 'fonts', 'ibm-plex-mono-latin-500-normal.woff2'));
 const browser = await chromium.launch({ channel: 'msedge', headless: true });
+// The YouTube thumbnail (1280×720) uses the same template; it stays local with the trailer master.
+const JOBS = [...Object.entries(PAGES).map(([name, p]) => ({ name, p, w: 1200, h: 630, out: join(SITE, 'public', 'og', `${name}.jpg`) })),
+  { name: 'live', p: { line: 'see your music.', sub: 'trailer · rendered live by the engine' }, w: 1280, h: 720, out: join(ROOT, 'local-media', 'youtube-thumbnail.jpg') }];
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 } });
-for (const [name, p] of Object.entries(PAGES)) {
+for (const { name, p, w, h, out } of JOBS) {
+  await page.setViewportSize({ width: w, height: h });
   const frame = b64(join(ROOT, 'verify', 'site', 'og-src', `${name}.jpg`));
   await page.setContent(`<!doctype html><html><head><style>
     @font-face { font-family: Inter; src: url(data:font/woff2;base64,${inter}) format('woff2-variations'); font-weight: 100 900; }
     @font-face { font-family: Mono; src: url(data:font/woff2;base64,${mono}) format('woff2'); font-weight: 500; }
-    html, body { margin: 0; width: 1200px; height: 630px; background: #08080A; overflow: hidden; }
+    html, body { margin: 0; width: ${w}px; height: ${h}px; background: #08080A; overflow: hidden; }
     .bg { position: absolute; inset: 0; background: url(data:image/jpeg;base64,${frame}) center / cover; }
     .card { position: absolute; left: 56px; bottom: 56px; background: #08080A; padding: 34px 38px 30px; border: 1px solid rgba(236,231,223,0.12); }
     .card svg { width: 300px; height: auto; display: block; }
@@ -33,7 +37,7 @@ for (const [name, p] of Object.entries(PAGES)) {
     .sub { font-family: Mono; font-weight: 500; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(236,231,223,0.62); margin-top: 18px; }
   </style></head><body><div class="bg"></div><div class="card">${lockup}<div class="line">${p.line}</div><div class="sub">${p.sub}</div></div></body></html>`);
   await page.waitForTimeout(300);
-  await page.screenshot({ path: join(SITE, 'public', 'og', `${name}.jpg`), type: 'jpeg', quality: 86 });
-  console.log(`og: ${name}`);
+  await page.screenshot({ path: out, type: 'jpeg', quality: 86 });
+  console.log(`og: ${out}`);
 }
 await browser.close();

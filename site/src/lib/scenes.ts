@@ -4,6 +4,7 @@
  */
 import type { StyleId } from '../../../src/styles/visual-style';
 import type { Scene } from './stage';
+import { mediaFor } from '../../../src/app/catalog';
 
 export interface Option { label: string; title: string; scene: Scene; media: string }
 export interface StyleScenes { groupLabel: string; options: Option[]; initial: number }
@@ -86,5 +87,17 @@ export const PREWARM: Required<Scene>[] = [
 export const PREWARM_FIRST = PREWARM.filter((s) => s.style !== 'voyage');
 export const PREWARM_LATER = PREWARM.filter((s) => s.style === 'voyage');
 
-/** Stills to show instead of a media name's own (Silk's hero still is its drop inversion: a white frame). */
-export const STILL_FOR: Record<string, string> = { silk: 'silk-view-flat' };
+/**
+ * Media for a fallback: the app's files (src/assets/media), except where the
+ * site has its own. Silk's app loop and still catch its drop inversion (white
+ * frames); the site's are cut from the trailer's pre-drop Silk shot.
+ */
+const SITE_MEDIA: Record<string, { still: string; loop: string }> = {
+  silk: { still: '/media/silk-still.webp', loop: '/media/silk-loop.webm' },
+};
+export function siteMedia(name: string): { still: string; stillSmall: string; loop?: string } {
+  const own = SITE_MEDIA[name];
+  if (own) return { still: own.still, stillSmall: own.still, loop: own.loop };
+  const m = mediaFor(name);
+  return { still: m.still, stillSmall: m.stillSmall ?? m.still, loop: m.loop };
+}

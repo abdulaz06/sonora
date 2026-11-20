@@ -14,10 +14,10 @@ import type { AudioFeatureFrame } from '../../../src/types/audio-frame';
 import type { SonoraEvent } from '../../../src/engine/events';
 import type { StyleId } from '../../../src/styles/visual-style';
 import { PALETTES } from '../../../src/engine/color-engine';
-import { describe, mediaFor } from '../../../src/app/catalog';
+import { describe } from '../../../src/app/catalog';
 import { DemoPlayer } from '../lib/demo-player';
 import { refreshDownloads } from '../lib/download';
-import { STILL_FOR, HERO_SCENE, HERO_START_S, HERO_WARM_S, PALETTE_HOLD_S, PALETTE_SCENE, PREWARM_FIRST, PREWARM_LATER, PREWARM_TIMEOUT_MS, SCENES } from '../lib/scenes';
+import { siteMedia, HERO_SCENE, HERO_START_S, HERO_WARM_S, PALETTE_HOLD_S, PALETTE_SCENE, PREWARM_FIRST, PREWARM_LATER, PREWARM_TIMEOUT_MS, SCENES } from '../lib/scenes';
 import type { Scene, Stage } from '../lib/stage';
 
 // ── Tuning ──────────────────────────────────────────────────────
@@ -122,8 +122,7 @@ function setupChipsStatic(): void {
 }
 
 function swapFallback(sec: HTMLElement, media: string): void {
-  const loop = mediaFor(media);
-  const m = STILL_FOR[media] ? { ...loop, ...(({ still, stillSmall }) => ({ still, stillSmall }))(mediaFor(STILL_FOR[media])) } : loop;
+  const m = siteMedia(media);
   const img = $<HTMLImageElement>('[data-fb-img]', sec);
   const video = $<HTMLVideoElement>('[data-fb-video]', sec);
   if (img && m.still) { img.removeAttribute('srcset'); img.src = m.still; }

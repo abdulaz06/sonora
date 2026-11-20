@@ -1,12 +1,11 @@
 ---
 import Base from '../layouts/Base.astro';
 import Lockup from '../components/Lockup.astro';
-import { mediaFor } from '../../../src/app/catalog';
 import { release, metaLabel } from '../lib/release';
-import { STILL_FOR } from '../lib/scenes';
+import { siteMedia } from '../lib/scenes';
 const title = 'try sonora live — in your browser';
 const description = 'The sonora engine in your browser: play the demo, drop an audio file, use the microphone, or share a tab’s sound. Nothing is uploaded; the analysis runs on your device.';
-const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-marble'].map((n) => ({ n, ...mediaFor(n), stillSmall: mediaFor(STILL_FOR[n] ?? n).stillSmall }));
+const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-marble'].map((n) => ({ n, ...siteMedia(n) }));
 ---
 <Base title={title} description={description} path="/live" og="/og/live.jpg" ogAlt="Wisp’s flames in the Neon palette, with the sonora lockup and the words try it live." page="live" htmlClass="live-page" nav={false}>
   <style is:global>
