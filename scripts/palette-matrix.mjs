@@ -81,6 +81,7 @@ function parseArgs(argv) {
     else if (a === '--no-metrics') o.metrics = false;
     else if (a === '--flicker') o.flicker = true;
     else if (a === '--clips') o.clips = true;
+    else if (a === '--debug') o.debug = JSON.parse(next());
     else if (a === '--drift-cycle') o.driftCycle = true;
   }
   return o;
@@ -125,7 +126,7 @@ async function renderOne(page, combo, pal, track, meta) {
   if (shots.every(([tag]) => existsSync(join(dir, `${track}-${tag}.png`)))) return;
   await page.reload();
   await page.waitForFunction(() => window.__sonora?.ready === true);
-  await page.evaluate((c) => window.__sonora.configure({ style: c.style, variant: c.variant, depth: c.depth, light: c.light ?? 'auto', quality: 'medium', drift: false }), combo);
+  await page.evaluate(([c, dbg]) => window.__sonora.configure({ style: c.style, variant: c.variant, depth: c.depth, light: c.light ?? 'auto', quality: 'medium', drift: false, debug: dbg }), [combo, opts.debug]);
   await page.evaluate((p) => window.__sonora.setPalette(p.def), pal);
   await page.evaluate((n) => window.__sonora.loadTrack(n), track);
   let t = 0;

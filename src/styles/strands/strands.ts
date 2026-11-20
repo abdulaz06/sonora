@@ -16,6 +16,7 @@
  * this engine and its shaders (`#define VARIANT 0 | 2 | 4`).
  */
 
+import { inkExp } from '../../engine/debug-flags';
 import { clamp01, createRng } from '../../engine/math';
 import { simplex2 } from '../../engine/noise';
 import type { SonoraEvent } from '../../engine/events';
@@ -59,6 +60,11 @@ const CFG: Record<StrandsKind, KindCfg> = {
   wisp: { count: 0.1, decay: 0.975, point: 1, gain: 0.02, display: 1.6 },
   warp: { count: 0.06, decay: 0.5, point: 1, gain: 0.75, display: 1 },
 };
+
+/** Wisp: share of hue-preserving smoke build-up (0 = per-channel, the 1.0 look).
+ * 0.5 halves the grey share; fully hue-preserving adds 3 points of fine-detail
+ * motion (saturated trails show more texture), half adds 2 (D70). */
+const SMOKE_HUE = 0.5;
 
 /** Silk: shockwave speed (world units/s) and lifetime (s). */
 const SHOCK_SPEED = 0.9;
@@ -314,6 +320,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
       u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
       u_light: false, u_gain: cfg.display * WISP_DEPTH_SMOKE, u_fade: ctx.fadeInOut, u_pulse: ctx.bassHits,
+      u_smoke_hue: inkExp('smokeHue', SMOKE_HUE),
       u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: 3,
     });
     drawQuad(gl, quadVAO);
@@ -623,7 +630,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
         u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
         u_light: kind === 'silk' ? silkLight : false, u_gain: cfg.display * (depth && kind === 'wisp' ? WISP_DEPTH_SMOKE : 1), u_fade: ctx.fadeInOut,
-        u_pulse: ctx.bassHits,
+        u_pulse: ctx.bassHits, u_smoke_hue: inkExp('smokeHue', SMOKE_HUE),
         u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: kind === 'wisp' ? agents.length : 0,
       });
       drawQuad(gl, quadVAO);

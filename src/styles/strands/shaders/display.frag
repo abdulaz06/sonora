@@ -11,6 +11,7 @@ uniform vec3 u_c0;   // primary
 uniform vec3 u_c1;   // secondary
 uniform vec3 u_c2;   // accent
 uniform vec3 u_c3;   // highlight
+uniform float u_smoke_hue;   // Wisp: share of hue-preserving smoke compression
 uniform int u_light;
 uniform float u_gain;
 uniform float u_fade;
@@ -61,12 +62,15 @@ void main() {
   }
 #elif VARIANT == 2
   // Wisp: coloured smoke trails, bright darting flames.
-  // Hue-preserving build-up: the brightest channel follows the same
-  // 1 - exp curve as before, the others keep their ratio to it (per-channel
-  // compression pulled dense trails of any saturated colour toward grey).
+  // Build-up keeps more of its hue: per-channel 1 - exp compression pulled
+  // dense trails of any saturated colour toward grey. hp compresses the
+  // brightest channel with the same curve and keeps the others' ratio to it;
+  // u_smoke_hue blends the two (SMOKE_HUE in strands.ts).
   vec3 sa = acc.rgb * u_gain;
   float sm = max(max(sa.r, sa.g), sa.b);
-  vec3 smoke = sm > 1e-5 ? sa * ((1.0 - exp(-sm)) / sm) : sa;
+  vec3 pc = 1.0 - exp(-sa);
+  vec3 hp = sm > 1e-5 ? sa * ((1.0 - exp(-sm)) / sm) : sa;
+  vec3 smoke = mix(pc, hp, u_smoke_hue);
   vec3 white = mix(vec3(1.0), u_c3, 0.25);
   float e = 1.0 + 0.35 * u_pulse;   // hits flare the trails on the frame
   col = u_bg * 0.5 + smoke * 1.15 * e;
