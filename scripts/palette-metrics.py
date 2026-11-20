@@ -12,7 +12,7 @@ Per frame, on the content pixels (lit pixels on dark looks, ink on paper looks):
   off     chroma-weighted share whose hue is far from every palette hue
           (and from the arcs between nearby palette hues): mixed into
           something the palette doesn't contain
-  olive   share of yellow-hued (85-125 deg) pixels darker than L 0.62
+  olive   share of yellow-hued (75-125 deg) pixels darker than L 0.62
   L, L95  mean / 95th percentile OKLab L of the content (perceived exposure)
   Lall    mean OKLab L of the whole frame
   sep     OKLab dE x100 between the two k-means clusters of the content
@@ -33,6 +33,7 @@ PAPER_DROP = 0.07     # content on paper looks: this much darker than the paper
 C_GREY = 0.04         # chroma below this reads as grey / white
 HUE_TOL = 30.0        # degrees from a palette hue still counts as on-palette
 ARC_MAX = 75.0        # palette hues this close blend along the arc between them
+OLIVE_H = (75, 125)  # dark yellows read olive from ~75 deg (Solar at 76 in Marble light, by eye)
 THUMB = (320, 180)
 
 # ── Colour maths ────────────────────────────────────────────────
@@ -151,7 +152,10 @@ def frame_metrics(path, pal, combo):
     off = off_palette(hc[col], hs, arcs)
     w = Cc[col]
     off_share = float((w * off).sum() / max(w.sum(), 1e-9)) if col.any() else 0.0
-    olive = (hc > 85) & (hc < 125) & (Lc < 0.62) & (Cc > 0.03)
+    # Dark yellows read olive: below L 0.62 from 95 deg, but toward amber only
+    # when darker (L 0.50 at 75 deg) — a medium gold reads gold, by eye.
+    lmax = 0.50 + 0.12 * np.clip((hc - OLIVE_H[0]) / 20.0, 0.0, 1.0)
+    olive = (hc > OLIVE_H[0]) & (hc < OLIVE_H[1]) & (Lc < lmax) & (Cc > 0.03)
     sub = lab[mask]
     if len(sub) > 6000:
         sub = sub[np.random.default_rng(1).choice(len(sub), 6000, replace=False)]

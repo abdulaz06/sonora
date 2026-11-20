@@ -38,6 +38,12 @@ const LIFT_MIN = -0.06;
 const LIFT_MAX = 0.12;
 /** Lightness the hue lift is measured from. */
 const LIFT_BASE = 0.6;
+/** Shade (the primary's dark tone, e.g. Marble on paper): the primary ×
+ * SHADE_K, and for yellows the hue turns up to SHADE_TURN° toward orange so
+ * dark gold reads amber-brown, never olive. */
+const SHADE_K = 0.55;
+const SHADE_TURN = 28;
+const SHADE_LIFT_L = 0.64;
 
 export type RGB = [number, number, number];
 
@@ -62,6 +68,8 @@ export interface ResolvedPalette {
   secondary: RGB;
   accent: RGB;
   highlight: RGB;
+  /** The primary's dark tone (derived, see SHADE_K). */
+  shade: RGB;
 }
 
 const css = (c: OKLCH): string => {
@@ -75,18 +83,20 @@ function pal(name: string, bg: OKLCH, primary: OKLCH, secondary: OKLCH, accent: 
 
 // ── Preset palettes (keys 1-9) ──────────────────────────────────
 // Ocean, Ember, Neon, Crimson and Violet are v0.1's colours exactly (their
-// old HSL values converted to OKLCH). Ink maps ink A = primary, ink B =
+// old HSL values converted to OKLCH); Neon's background is lifted from L 0.125
+// to 0.14 like the others' (Ink Glow Depth flicker swings 2.58 → 2.33/s, D67).
+// Aurora and Acid sit on a slightly lighter floor (0.16) for the same reason. Ink maps ink A = primary, ink B =
 // accent, sparkle = highlight.
 export const PALETTES: Palette[] = [
   pal('Ocean', [0.1329, 0.0141, 284.31], [0.5716, 0.1737, 262.35], [0.4569, 0.1735, 293.7], [0.7702, 0.1213, 194.93], [0.7925, 0.0987, 231.59]),
-  pal('Aurora', [0.14, 0.02, 200], [0.66, 0.16, 158], [0.62, 0.11, 195], [0.62, 0.22, 315], [0.88, 0.12, 170]),
+  pal('Aurora', [0.16, 0.022, 200], [0.66, 0.16, 158], [0.62, 0.11, 195], [0.62, 0.22, 315], [0.88, 0.12, 170]),
   pal('Ember', [0.142, 0.0098, 33.14], [0.6259, 0.1978, 36.83], [0.6548, 0.1307, 69.52], [0.522, 0.1732, 16.58], [0.8471, 0.1549, 89.45]),
-  pal('Neon', [0.1249, 0.0104, 301.7], [0.6685, 0.2799, 328.16], [0.8714, 0.1478, 194.78], [0.9519, 0.2028, 109.7], [0.687, 0.1997, 352.66]),
+  pal('Neon', [0.14, 0.012, 301.7], [0.6685, 0.2799, 328.16], [0.8714, 0.1478, 194.78], [0.9519, 0.2028, 109.7], [0.687, 0.1997, 352.66]),
   pal('Crimson', [0.1391, 0.0118, 6.31], [0.5907, 0.2277, 21.33], [0.6084, 0.1667, 38.18], [0.6267, 0.2212, 344.54], [0.6832, 0.174, 27.75]),
-  pal('Solar', [0.15, 0.02, 60], [0.69, 0.155, 76], [0.65, 0.17, 55], [0.62, 0.21, 10], [0.9, 0.14, 95]),
+  pal('Solar', [0.15, 0.02, 60], [0.68, 0.155, 68], [0.63, 0.18, 48], [0.66, 0.22, 355], [0.9, 0.13, 80]),
   pal('Violet', [0.1387, 0.0122, 308.25], [0.5475, 0.2295, 301.97], [0.5541, 0.1989, 327.85], [0.4896, 0.2058, 275.67], [0.7023, 0.1775, 313.42]),
   pal('Sunset', [0.14, 0.025, 330], [0.64, 0.24, 355], [0.55, 0.24, 315], [0.72, 0.18, 55], [0.86, 0.09, 50]),
-  pal('Acid', [0.14, 0.025, 150], [0.65, 0.21, 145], [0.74, 0.2, 132], [0.6, 0.24, 280], [0.86, 0.15, 165]),
+  pal('Acid', [0.16, 0.028, 150], [0.65, 0.21, 145], [0.74, 0.2, 132], [0.6, 0.24, 280], [0.86, 0.15, 165]),
 ];
 
 /** Picker swatch (CSS background): the core with a corner of the accent, two flat areas. */
@@ -184,10 +194,30 @@ function lerpPalette(a: Palette, b: Palette, t: number): Palette {
 }
 
 export function resolvePalette(p: Palette): ResolvedPalette {
+  const primary = oklchToSrgb(p.primary);
   return {
-    bg: oklchToSrgb(p.bg), paper: oklchToSrgb(p.paper), primary: oklchToSrgb(p.primary),
+    bg: oklchToSrgb(p.bg), paper: oklchToSrgb(p.paper), primary,
     secondary: oklchToSrgb(p.secondary), accent: oklchToSrgb(p.accent), highlight: oklchToSrgb(p.highlight),
+    shade: shadeOf(primary),
   };
+}
+
+/** Dark tone of a colour: × SHADE_K (exactly, outside the yellows). Golds
+ * (about 60-110°) turn toward orange at the same lightness; yellow-greens,
+ * which can't turn without passing through olive, stay lighter instead
+ * (olive is a dark yellow). Both blends are smooth, so Auto Drift never jumps. */
+export function shadeOf(c: RGB): RGB {
+  const d: RGB = [c[0] * SHADE_K, c[1] * SHADE_K, c[2] * SHADE_K];
+  const [l, ch, h] = toOklch(d);
+  const turn = smooth(55, 72, h) * (1 - smooth(95, 112, h));
+  const lift = smooth(85, 100, h) * (1 - smooth(125, 140, h));
+  if ((turn <= 0 && lift <= 0) || ch < 0.02) return d;
+  return oklchToSrgb([Math.max(l, l + (SHADE_LIFT_L - l) * lift), ch, h - SHADE_TURN * turn]);
+}
+
+function smooth(a: number, b: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
 }
 
 /** sRGB → OKLCH (classic styles derive ring colours from the resolved primary). */

@@ -36,7 +36,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = 5199;
+const PORT = Number(process.env.PALETTE_PORT || 5199);
 const DT = 1 / 60;
 
 /** Every style / look / view the app offers (classic styles excluded). */

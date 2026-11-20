@@ -5,14 +5,14 @@
    "chroma_min": 0.0785,
    "grey_max": 0.186,
    "off_max": 0.15,
-   "olive_max": 0.203,
+   "olive_max": 0.206,
    "sep_min": 9.0
   },
   "ink-glow-flat": {
    "chroma_min": 0.0759,
    "grey_max": 0.19,
    "off_max": 0.123,
-   "olive_max": 0.241,
+   "olive_max": 0.248,
    "sep_min": 8.6
   },
   "ink-marble-depth": {
@@ -89,28 +89,28 @@
    "chroma_min": 0.0522,
    "grey_max": 0.31,
    "off_max": 0.143,
-   "olive_max": 0.125,
+   "olive_max": 0.129,
    "sep_min": 21.6
   },
   "wisp-ground": {
    "chroma_min": 0.0508,
    "grey_max": 0.259,
    "off_max": 0.178,
-   "olive_max": 0.113,
+   "olive_max": 0.121,
    "sep_min": 21.4
   },
   "wisp-tunnel": {
    "chroma_min": 0.0528,
    "grey_max": 0.191,
    "off_max": 0.223,
-   "olive_max": 0.102,
+   "olive_max": 0.115,
    "sep_min": 23.0
   },
   "warp": {
    "chroma_min": 0.0934,
    "grey_max": 0.143,
    "off_max": 0.247,
-   "olive_max": 0.066,
+   "olive_max": 0.067,
    "sep_min": 11.1
   },
   "voyage-void": {
@@ -124,7 +124,7 @@
    "chroma_min": 0.0532,
    "grey_max": 0.232,
    "off_max": 0.25,
-   "olive_max": 0.092,
+   "olive_max": 0.094,
    "sep_min": 12.5
   },
   "voyage-ocean": {

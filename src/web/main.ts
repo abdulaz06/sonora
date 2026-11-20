@@ -16,7 +16,7 @@ import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
 import { createSourceUi, type SourceUi } from './source-ui';
 import { CAMERA_PRESETS } from '../engine/camera';
-import { PALETTES, resolvePalette, type ResolvedPalette } from '../engine/color-engine';
+import { PALETTES, resolvePalette, shadeOf, type ResolvedPalette } from '../engine/color-engine';
 import { presetsFor } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
 import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
@@ -394,7 +394,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
     palettes: () => PALETTES.map((p) => ({ name: p.name, resolved: resolvePalette(p) })),
     setPalette(p) {
       const ce = renderer.colorEngine;
-      ce.setOverride(p.resolved ?? null);
+      ce.setOverride(p.resolved ? { ...p.resolved, shade: p.resolved.shade ?? shadeOf(p.resolved.primary) } : null);
       if (p.index !== undefined) ce.setPalette(p.index, true);
       if (p.hue !== undefined) { ce.setCustomHue(p.hue); ce.update(10); }
       ce.setAutoDrift(p.driftDeg !== undefined);

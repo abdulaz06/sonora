@@ -63,7 +63,7 @@ export const PLAN = [
   { name: 'explain-drift-off', kind: 'explain', style: 'ink', look: 'glow', depth: false, track: D, candidates: [40], pick: 40, loop: 0, sizes: [640], palette: 0 },
 
   // ── Palettes, per style (swatch picker thumbnails) ──
-  ...['ink', 'silk', 'wisp', 'warp', 'voyage'].flatMap((s) => Array.from({ length: 11 }, (_, i) => ({
+  ...['ink', 'silk', 'wisp', 'warp', 'voyage'].flatMap((s) => Array.from({ length: 9 }, (_, i) => ({
     name: `pal-${s}-${i}`, kind: 'palette', style: s,
     look: { ink: 'glow', silk: 'silk', wisp: 'ground', warp: 'warp', voyage: 'void' }[s],
     depth: s === 'ink', track: H, candidates: [54], pick: 54, loop: 0, sizes: [480], palette: i, quality: 'medium', warmup: 8,

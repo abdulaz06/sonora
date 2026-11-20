@@ -572,6 +572,7 @@ export function createInkStyle(deps: StyleDeps): VisualStyle {
         gl.uniform3fv(u.u_ink_a, inkA);
         gl.uniform3fv(u.u_ink_b, inkB);
         gl.uniform3fv(u.u_spark, spark);
+        gl.uniform3fv(u.u_shade, pal.shade);
         gl.uniform1i(u.u_variant, vIdx);
         gl.uniform1i(u.u_light, light ? 1 : 0);
         gl.uniform1f(u.u_fade, ctx.fadeInOut);

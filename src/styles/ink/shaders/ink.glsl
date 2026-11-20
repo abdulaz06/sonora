@@ -13,6 +13,7 @@ uniform vec3 u_paper;
 uniform vec3 u_ink_a;
 uniform vec3 u_ink_b;
 uniform vec3 u_spark;
+uniform vec3 u_shade;         // the primary's dark tone (= ink A × 0.55; yellows turned toward orange)
 uniform int u_variant;        // 0 ink, 1 sumi, 2 marble
 uniform int u_light;          // 1 = ink on paper
 uniform float u_fade;
@@ -113,7 +114,7 @@ vec3 shadeInkBase(InkSample s, vec2 world, vec2 fragCoord, out float cover) {
     float fw = fwidth(field) * u_stip_aa;
     float stip = smoothstep(0.5 - 0.16 - fw, 0.5 + 0.16 + fw, field + n * 0.3 + (g - 0.5) * 0.12);
     vec3 bright = light ? mix(u_paper, u_ink_a * 0.9, 0.08) : u_ink_a;
-    vec3 dark = light ? u_ink_a * 0.55 : u_bg * 0.6;
+    vec3 dark = light ? u_shade : u_bg * 0.6;
     vec3 col = mix(dark, bright, stip);
     col = mix(col, light ? dark * 0.7 : bright * 1.25, veins * 0.6);
     // A high hit lights the marble already there, in its own colours (never

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ColorEngine, PALETTES, paletteFromHue, resolvePalette, type RGB } from './color-engine';
+import { ColorEngine, PALETTES, paletteFromHue, resolvePalette, shadeOf, type RGB } from './color-engine';
 import { oklabToOklch, srgbToOklab } from './oklch';
 
 /** v0.1 HSL → RGB, to prove the kept palettes did not move. */
@@ -35,6 +35,17 @@ describe('colour engine', () => {
       const r = resolvePalette(p);
       for (const c of Object.values(r)) for (const v of c) { expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1); }
       expect(chroma(r.primary), p.name).toBeGreaterThan(0.1);
+    }
+  });
+
+  it('shade: the primary × 0.55 outside the yellows; dark gold turns amber, never olive', () => {
+    for (const name of ['Ocean', 'Ember', 'Neon', 'Crimson', 'Violet']) {
+      const r = resolvePalette(PALETTES.find((p) => p.name === name)!);
+      r.primary.forEach((v, k) => expect(r.shade[k], name).toBeCloseTo(v * 0.55, 6));
+    }
+    for (let h = 60; h <= 120; h += 5) {
+      const sh = oklabToOklch(srgbToOklab(shadeOf(resolvePalette(paletteFromHue(h)).primary)));
+      expect(sh[2] < 75 || sh[2] > 125 || sh[0] > 0.62, `hue ${h}: shade at ${sh[2].toFixed(0)}°`).toBe(true);
     }
   });
 
