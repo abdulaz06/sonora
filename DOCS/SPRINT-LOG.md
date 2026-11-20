@@ -1,4 +1,6 @@
-# Palette overhaul + 1.0.1 — done (awaiting review; type "Ship it" to release)
+# Palette overhaul + 1.0.1 — shipped
+
+**Release:** https://github.com/abdulaz06/sonora/releases/tag/v1.0.1 — NSIS + MSI installers (unsigned), their updater signatures, and `latest.json` (version 1.0.1, both platform URLs on v1.0.1, signatures identical to the uploaded `.sig` files, signed with key EB16D8600B108A21 — the key and endpoint a 1.0.0 install checks, so "Check for updates" offers 1.0.1). Release and CI workflows green.
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Frames: `C:/Users/abdul/sonora-palette-frames/<set>/` (outside OneDrive, delete at the end); sheets + metrics: `verify/palettes/<set>/`.
@@ -107,7 +109,7 @@ Every palette keeps ≥ 90% of kicks seen in every look (lowest: Silk 91%, as in
 - [x] 5 Remove "Ink: previous behaviour" + legacy path, `../sonora-baseline` worktree; re-run Ink gates (no change)
 - [x] 6.1 Full gate run, review package `verify/palettes/review/` (sheets, before/after, Voyage, clips, Auto Drift cycle)
 - [x] 6.2 Desktop build runs; summary at the top of this section; stop and wait for "Ship it"
-- [ ] 6.3 (on "Ship it") 1.0.1 version bump, release notes, tag, release assets + latest.json checked
+- [x] 6.3 (on "Ship it") 1.0.1 version bump, release notes, tag, release assets + latest.json checked
 
 ## Notes
 
