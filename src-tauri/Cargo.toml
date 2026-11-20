@@ -1,6 +1,6 @@
 [package]
 name = "sonora"
-version = "1.0.0"
+version = "1.0.1"
 description = "Real-time generative music visualizer for Windows"
 authors = ["Abdul"]
 edition = "2021"
