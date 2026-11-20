@@ -51,7 +51,16 @@ const SHADE_LIFT_L = 0.64;
  * hue sits within 3° of either edge, with a steep BAND_STEP-wide crossing in
  * the middle (continuous, so drift never jumps). Light colours (highlights,
  * Neon's yellow) are left alone. */
-const BANDS: [number, number][] = [[70, 140], [172, 245]];
+const BANDS: [number, number][] = [[70, 140], [162, 245]];
+/** Auto Drift turns the whole palette rigidly and passes quickly through the
+ * turns where its primary or secondary would sit in this olive span (their
+ * blends would land on olive) or its primary in the cyan band (Marble draws
+ * the primary alone: a cyan one goes dull). A narrower olive span than the
+ * custom band's, so Acid's light lime secondary (132°) is allowed at rest. */
+const DRIFT_OLIVE: [number, number] = [70, 130];
+const DRIFT_CYAN: [number, number] = BANDS[1];
+/** Share of a forbidden stretch's width spent crossing it (phase degrees). */
+const DRIFT_CROSS = 0.12;
 /** The steep middle of a band (input degrees). */
 const BAND_STEP = 8;
 /** Custom palettes: accent offset from the core (a ~150° accent added up to
@@ -176,6 +185,13 @@ export function bandHue(h: number, snap = false): number {
   return x;
 }
 
+/** Does the shorter arc from hue a to hue b touch the olive band? */
+function arcHitsOlive(a: number, b: number): boolean {
+  const d = angDiff(b, a);
+  for (let i = 0; i <= 16; i++) if (inOlive(a + (d * i) / 16)) return true;
+  return false;
+}
+
 function angDiff(a: number, b: number): number {
   let d = wrapHue(a) - wrapHue(b);
   if (d > 180) d -= 360;
@@ -194,18 +210,67 @@ function bandShift(c: OKLCH, dh: number): number {
   return wrapHue(plain + angDiff(turned, plain) * w);
 }
 
-/** Turn a palette's hues by dh (Auto Drift), keeping each colour vivid: the
- * chromatic slots follow the hue lift so a blue palette turned to yellow
- * brightens instead of going olive. Paper takes only a whisper of the turn. */
-function shiftPalette(p: Palette, dh: number): Palette {
-  if (dh === 0) return p;
-  const s = (c: OKLCH, lift: boolean): OKLCH => {
-    const h = lift ? bandShift(c, dh) : wrapHue(c[2] + dh);
+/** Drift phase (0..360, uniform in time) → the hue turn actually applied:
+ * turns that put the core in a forbidden span (see DRIFT_OLIVE) are crossed
+ * in BAND_STEP degrees of phase, the rest stretched to fill the circle.
+ * Phase 0 is turn 0 (the palette exactly as chosen). */
+export function driftTurn(p: Palette, phase: number): number {
+  const P = p.primary[2], S = p.secondary[2];
+  // Forbidden turns as [start, length] on the circle, relative to turn 0.
+  const raw: [number, number][] = [
+    [wrapHue(DRIFT_OLIVE[0] - P), DRIFT_OLIVE[1] - DRIFT_OLIVE[0]],
+    [wrapHue(DRIFT_OLIVE[0] - S), DRIFT_OLIVE[1] - DRIFT_OLIVE[0]],
+    [wrapHue(DRIFT_CYAN[0] - P), DRIFT_CYAN[1] - DRIFT_CYAN[0]],
+  ];
+  // Unroll onto [0, 360) and merge overlaps (an interval may wrap past 360).
+  const iv: [number, number][] = [];
+  for (const [a, len] of raw) {
+    if (a + len > 360) { iv.push([a, 360]); iv.push([0, a + len - 360]); } else iv.push([a, a + len]);
+  }
+  iv.sort((x, y) => x[0] - y[0]);
+  const merged: [number, number][] = [];
+  for (const [a, b] of iv) {
+    const last = merged[merged.length - 1];
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b); else merged.push([a, b]);
+  }
+  // Turn 0 itself forbidden (shouldn't happen for a valid palette): turn plainly.
+  if (merged.some(([a, b]) => a <= 1e-9 && b > 1e-9 && !(a === 0 && b === 360)) || merged.length === 0) return wrapHue(phase);
+  // Each forbidden stretch is crossed in DRIFT_CROSS of its width (at least
+  // BAND_STEP degrees of phase): quick, never a jump.
+  const cross = merged.map(([a, b]) => Math.max(BAND_STEP, (b - a) * DRIFT_CROSS));
+  const forb = merged.reduce((t, [a, b]) => t + (b - a), 0);
+  const crossSum = cross.reduce((t, c) => t + c, 0);
+  if (forb >= 360 - crossSum) return wrapHue(phase);
+  const k = (360 - crossSum) / (360 - forb);
+  // Walk the circle: allowed stretches scaled by k, forbidden ones squeezed.
+  let x = wrapHue(phase), turn = 0;
+  for (let i = 0; i < merged.length; i++) {
+    const [a, b] = merged[i];
+    const allowed = (a - turn) * k;
+    if (x <= allowed) return turn + x / k;
+    x -= allowed;
+    if (x <= cross[i]) return a + (x / cross[i]) * (b - a);
+    x -= cross[i];
+    turn = b;
+  }
+  return Math.min(360, turn + x / k);
+}
+
+/** Turn a palette's hues (Auto Drift): rigidly by driftTurn(phase), so the
+ * analogous core stays together; the chromatic slots follow the hue lift (a
+ * blue palette turned to gold brightens instead of going dull), and the accent
+ * still steps through the bands on its own (relative to where it starts).
+ * Paper takes only a whisper of the turn. */
+function shiftPalette(p: Palette, phase: number): Palette {
+  if (phase === 0) return p;
+  const dh = driftTurn(p, phase);
+  const s = (c: OKLCH, lift: boolean, band = false): OKLCH => {
+    const h = band ? bandShift(c, dh) : wrapHue(c[2] + dh);
     return [lift ? c[0] + hueLift(h) - hueLift(c[2]) : c[0], c[1], h];
   };
   return {
     ...p,
-    bg: s(p.bg, false), primary: s(p.primary, true), secondary: s(p.secondary, true), accent: s(p.accent, true),
+    bg: s(p.bg, false), primary: s(p.primary, true), secondary: s(p.secondary, true), accent: s(p.accent, true, true),
     highlight: s(p.highlight, false), paper: [p.paper[0], p.paper[1], wrapHue(p.paper[2] + dh * 0.15)],
   };
 }
@@ -222,13 +287,16 @@ export function paletteFromHue(hue: number): Palette {
   const h = bandHue(h0, true);
   const moved = Math.abs(angDiff(h, h0)) > 12;
   const sec = moved && !inOlive(h0) ? h0 : inOlive(h + 35) && !inOlive(h - 35) ? h - 35 : h + 35;
-  const acc = inOlive(h - ACCENT_OFFSET) ? h + ACCENT_OFFSET : h - ACCENT_OFFSET;
+  // The accent's arc to the core must not cross the olive band (their blends,
+  // e.g. Glow's two inks, would pass through olive).
+  const acc = arcHitsOlive(h, h - ACCENT_OFFSET) ? h + ACCENT_OFFSET : h - ACCENT_OFFSET;
   const warm = h < 90 || h >= 300;
-  const hh = warm ? h + Math.max(-15, Math.min(15, angDiff(95, h))) : h + Math.max(-15, Math.min(15, angDiff(195, h)));
-  const primary = vivid(0.6, h, 0.22, 0.95);
+  const hh = warm ? h + Math.max(-15, Math.min(15, angDiff(80, h))) : h + Math.max(-15, Math.min(15, angDiff(195, h)));
+  const primary = vivid(0.6, h, 0.22, 1);
   const secondary = vivid(0.55, sec === h0 ? h0 : bandHue(sec, true), 0.2, 0.9);
   const accent = vivid(0.64, bandHue(acc, true), 0.2, 0.9);
-  const highlight: OKLCH = [0.88, Math.min(0.12, maxChroma(0.88, hh) * 0.9), wrapHue(hh)];
+  const hl = warm ? 0.88 : 0.86;
+  const highlight: OKLCH = [hl, Math.min(0.13, maxChroma(hl, hh) * 0.95), wrapHue(hh)];
   return pal('Custom', [0.14, 0.02, h], primary, secondary, accent, highlight);
 }
 

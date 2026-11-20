@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bandHue, ColorEngine, PALETTES, paletteFromHue, resolvePalette, shadeOf, type RGB } from './color-engine';
+import { bandHue, ColorEngine, driftTurn, PALETTES, paletteFromHue, resolvePalette, shadeOf, type RGB } from './color-engine';
 import { oklabToOklch, srgbToOklab } from './oklch';
 
 /** v0.1 HSL → RGB, to prove the kept palettes did not move. */
@@ -52,7 +52,7 @@ describe('colour engine', () => {
   it('olive band: core hues cross it steeply but continuously; drift starts from the preset exactly', () => {
     for (let h = 0; h < 360; h += 0.5) {
       const d = Math.abs(bandHue(h + 0.5) - bandHue(h));
-      expect(Math.min(d, 360 - d), `at ${h}`).toBeLessThan(4.5);   // ≤ 9× the input step, never a jump
+      expect(Math.min(d, 360 - d), `at ${h}`).toBeLessThan(5.5);   // ≤ 11× the input step, never a jump
     }
     for (let h = 0; h < 360; h += 5) {
       const p = paletteFromHue(h);
@@ -70,6 +70,26 @@ describe('colour engine', () => {
       e.update(0);
       expect(e.getResolved().primary).toEqual(resolvePalette(PALETTES[i]).primary);
       e.setAutoDrift(false);
+    }
+  });
+
+  it('Auto Drift turns smoothly and crosses the olive / cyan spans quickly', () => {
+    for (const p of PALETTES) {
+      let prev = 0, inOlive = 0, inCyan = 0;
+      for (let ph = 0.5; ph < 360; ph += 0.5) {
+        const t = driftTurn(p, ph);
+        const step = t - prev;
+        expect(step, `${p.name} at ${ph}`).toBeGreaterThanOrEqual(-1e-9);   // monotone
+        expect(step, `${p.name} at ${ph}`).toBeLessThan(8);                   // a fast crossing, never a jump
+        prev = t;
+        const pri = (p.primary[2] + t) % 360, sec = (p.secondary[2] + t) % 360;
+        if ((pri > 72 && pri < 128) || (sec > 72 && sec < 128)) inOlive += 0.5;
+        if (pri > 165 && pri < 242) inCyan += 0.5;
+      }
+      expect(360 - prev, p.name).toBeLessThan(6);   // the turn comes round to 360 (= 0)
+      // Only the quick crossings (12% of each forbidden stretch's width).
+      expect(inOlive, p.name).toBeLessThanOrEqual(24);
+      expect(inCyan, p.name).toBeLessThanOrEqual(24);
     }
   });
 
