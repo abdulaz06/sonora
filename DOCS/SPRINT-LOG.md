@@ -1,7 +1,80 @@
-# Palette overhaul + 1.0.1 — in progress
+# Palette overhaul + 1.0.1 — done (awaiting review; type "Ship it" to release)
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Frames: `C:/Users/abdul/sonora-palette-frames/<set>/` (outside OneDrive, delete at the end); sheets + metrics: `verify/palettes/<set>/`.
+
+## Summary
+
+**Look first:** `verify/palettes/review/` — `before-after.jpg` (every style / look / view, the 1.0 palettes left, the new set right), `voyage-before-after.jpg` (all three backdrops), `palette-<name>.jpg` (each palette in every style / look / view, two songs), `ink-before-after.jpg` (the only two Ink colour changes), `clips/<style>.mp4` (the same seeded passage once per palette, labelled 1–9) and `clips/drift-cycle-ink-glow-depth.mp4` (one full Auto Drift turn at 2×). In the app: keys 1–9.
+
+### The set (OKLCH L C h; DOCS/16 §8)
+| # | Palette | bg | primary | secondary | accent | highlight | notes |
+|---|---|---|---|---|---|---|---|
+| 1 | Ocean | .133 .014 284 | .572 .174 262 | .457 .174 294 | .770 .121 195 | .793 .099 232 | v0.1, unchanged |
+| 2 | Aurora | .16 .022 200 | .66 .16 158 | .62 .11 195 | .62 .22 315 | .88 .12 170 | reworked: teal-green core, orchid accent |
+| 3 | Ember | .142 .010 33 | .626 .198 37 | .655 .131 70 | .522 .173 17 | .847 .155 89 | v0.1, unchanged |
+| 4 | Neon | .14 .012 302 | .669 .280 328 | .871 .148 195 | .952 .203 110 | .687 .200 353 | v0.1; bg .125 → .14 (Glow Depth flicker) |
+| 5 | Crimson | .139 .012 6 | .591 .228 21 | .608 .167 38 | .627 .221 345 | .683 .174 28 | v0.1, unchanged |
+| 6 | Solar | .15 .02 60 | .68 .155 68 | .63 .18 48 | .66 .22 355 | .90 .13 80 | Gold reworked: amber, never olive |
+| 7 | Violet | .139 .012 308 | .548 .230 302 | .554 .199 328 | .490 .206 276 | .702 .178 313 | v0.1, unchanged |
+| 8 | Sunset | .14 .025 330 | .64 .24 355 | .55 .24 315 | .72 .18 55 | .86 .09 50 | new |
+| 9 | Acid | .16 .028 150 | .64 .21 145 | .70 .20 132 | .60 .24 280 | .86 .15 165 | new (ultraviolet accent, not magenta) |
+
+Duotones gone; saved choices migrate by name (settings v8: Gold → Solar, Ember / Black → Ember, Crimson / Black → Crimson, Cold / Black and Ivory / Black → Ocean; custom hue and drift kept).
+
+### Colour metrics, final set (content chroma · grey share; thresholds calibrated on the 1.0 palettes)
+Every palette passes every colour gate (chroma, grey, off-palette, olive, exposure vs Ocean, separation) in all 19 combos, and every flicker / blown-out gate on dense-128 at Punchy (Silk's deliberate inversion cut excepted, unchanged from 1.0: 1-frame step 0.64–0.77 for every palette). Sumi and paper looks are ink on bone by design (low chroma for every palette, as in 1.0).
+
+| combo | Ocean | Aurora | Ember | Neon | Crimson | Solar | Violet | Sunset | Acid |
+|---|---|---|---|---|---|---|---|---|---|
+| ink-glow-depth | 0.092 · 8% | 0.090 · 8% | 0.118 · 8% | 0.130 · 9% | 0.146 · 8% | 0.103 · 8% | 0.144 · 8% | 0.133 · 8% | 0.116 · 8% |
+| ink-glow-flat | 0.089 · 8% | 0.087 · 9% | 0.114 · 8% | 0.126 · 9% | 0.140 · 8% | 0.099 · 8% | 0.140 · 8% | 0.129 · 8% | 0.113 · 9% |
+| ink-marble-depth | 0.120 · 0% | 0.116 · 0% | 0.136 · 0% | 0.196 · 0% | 0.167 · 0% | 0.110 · 0% | 0.168 · 0% | 0.171 · 0% | 0.158 · 0% |
+| ink-marble-flat | 0.120 · 0% | 0.116 · 0% | 0.137 · 0% | 0.196 · 0% | 0.167 · 0% | 0.110 · 0% | 0.169 · 0% | 0.171 · 0% | 0.158 · 0% |
+| ink-sumi-depth | 0.007 · 100% | 0.008 · 100% | 0.009 · 100% | 0.008 · 100% | 0.009 · 100% | 0.009 · 100% | 0.008 · 100% | 0.009 · 100% | 0.008 · 100% |
+| ink-sumi-flat | 0.008 · 100% | 0.008 · 100% | 0.009 · 100% | 0.009 · 100% | 0.009 · 100% | 0.009 · 100% | 0.008 · 100% | 0.009 · 100% | 0.009 · 100% |
+| ink-glow-flat-light | 0.039 · 63% | 0.036 · 62% | 0.053 · 53% | 0.063 · 54% | 0.060 · 50% | 0.047 · 53% | 0.053 · 55% | 0.063 · 50% | 0.043 · 56% |
+| ink-marble-flat-light | 0.075 · 5% | 0.079 · 1% | 0.092 · 0% | 0.136 · 0% | 0.112 · 0% | 0.073 · 1% | 0.107 · 0% | 0.117 · 0% | 0.102 · 0% |
+| ink-sumi-flat-dark | 0.006 · 98% | 0.012 · 97% | 0.011 · 97% | 0.008 · 98% | 0.011 · 98% | 0.015 · 97% | 0.008 · 98% | 0.013 · 98% | 0.019 · 97% |
+| silk-flat | 0.077 · 27% | 0.084 · 30% | 0.093 · 27% | 0.142 · 26% | 0.123 · 26% | 0.076 · 31% | 0.120 · 26% | 0.099 · 26% | 0.117 · 27% |
+| silk-depth | 0.080 · 25% | 0.089 · 25% | 0.095 · 25% | 0.143 · 25% | 0.124 · 25% | 0.083 · 25% | 0.124 · 25% | 0.104 · 25% | 0.120 · 25% |
+| silk-flat-light | 0.024 · 81% | 0.026 · 81% | 0.029 · 81% | 0.040 · 80% | 0.035 · 80% | 0.028 · 81% | 0.035 · 80% | 0.034 · 80% | 0.037 · 80% |
+| wisp-flat | 0.073 · 8% | 0.080 · 11% | 0.103 · 1% | 0.111 · 2% | 0.125 · 1% | 0.085 · 10% | 0.120 · 0% | 0.091 · 12% | 0.098 · 2% |
+| wisp-ground | 0.066 · 9% | 0.066 · 16% | 0.089 · 2% | 0.093 · 7% | 0.113 · 1% | 0.072 · 8% | 0.110 · 1% | 0.079 · 8% | 0.084 · 4% |
+| wisp-tunnel | 0.070 · 3% | 0.063 · 11% | 0.095 · 1% | 0.085 · 3% | 0.124 · 0% | 0.076 · 3% | 0.119 · 1% | 0.084 · 3% | 0.082 · 3% |
+| warp | 0.110 · 1% | 0.094 · 1% | 0.118 · 1% | 0.114 · 4% | 0.148 · 0% | 0.110 · 1% | 0.155 · 0% | 0.158 · 1% | 0.140 · 0% |
+| voyage-void | 0.094 · 4% | 0.078 · 8% | 0.113 · 1% | 0.121 · 6% | 0.149 · 1% | 0.090 · 3% | 0.144 · 3% | 0.131 · 2% | 0.110 · 3% |
+| voyage-city | 0.092 · 4% | 0.077 · 7% | 0.109 · 0% | 0.109 · 6% | 0.143 · 0% | 0.091 · 2% | 0.137 · 3% | 0.125 · 1% | 0.106 · 2% |
+| voyage-ocean | 0.098 · 2% | 0.076 · 7% | 0.109 · 1% | 0.109 · 6% | 0.145 · 0% | 0.092 · 2% | 0.145 · 1% | 0.133 · 1% | 0.108 · 2% |
+
+### What changed in each style's colour mapping, and why
+- **Voyage (D69):** the stone was `mix(grey 0.64, tint, 0.42)` — 0.06–0.11 chroma for any palette, and an RGB average of a distant primary / secondary (Aurora, Neon) cancelled to grey. Bands now pick between the core colours with a chroma-keeping blend, the tint is normalised to a fixed value (78% of the albedo, ±10% value with the bands so the forms read), the nebula uses the core colours, and the sea / crest light take the secondary. Ocean: chroma 0.055–0.063 → 0.092–0.098, grey 12–20 → 2–4%, frame brightness +0.01–0.02. Aurora grey 57 → 8%, Neon 44–48 → 6%.
+- **Wisp (D70):** the smoke's per-channel `1 − exp` greyed dense coloured trails; half of a hue-preserving version is blended in: grey Ocean Flat 21 → 8%, Tunnel 8 → 3%, at the same brightness.
+- **Ink (signed off):** no slot changes for the presets. A derived `shade` slot (the primary's dark tone) feeds Marble on paper: identical to primary × 0.55 for every palette except golds, which it turns amber (Solar there was mustard-olive; stills in `ink-before-after.jpg`). Neon's background lift is the other Ink-visible change (invisible in the stills, fixes Glow Depth flicker).
+- **Silk, Warp:** no mapping change (already saturated; their numbers are identical).
+- **Custom hue / Auto Drift / crossfades (D71):** OKLCH everywhere; the RGB crossfade dipped to grey in 6 of 36 preset pairs (Ocean ↔ Solar to chroma 0.008), the OKLCH one never below 0.103.
+
+### Gates at Ocean, 1.0 → now (`verify/palettes/gates/baseline-ocean.log`, `…/new-ocean.log`)
+| look · view | sync house / song | flicker swings · step · blown-out | fine share house / song | bg step p99 |
+|---|---|---|---|---|
+| Ink (all six) | identical (Glow 100/100, Marble 100/96, Sumi regional 100) | identical | identical | identical |
+| Silk Flat / Depth | 91/96 · 91/96, identical | identical (step = inversion cut) | identical | identical |
+| Wisp Flat | 100/100 → 100/100 | 1.25 · 0.062 · 3.2% → same | 48/70 → 50/72% | 0.0125 → 0.0136 |
+| Wisp Ground / Tunnel | 100/100 → 100/100 | same | 46/53 → 47/53, 67/68 → 66/68% | ≈ |
+| Warp | identical | identical | identical | identical |
+| Voyage Void | 100/100 → 100/100 (rise 35.8/80.1 → 32.6/71.9%) | 1.33 · 0.079 → 1.00 · 0.075 | 74/75 → 74/76% | 0.0133 → 0.0153 |
+| Voyage City / Ocean | 100/100 → 100/100 (rise −1 to −3 points) | 0.50 / 0.83 → 0.50 / 0.67 | 78/75 → 77/75% | 0.033 → 0.025 |
+
+DRIFT_HUE_PLACEHOLDER
+
+COST_PLACEHOLDER
+
+### Unsure / for your eyes
+- **Voyage's sea and stone now carry the palette strongly** (a violet sea with Ocean, an amber sea with Ember / Solar, a lime one with Acid). It's what the brief asked for, but it changes Voyage's character more than any other style; the before/after sheet shows it.
+- **Wisp Flat's fine-detail share rises 2 points** (48 → 50%, 70 → 72%; the ≤45% gate already failed at 1.0). Saturated trails show more texture; half of the hue-preserving build-up is the compromise (fully: +3; none: the old grey).
+- **Custom hue and drift skip two narrow regions:** a custom pick in the olive band becomes gold or lime, one in the cyan band teal or azure (the picked cyan stays as the secondary), and Auto Drift passes those turns quickly instead of resting there. sRGB simply has no vivid dark yellow and no vivid mid-light cyan; resting there failed the gates in every style.
+- **Silk's 1-frame step** (the drop inversion cut) still exceeds 0.12, for every palette, exactly as in 1.0 (flash-guarded and deliberate).
+- **The olive metric** was widened after looking at frames (dark yellows from 75°, lightness-dependent); the baseline was recalibrated with it before the final set was judged.
 
 ## Checklist
 - [x] 0 Read CLAUDE.md, sprint log, decisions, DOCS/16, brand, colour engine, every palette-reading shader, PALETTE-RESEARCH.md + images; attribution off in `.claude/settings.json`
