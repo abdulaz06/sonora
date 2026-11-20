@@ -225,9 +225,17 @@ export function driftTurn(p: Palette, phase: number): number {
   return driftMap(p, phase).turn;
 }
 
-/** True while Auto Drift is crossing a forbidden stretch (a few seconds per turn). */
+/** True while Auto Drift is crossing a skipped stretch, or the accent or
+ * highlight is in the steep middle of its own band crossing (a few seconds
+ * each per turn). */
 export function driftCrossing(p: Palette, phase: number): boolean {
-  return driftMap(p, phase).crossing;
+  const m = driftMap(p, phase);
+  if (m.crossing) return true;
+  const steep = (h: number): boolean => BANDS.some(([a, b]) => {
+    const x = wrapHue(h), mid = (a + b) / 2;
+    return x > mid - BAND_STEP / 2 && x < mid + BAND_STEP / 2;
+  });
+  return steep(p.accent[2] + m.turn) || steep(p.highlight[2] + m.turn);
 }
 
 function driftMap(p: Palette, phase: number): { turn: number; crossing: boolean } {
