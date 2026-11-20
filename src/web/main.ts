@@ -70,7 +70,7 @@ export interface HarnessApi {
   /** Palette research: the preset list as ready RGB. */
   palettes(): { name: string; resolved: ResolvedPalette }[];
   /** Palette research: show any palette (RGB), a custom hue, or Auto Drift at a phase. */
-  setPalette(p: { resolved?: ResolvedPalette; index?: number; hue?: number; driftDeg?: number }): void;
+  setPalette(p: { resolved?: ResolvedPalette; index?: number; hue?: number; driftDeg?: number; holdDrift?: boolean }): void;
   /** The palette the styles currently receive. */
   currentPalette(): ResolvedPalette;
 }
@@ -399,6 +399,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       if (p.hue !== undefined) { ce.setCustomHue(p.hue); ce.update(10); }
       ce.setAutoDrift(p.driftDeg !== undefined);
       if (p.driftDeg !== undefined) ce.setDriftPhase(p.driftDeg);
+      ce.holdDrift(p.driftDeg !== undefined && p.holdDrift !== false);
       ce.update(0);
     },
     currentPalette: () => renderer.colorEngine.getResolved(),

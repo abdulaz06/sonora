@@ -51,7 +51,7 @@ const SHADE_LIFT_L = 0.64;
  * hue sits within 3° of either edge, with a steep BAND_STEP-wide crossing in
  * the middle (continuous, so drift never jumps). Light colours (highlights,
  * Neon's yellow) are left alone. */
-const BANDS: [number, number][] = [[70, 140], [162, 245]];
+const BANDS: [number, number][] = [[65, 140], [162, 245]];
 /** Auto Drift turns the whole palette rigidly and passes quickly through the
  * turns where its primary or secondary would sit in this olive span (their
  * blends would land on olive) or its primary in the cyan band (Marble draws
@@ -361,6 +361,7 @@ export class ColorEngine {
   private current: Palette;
   /** Harness only: a palette given as ready RGB, shown instead of the presets. */
   private override: ResolvedPalette | null = null;
+  private driftHeld = false;
 
   constructor() {
     this.from = PALETTES[0];
@@ -401,13 +402,16 @@ export class ColorEngine {
   /** Harness only: jump Auto Drift to a hue offset (degrees). */
   setDriftPhase(deg: number): void { this.driftPhase = wrapHue(deg); }
 
+  /** Harness only: hold Auto Drift at its phase (palette sweeps render 14 s per frame set). */
+  holdDrift(on: boolean): void { this.driftHeld = on; }
+
   setDriftPeriod(seconds: number): void {
     this.driftPeriod = Math.max(MIN_DRIFT_PERIOD_S, Math.min(MAX_DRIFT_PERIOD_S, seconds));
   }
 
   update(dt: number): void {
     if (this.progress < 1) this.progress = Math.min(1, this.progress + TRANSITION_SPEED * dt);
-    if (this.autoDrift) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
+    if (this.autoDrift && !this.driftHeld) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
     // The crossfade runs in OKLCH along the shorter hue arc (basePalette):
     // chroma never dips through grey, as an RGB crossfade between distant hues does.
     this.current = shiftPalette(this.basePalette(), this.driftDegrees);
