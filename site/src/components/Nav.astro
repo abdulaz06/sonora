@@ -19,7 +19,7 @@ const home = page === 'home';
   const nav = document.querySelector<HTMLElement>('[data-nav]');
   if (nav) {
     const solid = (): void => { nav.classList.toggle('is-solid', window.scrollY > 24 && !document.documentElement.classList.contains('nav-clear')); };
-    solid();
+    requestAnimationFrame(solid);
     window.addEventListener('scroll', solid, { passive: true });
   }
 </script>

@@ -19,6 +19,8 @@ const MAX_CATCH_UP = 20;
 /** Audio fade when sound is switched (s). */
 const FADE_S = 0.25;
 const AUDIO_GAIN = 0.85;
+/** Frames the event layer hears per slice while warming up. */
+const WARM_SLICE = 700;
 
 export type FrameListener = (f: AudioFeatureFrame, t: number) => void;
 export type EventListener = (e: SonoraEvent, t: number) => void;
@@ -46,13 +48,29 @@ export class DemoPlayer {
   private eventListeners: EventListener[] = [];
   private _sound = false;
   private _time = 0;
+  private warming = false;
 
   static async load(url: string): Promise<DemoPlayer> {
     const buf = await fetch(url).then((r) => {
       if (!r.ok) throw new Error(`demo frames: ${r.status}`);
       return r.arrayBuffer();
     });
-    return new DemoPlayer(buf);
+    const p = new DemoPlayer(buf);
+    await p.hearLoop();
+    return p;
+  }
+
+  /** The event layer hears one whole loop first, as looping playback would
+   * have (sections, running loudness); in slices, so no long task. */
+  private async hearLoop(): Promise<void> {
+    this.warming = true;
+    for (let i = 0; i < this.frames.length; i += WARM_SLICE) {
+      const end = Math.min(this.frames.length, i + WARM_SLICE);
+      for (let k = i; k < end; k++) this.events.process(this.frames[k]);
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    this.warming = false;
+    this.wallBase = performance.now();
   }
 
   private constructor(buf: ArrayBuffer) {
@@ -61,9 +79,7 @@ export class DemoPlayer {
     this.frames = frames;
     this.fps = header.fps;
     this.duration = header.frames / header.fps;
-    // Hear one whole loop first, as looping playback would have (sections, running loudness).
-    for (const f of frames) this.events.process(f);
-    this.events.on((e) => { for (const l of this.eventListeners) l(e, this._time); });
+    this.events.on((e) => { if (!this.warming) for (const l of this.eventListeners) l(e, this._time); });
     document.addEventListener('visibilitychange', () => this.setHidden(document.hidden));
   }
 

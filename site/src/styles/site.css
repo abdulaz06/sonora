@@ -87,7 +87,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .micro { font-family: var(--f-mono); font-size: var(--t-micro); font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: var(--b62); }
 .bone { color: var(--bone); }
-.dim { color: var(--b40); }
+.dim { color: var(--b62); }
 
 /* ── Buttons and chips ── */
 .btn {
@@ -204,10 +204,11 @@ html:not(.static) .only-static { display: none !important; }
   display: flex; flex-direction: column; justify-content: space-between; gap: 10px;
 }
 .sig:nth-child(3n) { border-right: 0; }
-.sig .name { font-family: var(--f-mono); font-size: var(--t-label); font-weight: 500; letter-spacing: var(--track); text-transform: uppercase; color: var(--b40); transition: color 90ms linear; }
+.sig .name { font-family: var(--f-mono); font-size: var(--t-label); font-weight: 500; letter-spacing: var(--track); text-transform: uppercase; color: var(--b62); transition: color 90ms linear; }
 .sig .bar { height: 2px; background: var(--b12); position: relative; overflow: hidden; }
 .sig .bar i { position: absolute; inset: 0; background: var(--bone); transform-origin: left; transform: scaleX(0); }
 .sig.on .name { color: var(--bone); }
+.sig .bar i { transition: none; }
 .sig.ev { background: transparent; transition: background-color 600ms var(--ease); }
 .sig.ev.on { background: var(--bone); transition: none; }
 .sig.ev.on .name { color: var(--night); }
@@ -218,7 +219,7 @@ html:not(.static) .only-static { display: none !important; }
 .board-foot .v { font-family: var(--f-display); font-weight: 600; font-variation-settings: 'opsz' 28; font-size: clamp(20px, 1.6vw, 28px); color: var(--bone); letter-spacing: -0.02em; line-height: 1.1; margin-top: 4px; text-transform: lowercase; }
 .timeline { position: relative; height: 34px; border-top: var(--line); }
 .timeline .sec { position: absolute; top: 0; bottom: 0; border-left: var(--line); overflow: hidden; }
-.timeline .sec span { position: absolute; left: 6px; bottom: 6px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--b40); white-space: nowrap; }
+.timeline .sec span { position: absolute; left: 6px; bottom: 6px; font-family: var(--f-mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--b62); white-space: nowrap; }
 .timeline .head { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--bone); left: 0; will-change: transform; }
 @media (max-width: 1000px) { .hears-grid { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .timeline .sec span { display: none; } }
@@ -235,7 +236,7 @@ html:not(.static) .only-static { display: none !important; }
 @media (max-width: 900px) { .style-more { text-align: left; } }
 .style-controls { display: flex; flex-direction: column; gap: 14px; align-items: flex-end; }
 .style-controls .grp { display: flex; gap: 14px; align-items: center; }
-.style .heavy { margin-left: 10px; color: var(--b40); }
+.style .heavy { margin-left: 10px; color: var(--b62); }
 .glass { background: var(--n60); padding: clamp(18px, 2vw, 28px); border: var(--line); }
 @media (max-width: 900px) {
   .style-card { grid-template-columns: 1fr; }
@@ -335,7 +336,7 @@ html:not(.static) .only-static { display: none !important; }
 .dl-grid > div:last-child { border-right: 0; }
 .dl-grid ul { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
 .dl-grid li { font-size: var(--t-small); color: var(--b75); display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
-.dl-grid li span:first-child { font-family: var(--f-mono); font-size: var(--t-micro); letter-spacing: 0.12em; text-transform: uppercase; color: var(--b40); padding-top: 3px; }
+.dl-grid li span:first-child { font-family: var(--f-mono); font-size: var(--t-micro); letter-spacing: 0.12em; text-transform: uppercase; color: var(--b62); padding-top: 3px; }
 .ss { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ss figure { margin: 0; }
 .ss svg { width: 100%; height: auto; border: var(--line); }
@@ -354,6 +355,9 @@ html:not(.static) .only-static { display: none !important; }
 .lb.is-open { display: flex; }
 .lb video { width: min(100%, calc((100vh - 140px) * 16 / 9)); height: auto; border: var(--line); background: #000; }
 .lb-close { position: absolute; top: 18px; right: var(--gutter); }
+
+/* ── First paint: sections far below the fold skip layout and paint until near ── */
+.solid.app, .solid.how, .solid.dl, .foot { content-visibility: auto; contain-intrinsic-size: auto 1100px; }
 
 /* ── Reveal ── */
 @media (prefers-reduced-motion: no-preference) {

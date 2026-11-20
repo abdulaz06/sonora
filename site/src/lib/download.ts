@@ -41,7 +41,9 @@ async function latest(): Promise<Latest | null> {
 export async function refreshDownloads(): Promise<void> {
   const l = await latest();
   if (!l) return;
-  document.querySelectorAll<HTMLAnchorElement>('a[data-dl]').forEach((a) => { a.href = l.url; });
-  document.querySelectorAll<HTMLElement>('[data-dl-meta]').forEach((e) => { e.textContent = label(l); });
-  document.querySelectorAll<HTMLElement>('[data-dl-version]').forEach((e) => { e.textContent = `v${l.version}`; });
+  // Only touch what changed (an unchanged page shouldn't repaint).
+  const set = (e: HTMLElement, text: string): void => { if (e.textContent !== text) e.textContent = text; };
+  document.querySelectorAll<HTMLAnchorElement>('a[data-dl]').forEach((a) => { if (a.href !== l.url) a.href = l.url; });
+  document.querySelectorAll<HTMLElement>('[data-dl-meta]').forEach((e) => set(e, label(l) + (e.dataset.dlSuffix ?? '')));
+  document.querySelectorAll<HTMLElement>('[data-dl-version]').forEach((e) => set(e, `v${l.version}`));
 }

@@ -17,7 +17,7 @@ import { PALETTES } from '../../../src/engine/color-engine';
 import { describe, mediaFor } from '../../../src/app/catalog';
 import { DemoPlayer } from '../lib/demo-player';
 import { refreshDownloads } from '../lib/download';
-import { HERO_SCENE, HERO_START_S, HERO_WARM_S, PALETTE_HOLD_S, PALETTE_SCENE, PREWARM_FIRST, PREWARM_LATER, PREWARM_TIMEOUT_MS, SCENES } from '../lib/scenes';
+import { STILL_FOR, HERO_SCENE, HERO_START_S, HERO_WARM_S, PALETTE_HOLD_S, PALETTE_SCENE, PREWARM_FIRST, PREWARM_LATER, PREWARM_TIMEOUT_MS, SCENES } from '../lib/scenes';
 import type { Scene, Stage } from '../lib/stage';
 
 // ── Tuning ──────────────────────────────────────────────────────
@@ -122,7 +122,8 @@ function setupChipsStatic(): void {
 }
 
 function swapFallback(sec: HTMLElement, media: string): void {
-  const m = mediaFor(media);
+  const loop = mediaFor(media);
+  const m = STILL_FOR[media] ? { ...loop, ...(({ still, stillSmall }) => ({ still, stillSmall }))(mediaFor(STILL_FOR[media])) } : loop;
   const img = $<HTMLImageElement>('[data-fb-img]', sec);
   const video = $<HTMLVideoElement>('[data-fb-video]', sec);
   if (img && m.still) { img.removeAttribute('srcset'); img.src = m.still; }
@@ -183,24 +184,35 @@ let applyScene: () => void = () => undefined;
 
 // ── Demo + engine ───────────────────────────────────────────────
 async function startDemo(sections: LiveSection[]): Promise<void> {
+  const start = (p: DemoPlayer): DemoPlayer => { p.seek(HERO_START_S); setupBoard(p); return p; };
+  if (isStatic()) {
+    // No engine: the frames only drive the signals board (and the sound), so
+    // they load when that section comes near or sound is asked for.
+    startFallbackVideos();
+    let loading: Promise<DemoPlayer | null> | null = null;
+    const ensure = (): Promise<DemoPlayer | null> => (loading ??= DemoPlayer.load('/demo/frames.bin').then((p) => {
+      start(p);
+      const tick = (): void => { p.tick(); requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      return p;
+    }).catch(() => null));
+    const hears = $('section[data-scene="hears"]');
+    if (hears && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); void ensure(); } }, { rootMargin: '60% 0px' });
+      io.observe(hears);
+    }
+    setupSound(ensure);
+    return;
+  }
   let player: DemoPlayer;
   try {
-    player = await DemoPlayer.load('/demo/frames.bin');
+    player = start(await DemoPlayer.load('/demo/frames.bin'));
   } catch {
     document.documentElement.classList.add('static');
     startFallbackVideos();
     return;
   }
-  player.seek(HERO_START_S);
-  setupBoard(player);
-  setupSound(player);
-  if (isStatic()) {
-    startFallbackVideos();
-    // Without the engine the frames still drive the signals board.
-    const tick = (): void => { player.tick(); requestAnimationFrame(tick); };
-    requestAnimationFrame(tick);
-    return;
-  }
+  setupSound(() => Promise.resolve(player));
   await new Promise((r) => setTimeout(r, ENGINE_DELAY_MS));
   // Until the engine is ready every live section shows its still.
   document.documentElement.classList.add('warming');
@@ -492,16 +504,20 @@ function setupBoard(player: DemoPlayer): void {
 }
 
 // ── Sound ───────────────────────────────────────────────────────
-function setupSound(player: DemoPlayer): void {
+function setupSound(get: () => Promise<DemoPlayer | null>): void {
   const btns = $$<HTMLButtonElement>('[data-sound]');
+  const label = (t: string): void => btns.forEach((b) => { const l = $('[data-sound-label]', b); if (l) l.textContent = t; });
   btns.forEach((btn) => btn.addEventListener('click', async () => {
+    label('Loading…');
+    const player = await get();
+    if (!player) { label('Sound off'); return; }
     const on = !player.sound;
-    btns.forEach((b) => { b.setAttribute('aria-pressed', String(on)); const l = $('[data-sound-label]', b); if (l) l.textContent = on ? 'Loading…' : 'Sound off'; });
+    btns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
     try {
       await player.setSound(on, SOUND_URLS);
     } catch {
       btns.forEach((b) => b.setAttribute('aria-pressed', 'false'));
     }
-    btns.forEach((b) => { const l = $('[data-sound-label]', b); if (l) l.textContent = player.sound ? 'Sound on' : 'Sound off'; });
+    label(player.sound ? 'Sound on' : 'Sound off');
   }));
 }

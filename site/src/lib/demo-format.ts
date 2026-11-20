@@ -14,6 +14,22 @@
 import { emptyFrame } from '../../../src/types/audio-frame';
 import type { AudioFeatureFrame, BandHits } from '../../../src/types/audio-frame';
 
+/** Parts of a frame the demo doesn't record: one shared, read-only instance (decoding allocates far less). */
+const STATIC_PARTS = (() => {
+  const e = emptyFrame();
+  return { bands: e.bands, spectral: e.spectral, elements: e.elements, mood: e.mood, spectrum_bars: e.spectrum_bars, juiced_fft: e.juiced_fft };
+})();
+const zeroBands = (): BandHits => ({ sub_bass: 0, bass: 0, low_mid: 0, mid: 0, upper_mid: 0, high: 0, air: 0 });
+function leanFrame(): AudioFeatureFrame {
+  return {
+    ...STATIC_PARTS,
+    energy: { instant: 0, short_term: 0, long_term: 0, ratio: 0, dynamic_range: 0 },
+    beat: { bpm: 120, phase: 0, onset: false, confidence: 0 },
+    rhythm: { four_on_floor: 0, half_time_heavy: 0, backbeat_groove: 0, broken_beat: 0, syncopated_dance: 0, ambient_free: 0 },
+    motion_density: 0, fade_in_out: 0, intensity: 0, presence: zeroBands(), hits: zeroBands(),
+  };
+}
+
 export const BANDS = ['sub_bass', 'bass', 'low_mid', 'mid', 'upper_mid', 'high', 'air'] as const;
 
 type Get = (f: AudioFeatureFrame) => number;
@@ -94,7 +110,7 @@ export function decodeDemo(buf: ArrayBuffer): DemoData {
   const header = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 4, len))) as DemoHeader;
   const n = header.frames;
   const frames: AudioFeatureFrame[] = [];
-  for (let i = 0; i < n; i++) frames.push(emptyFrame());
+  for (let i = 0; i < n; i++) frames.push(leanFrame());
   let off = 4 + len;
   off += off % 2;
   header.channels.forEach((c, k) => {

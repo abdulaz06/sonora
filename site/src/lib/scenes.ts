@@ -85,3 +85,6 @@ export const PREWARM: Required<Scene>[] = [
 ];
 export const PREWARM_FIRST = PREWARM.filter((s) => s.style !== 'voyage');
 export const PREWARM_LATER = PREWARM.filter((s) => s.style === 'voyage');
+
+/** Stills to show instead of a media name's own (Silk's hero still is its drop inversion: a white frame). */
+export const STILL_FOR: Record<string, string> = { silk: 'silk-view-flat' };

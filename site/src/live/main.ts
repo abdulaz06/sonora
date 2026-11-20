@@ -22,6 +22,8 @@ const SAVE_DEBOUNCE_MS = 400;
 /** The live page caps the backing store a little (laptops on battery). */
 const MAX_PIXEL_RATIO = 2;
 const DEMO = { webm: '/demo/demo.webm', m4a: '/demo/demo.m4a' };
+/** The demo starts where the groove comes in (s), so the picture moves at once. */
+const DEMO_START_S = 8.4;
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string): T | null => document.querySelector<T>(sel);
 
@@ -102,10 +104,10 @@ export async function bootLive(): Promise<void> {
   fileInput.type = 'file';
   fileInput.accept = 'audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.opus,.webm';
 
-  const playData = async (data: Blob | ArrayBuffer, label: string): Promise<void> => {
+  const playData = async (data: Blob | ArrayBuffer, label: string, from = 0): Promise<void> => {
     try {
       const buf = await source.loadFile(data);
-      await source.playBuffer(buf, 0, () => undefined, label);
+      await source.playBuffer(buf, from, () => undefined, label);
       renderer.events.notifyTrackChange({ title: label.replace(/\.[a-z0-9]+$/i, '') });
       closeSheet();
       say('');
@@ -120,7 +122,7 @@ export async function bootLive(): Promise<void> {
     const probe = document.createElement('audio');
     const url = probe.canPlayType('audio/webm; codecs="opus"') ? DEMO.webm : DEMO.m4a;
     const data = await fetch(url).then((r) => r.arrayBuffer());
-    await playData(data, 'sonora demo');
+    await playData(data, 'sonora demo', DEMO_START_S);
   };
 
   sheet.addEventListener('click', (e) => {
@@ -147,7 +149,7 @@ export async function bootLive(): Promise<void> {
         const cancelled = err instanceof DOMException && err.name === 'NotAllowedError';
         const st: SourceStatus = source.currentStatus;
         say(cancelled
-          ? 'Sharing was cancelled. When you try again, pick the tab with the music, and keep “Also share tab audio” on. Sonora only hears the sound; nothing leaves your computer.'
+          ? 'Sharing was cancelled. When you try again, pick the tab with the music, and keep “Also share tab audio” on. sonora only hears the sound; nothing leaves your computer.'
           : st.message || 'This browser couldn’t share the tab’s sound. Play a file or use the microphone instead.');
       });
     }

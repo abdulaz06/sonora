@@ -31,7 +31,9 @@ export const STAGE_SEED = 1234;
 /** Set Mode on the page: switches as often as the demo allows. */
 const SET_MODE_MIN_INTERVAL_S = 12;
 /** Warm-up render steps per display frame. */
-const WARM_STEPS_PER_FRAME = 6;
+const WARM_STEPS_PER_FRAME = 4;
+/** Frames the renderer's event layer hears per slice while warming up. */
+const WARM_EVENT_SLICE = 700;
 
 export interface Scene { style: StyleId; variant?: string; depth?: boolean }
 
@@ -185,7 +187,10 @@ export function createStage(canvas: HTMLCanvasElement, player: DemoPlayer, quali
       const start = Math.round((from - seconds) * 60);
       // The event layer first hears one whole loop, as looping playback would
       // have (section, running loudness), then the render warm-up follows.
-      for (let k = -n; k < 0; k++) renderer.pushFrame(frames[(((start + k) % n) + n) % n]);
+      for (let k = -n; k < 0; k += WARM_EVENT_SLICE) {
+        for (let j = k; j < Math.min(0, k + WARM_EVENT_SLICE); j++) renderer.pushFrame(frames[(((start + j) % n) + n) % n]);
+        await new Promise((r) => setTimeout(r, 0));
+      }
       const per = Math.round(60 / fps);
       const total = Math.round(seconds * 60);
       let k = 0;

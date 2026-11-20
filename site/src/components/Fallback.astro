@@ -5,11 +5,13 @@
  * section comes into view (never under reduced motion).
  */
 import { mediaFor } from '../../../src/app/catalog';
+import { STILL_FOR } from '../lib/scenes';
 interface Props { media: string; id?: string; eager?: boolean; still?: boolean; videoOnly?: boolean }
 const { media, id, eager = false, still = false, videoOnly = false } = Astro.props;
 const stillUrl = (() => {
   const m = mediaFor(media);
-  if (m.still) return m;
+  const over = STILL_FOR[media] ? mediaFor(STILL_FOR[media]) : null;
+  if (m.still) return over ? { ...m, still: over.still, stillSmall: over.stillSmall } : m;
   return { still: '', stillSmall: '', loop: undefined, alt: '' };
 })();
 const files = import.meta.glob('../../../src/assets/media/pal-*-480.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;

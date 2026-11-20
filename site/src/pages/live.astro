@@ -3,9 +3,10 @@ import Base from '../layouts/Base.astro';
 import Lockup from '../components/Lockup.astro';
 import { mediaFor } from '../../../src/app/catalog';
 import { release, metaLabel } from '../lib/release';
+import { STILL_FOR } from '../lib/scenes';
 const title = 'try sonora live — in your browser';
 const description = 'The sonora engine in your browser: play the demo, drop an audio file, use the microphone, or share a tab’s sound. Nothing is uploaded; the analysis runs on your device.';
-const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-marble'].map((n) => ({ n, ...mediaFor(n) }));
+const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-marble'].map((n) => ({ n, ...mediaFor(n), stillSmall: mediaFor(STILL_FOR[n] ?? n).stillSmall }));
 ---
 <Base title={title} description={description} path="/live" og="/og/live.jpg" ogAlt="Wisp’s flames in the Neon palette, with the sonora lockup and the words try it live." page="live" htmlClass="live-page" nav={false}>
   <style is:global>
@@ -49,6 +50,7 @@ const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-ma
     .lv-fallback { display: none; position: fixed; inset: 0; overflow: auto; background: var(--night); z-index: 3000; }
     html.lv-static .lv-fallback { display: block; }
     html.lv-static #canvas, html.lv-static .lv-strip { display: none; }
+    .lv-lockup { width: 220px; height: auto; }
     .lv-fb-in { max-width: 1200px; margin: 0 auto; padding: clamp(28px, 6vh, 72px) var(--gutter); }
     .lv-fb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 36px; }
     .lv-fb-grid figure { margin: 0; border: 1px solid var(--b12); }
@@ -98,7 +100,7 @@ const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-ma
 
   <section class="lv-fallback" aria-labelledby="fb-h">
     <div class="lv-fb-in">
-      <a href="/" aria-label="sonora, home"><Lockup class="hero-lockup" title="sonora" /></a>
+      <a href="/" aria-label="sonora, home"><Lockup class="lv-lockup" title="sonora" /></a>
       <h2 class="h1" id="fb-h" style="margin-top:28px;max-width:14em" data-fb-title>the live engine needs a desktop browser.</h2>
       <p class="lede" style="margin-top:18px" data-fb-body>On a phone the visuals would run hot and drain the battery, so here they are as recordings from the engine. Open this page on a computer with Chrome, Edge or Firefox to play your own music through it.</p>
       <p style="margin-top:26px;display:flex;gap:12px;flex-wrap:wrap"><a class="btn btn--primary" href={release.url} data-dl>Download for Windows</a><a class="btn" href="/">Back to sonora</a></p>
