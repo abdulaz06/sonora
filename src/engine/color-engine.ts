@@ -209,7 +209,7 @@ export function resolvePalette(p: Palette): ResolvedPalette {
 export function shadeOf(c: RGB): RGB {
   const d: RGB = [c[0] * SHADE_K, c[1] * SHADE_K, c[2] * SHADE_K];
   const [l, ch, h] = toOklch(d);
-  const turn = smooth(55, 72, h) * (1 - smooth(95, 112, h));
+  const turn = smooth(50, 80, h) * (1 - smooth(95, 112, h));
   const lift = smooth(85, 100, h) * (1 - smooth(125, 140, h));
   if ((turn <= 0 && lift <= 0) || ch < 0.02) return d;
   return oklchToSrgb([Math.max(l, l + (SHADE_LIFT_L - l) * lift), ch, h - SHADE_TURN * turn]);

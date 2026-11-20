@@ -15,7 +15,7 @@ Flow Ink is the floor, not the ceiling. A style is not done until:
 3. **Wallpaper test:** a random frame is something you would set as a desktop wallpaper.
 4. **Arc-aware:** silence → fade-in → build → drop → breakdown reads clearly. Quiet music = restraint and negative space. Drops land with a visible event (cut, inversion, burst, camera lurch), not just "more."
 5. **Texture over blur:** fine detail (filaments, grain, stipple, strands) instead of soft gaussian mush. Every reference that looks good has fine-scale detail.
-6. **Palette logic:** works with the shared color system (presets, custom hue, auto hue-drift). Duotone and near-monochrome palettes are encouraged; rainbow is not.
+6. **Palette logic:** works with the shared color system (presets, custom hue, auto hue-drift) and passes the palette gates (§8) with every palette. Vivid, saturated, cinematic; never dry, washed-out or near-monochrome; rainbow is not the goal either.
 7. **Light and dark:** where the reference supports it, offer an inverted (ink-on-paper) variant.
 8. **Performance:** 60 fps at 1080p on Medium on the dev machine (RX 7700S); Low preset genuinely reduces sim/render resolution, particle count, or raymarch steps.
 9. **Self-verified:** the author has rendered it headless against the test tracks and looked at the screenshots before calling it done.
@@ -62,7 +62,7 @@ Classic: Aura and Halo move to a hidden "Classic" section (settings toggle, off 
 ## 4. Shared Engine Features (built once, used by every style)
 
 - **World camera:** styles render into a world larger than the screen; a camera drifts, banks, and lurches on drops. 2D styles get pan/zoom/rotate; 3D styles get a full perspective camera with fog.
-- **Color system:** presets + custom hue + **Auto Drift** (slow, near-imperceptible hue rotation, ~2–4 min per full cycle) + duotone support + light/dark (inverted) per style.
+- **Color system:** nine presets + custom hue + **Auto Drift** (slow hue rotation, ~2–4 min per full cycle) + light/dark (inverted) per style. See §8.
 - **Event layer:** a single place that turns mapping signals into discrete events every style can subscribe to: `drop`, `build`, `breakdown`, `bigHit`, `trackChange`. Drop detection = sharp intensity rise after a sustained build or a silence gap.
 - **Signal contract:** styles consume only the mapping layer (FadeInOut, Intensity, Presence×7, Hits×7, Juiced FFT, beat phase/confidence, events) — never raw element heuristics.
 
@@ -118,3 +118,38 @@ Registry order: **Ink, Silk, Wisp, Warp, Voyage**; Aura and Halo stay in the hid
 **Flicker / exposure** (`--flicker`, dense-128, Punchy, Ocean): Voyage 0.58, Silk 1.17 (Depth 0.83), Wisp 1.25 (Ground 0.83, Tunnel 1.5), Ink Glow 1.9–2.4 (v0.1 itself 3.1), Marble 0.1–1.0, Sumi 0, Warp 1.42 brightness swings per second; at most ~5% blown-out pixels at peak. Gates (D47): swings either way ≤2.5/s, largest one-frame change ≤0.12, blown-out ≤6%; `scripts/motion-check.py`: fine-detail share of motion ≤45% (v0.1 34%), background step ≤0.02.
 
 **Frame rate.** Settings › Quality › Frame rate caps rendering at 30, 60 (default), 90, 120, 144 fps or the display rate.
+
+---
+
+## 8. Colour (palette overhaul for 1.0.1; D67–D71)
+
+**What Abdul wants:** colours that make the visuals richer: vivid, saturated, cinematic. Loved: Ocean, Neon, Crimson, Violet. Hated: Ivory / Black (plain white on black) and dull duotones. Every palette must look great in every style, look and view.
+
+**Rules (measured with the palette matrix, `DOCS/reference/palettes/PALETTE-RESEARCH.md`):**
+- **Analogous core:** primary and secondary about 20–60° apart (OKLCH hue). Styles blend them (additive strands, Voyage's stone bands, nebulae); distant hues averaged in RGB cancel toward grey (Aurora 1.0 lost 70% of its chroma there).
+- **One contrasting accent** that works as a small detail and as Ink's large second ink. Not complementary to the primary in styles that add them as equal light: Wisp's second flame is the accent, and green + magenta flames add up to white (Acid moved to an ultraviolet accent).
+- **Highlight:** a lighter version of the core, warm cores toward yellow, cool cores toward cyan.
+- **High chroma, matched lightness:** palettes are defined in OKLCH and converted with gamut mapping by chroma reduction (`src/engine/oklch.ts`), so brightness is even across palettes; primaries sit at L 0.55–0.68. Yellow and gold need care: a dark yellow reads olive, so golds stay light and the engine's `shade` slot (the primary's dark tone) turns them toward amber; yellow-greens stay lighter instead.
+- **Dark, palette-tinted background** (OKLCH L 0.13–0.16, a whisper of chroma); a lighter floor lowers Ink Glow's flicker swings. Sumi's paper stays bone.
+- **Styles never average two distant slots in RGB.** Mix along the hue (Voyage's `keepChroma`) or let bands pick one colour. Additive build-up is compressed hue-preservingly (Wisp's smoke), so dense light stays coloured instead of greying.
+
+**The set (keys 1–9; OKLCH L C h — bg / primary / secondary / accent / highlight):**
+
+| # | Palette | bg | primary | secondary | accent | highlight |
+|---|---|---|---|---|---|---|
+| 1 | Ocean | .133 .014 284 | .572 .174 262 | .457 .174 294 | .770 .121 195 | .793 .099 232 |
+| 2 | Aurora | .16 .022 200 | .66 .16 158 | .62 .11 195 | .62 .22 315 | .88 .12 170 |
+| 3 | Ember | .142 .010 33 | .626 .198 37 | .655 .131 70 | .522 .173 17 | .847 .155 89 |
+| 4 | Neon | .14 .012 302 | .669 .280 328 | .871 .148 195 | .952 .203 110 | .687 .200 353 |
+| 5 | Crimson | .139 .012 6 | .591 .228 21 | .608 .167 38 | .627 .221 345 | .683 .174 28 |
+| 6 | Solar | .15 .02 60 | .68 .155 68 | .63 .18 48 | .66 .22 355 | .90 .13 80 |
+| 7 | Violet | .139 .012 308 | .548 .230 302 | .554 .199 328 | .490 .206 276 | .702 .178 313 |
+| 8 | Sunset | .14 .025 330 | .64 .24 355 | .55 .24 315 | .72 .18 55 | .86 .09 50 |
+| 9 | Acid | .16 .028 150 | .64 .21 145 | .70 .20 132 | .60 .24 280 | .86 .15 165 |
+
+Ocean, Ember, Neon, Crimson and Violet are v0.1's colours exactly (Neon's background lifted from L 0.125 to 0.14 like the others'). The four duotones are gone; saved choices migrate by name (settings v8).
+
+**Custom hue** builds the same structure from one hue: primary at L 0.62 (+ a hue lift toward the gamut cusp: yellows and cyans lighter, blues darker), secondary +35°, accent +150°, highlight L 0.88 leaning to yellow or cyan. **Auto Drift** turns every hue in OKLCH with the same lift; palette changes crossfade in OKLCH along the shorter hue arc (never through grey).
+
+**Metrics and gates** (`npm run verify -- --palette-matrix`, `scripts/palette-metrics.py`, thresholds in `scripts/palette-thresholds.json`, calibrated on the 1.0 palettes: good = Ocean / Neon / Crimson / Violet, bad = Ivory / Black, Aurora in Voyage). Per frame on the content (lit pixels on dark looks, ink on paper): mean OKLCH chroma (≥ 0.85 × the lowest good palette in that combo), grey share (≤ highest good + 10 points), off-palette share (hues far from every palette hue and from the arcs between nearby ones; ≤ highest good + 10), olive share (dark yellows; ≤ highest good + 5), exposure (content L and whole-frame L within ±0.07 of Ocean in the same combo), separation (k-means ΔE ≥ 0.8 × lowest good; Ink A vs B ΔE×100 ≥ 10). Plus the flicker / blown-out gates for every palette × combo (`palette-matrix.mjs --flicker`).
+
