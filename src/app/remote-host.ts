@@ -1,5 +1,5 @@
 /**
- * The output's side of the controller link (D83): broadcasts the state the
+ * The output's side of the controller link (D84): broadcasts the state the
  * controller mirrors, applies its calls, runs its forwarded shortcuts, and
  * keeps the preview tap running only while a controller is there. Losing the
  * controller (closed, crashed) changes nothing on the output.

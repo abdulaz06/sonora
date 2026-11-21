@@ -1,6 +1,6 @@
 /**
  * Controller preview: a small copy of exactly what the output shows, at
- * PREVIEW_FPS, without costing the output a frame (D83). Two techniques,
+ * PREVIEW_FPS, without costing the output a frame (D84). Two techniques,
  * chosen by measurement (sprint log):
  *
  * - 'bitmap': right after a frame is drawn (the canvas still holds it),

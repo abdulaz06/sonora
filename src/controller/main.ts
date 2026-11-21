@@ -1,5 +1,5 @@
 /**
- * The controller: sonora's remote for a second screen (D83). The visual runs
+ * The controller: sonora's remote for a second screen (D84). The visual runs
  * full screen on the output (the TV); this window shows a live preview of
  * exactly what it shows, now playing, Set Mode, style / look / view, palettes
  * (Album first), quick feel controls, the output display, blackout and freeze,

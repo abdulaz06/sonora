@@ -1,6 +1,6 @@
 /**
  * The link between the output (the window showing the visual) and the
- * controller (the remote on a second screen, D83). One source of truth: the
+ * controller (the remote on a second screen, D84). One source of truth: the
  * output owns every setting and the engine; the controller mirrors the state
  * it broadcasts and sends calls back. Both windows share an origin, so a
  * BroadcastChannel carries it (two Tauri windows share one WebView2

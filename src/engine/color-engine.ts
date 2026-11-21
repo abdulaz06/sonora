@@ -74,7 +74,7 @@ const ACCENT_OFFSET = 70;
 /** Neon's Auto Drift window (turn degrees): its magenta / cyan / yellow triad,
  * turned further, lands on complementary pairs whose light adds up to olive in
  * Wisp and Voyage (90–150°) or on dull Warp streaks. Measured with the palette
- * matrix in 5° steps (D81): −20…+40° pass every gate, −25° and +45° fail Warp's
+ * matrix in 5° steps (D82): −20…+40° pass every gate, −25° and +45° fail Warp's
  * chroma floor (0.093); the window keeps a margin (Warp ≥ 0.100). */
 const NEON_DRIFT_WINDOW: [number, number] = [-15, 35];
 /** Album palettes (paletteFromCover): a cover colour is used as the secondary
@@ -108,7 +108,7 @@ export interface Palette {
   paper: OKLCH;
   /** Wide-hue palettes (Neon): Auto Drift sways between these turns (degrees,
    * min < 0 < max) instead of turning all the way round; every turn inside
-   * passes the colour gates (D81). */
+   * passes the colour gates (D82). */
   driftWindow?: [number, number];
 }
 
@@ -530,7 +530,7 @@ export class ColorEngine {
   get driftPeriodSeconds(): number { return this.driftPeriod; }
   /** Album colours are driving the palette right now. */
   get albumActive(): boolean { return this.album !== null; }
-  /** Current Auto Drift hue offset in degrees (0 while album colours drive: D82). */
+  /** Current Auto Drift hue offset in degrees (0 while album colours drive: D83). */
   get driftDegrees(): number { return this.autoDrift && !this.album ? this.driftPhase : 0; }
 
   /** Select a preset; `immediate` skips the crossfade. While album colours
@@ -561,7 +561,7 @@ export class ColorEngine {
   /** Album colours: crossfade (from what's on screen, drift included) to the
    * album palette, or back to the chosen palette with null. Auto Drift pauses
    * at turn 0 while an album drives and restarts from the chosen palette as
-   * it is (D82). The same colours again change nothing. */
+   * it is (D83). The same colours again change nothing. */
   setAlbum(p: Palette | null, fadeS = ALBUM_FADE_S, immediate = false): void {
     if (p === this.album || (p && this.album && samePalette(p, this.album))) return;
     const shown = this.current;

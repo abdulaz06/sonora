@@ -473,7 +473,7 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
   if (r.fpsCorner === 'bottom-left' || r.fpsCorner === 'bottom-right' || r.fpsCorner === 'top-left' || r.fpsCorner === 'top-right') out.fpsCorner = r.fpsCorner;
   // ── v9 ──
   // Album colours are on for new installs; anyone updating keeps the palette
-  // they chose and gets a one-time toast offering them (D82).
+  // they chose and gets a one-time toast offering them (D83).
   if (version < 9) {
     out.albumColours = false;
     out.albumIntro = true;

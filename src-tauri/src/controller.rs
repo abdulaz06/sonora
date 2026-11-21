@@ -1,5 +1,5 @@
 //! The controller: a second window that works as a remote for the output (the
-//! Set Mode controller view, D83). The two windows talk over a
+//! Set Mode controller view, D84). The two windows talk over a
 //! BroadcastChannel (same origin, same WebView2 environment); this module only
 //! opens the window. Closing it never touches the output.
 

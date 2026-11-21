@@ -74,7 +74,7 @@ export function createSetMode(ctl: Controller, onChange: (on: boolean) => void, 
     // Views: driving music leans to Depth for Ink (the camera banks and lurches), calm to Flat.
     const depth = piece.views.length > 1 ? rand() < (piece.style === 'ink' ? 0.35 + 0.5 * e : 0.5) : piece.views[0] === 'depth';
     let palette: number | null = null;
-    // Album colours on: the cover chooses the colours (D82).
+    // Album colours on: the cover chooses the colours (D83).
     if (s.setMode.palettes && !s.albumColours) {
       const list = PALETTES.map((_, i) => i).filter((i) => i !== s.paletteIndex);
       palette = list[Math.floor(rand() * list.length)] ?? null;
