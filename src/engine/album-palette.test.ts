@@ -85,7 +85,8 @@ describe('album palette: building', () => {
     for (let h = 0; h < 360; h += 7.5) {
       if (h > 65 && h < 140) continue;   // the olive band splits at 118° for covers (102.5° for custom)
       const a = paletteFromCover({ primary: h }), b = paletteFromHue(h);
-      expect({ ...a, name: '' }).toEqual({ ...b, name: '' });
+      // (The floor lifts for gold to teal primaries: Ink Glow Depth flicker.)
+      expect({ ...a, name: '', bg: null }).toEqual({ ...b, name: '', bg: null });
     }
   });
 
@@ -105,11 +106,11 @@ describe('album palette: building', () => {
     }
   });
 
-  it('a near-complementary cover accent is pulled back to 165° on its side', () => {
+  it('a far cover accent is pulled back to 100° on its own side (far ones whiten Wisp)', () => {
     const p = paletteFromCover({ primary: 260, accent: 260 + 178 });
     const d = Math.abs(((p.accent[2] - p.primary[2] + 540) % 360) - 180);
-    expect(d).toBeLessThanOrEqual(166);
-    expect(d).toBeGreaterThanOrEqual(120);
+    expect(d).toBeLessThanOrEqual(101);
+    expect(d).toBeGreaterThanOrEqual(80);
   });
 
   it('a yellow cover reads gold, a green one lime; a gold accent on magenta is kept', () => {
@@ -119,6 +120,12 @@ describe('album palette: building', () => {
     const g = paletteFromCover({ primary: 343, secondary: 320, accent: 101 });
     expect(g.accent[2]).toBeGreaterThan(55);
     expect(g.accent[2]).toBeLessThan(72);
+  });
+
+  it('gold to teal primaries sit on a lighter floor (Aurora / Acid), others on the usual one', () => {
+    expect(paletteFromCover({ primary: 145 }).bg[0]).toBeCloseTo(0.16, 3);
+    expect(paletteFromCover({ primary: 262 }).bg[0]).toBeCloseTo(0.14, 3);
+    expect(paletteFromCover({ primary: 345 }).bg[0]).toBeCloseTo(0.14, 3);
   });
 
   it('a cyan cover accent stays cyan, as a light colour', () => {

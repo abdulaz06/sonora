@@ -79,10 +79,12 @@ const ACCENT_OFFSET = 70;
 const NEON_DRIFT_WINDOW: [number, number] = [-15, 35];
 /** Album palettes (paletteFromCover): a cover colour is used as the secondary
  * when it sits this far from the primary (degrees, analogous), and as the
- * accent from COVER_ACC_RANGE[0] on, pulled back to COVER_ACC_RANGE[1] when it
- * is nearer complementary (Acid's 175° magenta whitened Wisp; 135–157° pass). */
+ * accent from COVER_ACC_RANGE[0] on, pulled back to COVER_ACC_RANGE[1] on its
+ * own side when it is further: in the test set, cover accents 118–167° from
+ * the primary (red + blue, purple + orange, purple + gold) added up to white
+ * in Wisp's smoke (grey 34–51%), as Acid's magenta did (D67). */
 const COVER_SEC_RANGE: [number, number] = [18, 62];
-const COVER_ACC_RANGE: [number, number] = [45, 165];
+const COVER_ACC_RANGE: [number, number] = [45, 100];
 /** Album palettes: a cover hue in the olive band snaps to gold up to this hue
  * and to lime above it (custom hue splits at the band's middle, 102.5°): a
  * yellow cover reads gold, not lime. */
@@ -91,6 +93,13 @@ const COVER_OLIVE_SPLIT = 118;
  * cyan (Ocean's accent: L 0.77, C 0.12 passes every gate) instead of turning azure. */
 const COVER_CYAN_ACCENT_L = 0.77;
 const COVER_CYAN_ACCENT_C = 0.125;
+/** Album palettes with a gold, lime, green or teal primary sit on a lighter,
+ * slightly tinted floor, as Aurora and Acid do (D67): against the darkest
+ * floor Ink Glow Depth's hits swung 2.58–2.67/s (gate 2.5) with those bright
+ * hues. Weight 1 from COVER_FLOOR_HUES[1] to [2], easing in and out over 20°. */
+const COVER_FLOOR_HUES = [50, 70, 170, 190];
+const COVER_FLOOR_L = 0.02;
+const COVER_FLOOR_C = 0.008;
 
 export type RGB = [number, number, number];
 
@@ -408,13 +417,18 @@ export function paletteFromCover(c: CoverHues, name = 'Album'): Palette {
   const warm = h < 90 || h >= 300;
   const hh = warm ? h + Math.max(-15, Math.min(15, angDiff(80, h))) : h + Math.max(-15, Math.min(15, angDiff(195, h)));
   const primary = vivid(0.6, h, 0.22, 1);
-  const secondary = vivid(0.55, secFromCover || sec === h0 ? sec : bandHue(sec, true), 0.2, 0.9);
+  const secHue = secFromCover || sec === h0 ? sec : bandHue(sec, true);
+  // A cover's cyan secondary is kept as a light cyan, like a cyan accent (a mid-light
+  // one was dull: Warp's streaks fell under its chroma floor).
+  const cyanSec = secFromCover && secHue > BANDS[1][0] && secHue < BANDS[1][1];
+  const secondary: OKLCH = cyanSec ? [COVER_CYAN_ACCENT_L - 0.05, Math.min(COVER_CYAN_ACCENT_C + 0.015, maxChroma(COVER_CYAN_ACCENT_L - 0.05, secHue) * 0.95), secHue] : vivid(0.55, secHue, 0.2, 0.9);
   const accent: OKLCH = cyanAccent
     ? [COVER_CYAN_ACCENT_L, Math.min(COVER_CYAN_ACCENT_C, maxChroma(COVER_CYAN_ACCENT_L, acc) * 0.95), acc]
     : vivid(0.64, bandHue(acc, true), 0.2, 0.9);
   const hl = warm ? 0.88 : 0.86;
   const highlight: OKLCH = [hl, Math.min(0.13, maxChroma(hl, hh) * 0.95), wrapHue(hh)];
-  return pal(name, [0.14, 0.02, h], primary, secondary, accent, highlight);
+  const lift = smooth(COVER_FLOOR_HUES[0], COVER_FLOOR_HUES[1], h) * (1 - smooth(COVER_FLOOR_HUES[2], COVER_FLOOR_HUES[3], h));
+  return pal(name, [0.14 + COVER_FLOOR_L * lift, 0.02 + COVER_FLOOR_C * lift, h], primary, secondary, accent, highlight);
 }
 
 /** Through the bands like a still custom pick, but the olive band splits at
