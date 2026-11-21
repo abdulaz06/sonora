@@ -75,7 +75,8 @@ def main():
             d.text((x, y + 60), 'no palette:\nthe chosen one stays', fill=DIM, font=f_small)
         x += 150 + 12
         for cid, lbl in COMBOS:
-            p = os.path.join(FR, cid, e['name'], SHOT)
+            # Silk's drop frame is its bone inversion cut in every palette: show its build instead.
+            p = os.path.join(FR, cid, e['name'], 'house-124-build.png' if cid.startswith('silk') else SHOT)
             if e.get('resolved') and os.path.exists(p):
                 row.paste(Image.open(p).convert('RGB').resize((FW, ROW_H)), (x, y))
             if not rows:
