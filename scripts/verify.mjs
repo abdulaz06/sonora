@@ -21,6 +21,8 @@
 //   --out <dir>         output dir (default verify/<style>[-<look>][-flat][-camera][-light]/<track>)
 //   --headed            show the browser
 //   --no-bench          skip the FPS measurement
+//   --preview-cost      controller preview: frame cost with the tap off / every frame / every 2nd / 6th (D83)
+//   --preview           with --pacing: the controller's preview tap runs at its real rate
 //   --pacing            real-time frame pacing on the display (renderer's own rAF loop):
 //                       interval mean / p99 and held frames per cap (match, 1/2, 60)
 //   --dt-sweep          frame-rate independence (forwards to scripts/dt-sweep.mjs)
@@ -77,6 +79,8 @@ function parseArgs(argv) {
     else if (a === '--debug') o.debug = JSON.parse(next());
     else if (a === '--caps') o.caps = next();
     else if (a === '--seconds') o.seconds = Number(next());
+    else if (a === '--preview') o.preview = true;
+    else if (a === '--preview-cost') o.previewCost = true;
   }
   return o;
 }
@@ -135,6 +139,13 @@ try {
   const view = opts.flat ? 'flat' : 'depth';
   const summary = [];
   console.log(`GPU: ${gpu}`);
+
+  if (opts.previewCost) {
+    await runPreviewCost(page, tracks[names[0]], names[0]);
+    await browser.close();
+    cleanup();
+    process.exit(process.exitCode ?? 0);
+  }
 
   if (opts.pacing) {
     await runPacing(page, tracks[names[0]], names[0]);
@@ -265,6 +276,36 @@ try {
   process.exit(1);
 }
 
+// ── Controller preview cost (D83) ───────────────────────────────────
+// Frame cost (step + GPU sync) with the preview tap off, and capturing every
+// 1st / 2nd / 6th frame, interleaved over rounds; median per setting. At 60 Hz
+// the real rate (25 fps) is about every 2.4th frame, at 165 Hz every 6.6th.
+// Gate: the real-rate increase ≤ 0.3 ms.
+async function runPreviewCost(page, meta, name) {
+  const MAX_ADD_MS = 0.3;
+  await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera }), opts);
+  await page.evaluate((n) => window.__sonora.loadTrack(n), name);
+  await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, meta.markers.drop - 2));
+  await page.evaluate(() => window.__sonora.advance(2, 1 / 60));
+  const settings = [0, 1, 2, 6];
+  const res = Object.fromEntries(settings.map((e) => [e, []]));
+  for (let round = 0; round < 5; round++) {
+    for (const every of settings) {
+      await page.evaluate((e) => window.__sonora.previewTap({ on: e > 0, every: e }), every);
+      res[every].push(await page.evaluate(() => window.__sonora.frameCost(120, 1 / 60)));
+    }
+  }
+  await page.evaluate(() => window.__sonora.previewTap({ on: false }));
+  const med = (a) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
+  const off = med(res[0]);
+  const add = (e) => med(res[e]) - off;
+  const at60 = add(1) / 2.4, at165 = add(1) / 6.6;
+  console.log(`${name} [${opts.style}/${opts.variant || 'default'} ${opts.flat ? 'flat' : 'depth'} ${opts.size}]: frame cost off ${off.toFixed(3)} ms; capture every frame +${add(1).toFixed(3)}, every 2nd +${add(2).toFixed(3)}, every 6th +${add(6).toFixed(3)} ms → at 25 fps on 60 Hz +${at60.toFixed(3)} ms/frame, on 165 Hz +${at165.toFixed(3)} ms/frame`);
+  const ok = add(2) <= MAX_ADD_MS && at60 <= MAX_ADD_MS;
+  console.log(ok ? '  preview cost PASS' : '  PREVIEW COST FAIL');
+  if (!ok) process.exitCode = 1;
+}
+
 // ── Real-time frame pacing ──────────────────────────────────────────
 // Runs the renderer's own rAF loop (the app's pacing code) at the display's
 // real refresh for a while per cap and reports the intervals between rendered
@@ -283,6 +324,8 @@ async function runPacing(page, meta, name) {
     await page.evaluate((o) => window.__sonora.configure({ style: o.style, variant: o.variant || undefined, depth: !o.flat, light: o.light, quality: o.quality, palette: o.palette, drift: false, camera: o.camera, responsiveness: o.resp, debug: o.debug }), opts);
     await page.evaluate((n) => window.__sonora.loadTrack(n), name);
     await page.evaluate((s) => window.__sonora.analyseOnly(s), Math.max(0, meta.markers.drop - 2));
+    // --preview: the controller's preview tap runs at its real rate (D83).
+    if (opts.preview) await page.evaluate(() => window.__sonora.previewTap({ on: true }));
     // Warm up (shader compiles, refresh measurement), then measure.
     await page.evaluate((c) => window.__sonora.pacingRun(1.5, c), cap);
     const { frames, displayHz } = await page.evaluate(([s, c]) => window.__sonora.pacingRun(s, c), [secs, cap]);

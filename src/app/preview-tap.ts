@@ -50,6 +50,9 @@ export class PreviewTap {
   private hookN = 0;
   private hookT0 = 0;
   readonly stats: PreviewStats = { captures: 0, sent: 0, hookMs: 0, dropped: 0 };
+  /** Harness only: capture every n-th frame regardless of time (0 = by time, PREVIEW_FPS). */
+  forceEvery = 0;
+  private frameN = 0;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -69,7 +72,9 @@ export class PreviewTap {
     if (!this.active) return;
     const t0 = performance.now();
     this.collect();
-    if (nowMs - this.last >= 1000 / PREVIEW_FPS - 2) {
+    this.frameN++;
+    const due = this.forceEvery > 0 ? this.frameN % this.forceEvery === 0 : nowMs - this.last >= 1000 / PREVIEW_FPS - 2;
+    if (due) {
       const slot = this.slots.find((s) => !s.fence);
       if (slot) { this.capture(slot); this.last = nowMs; } else this.stats.dropped++;
     }

@@ -27,6 +27,7 @@ import type { SonoraEvent } from '../engine/events';
 import type { LightMode, StyleId } from '../styles/visual-style';
 import { setDebugFlags, type DebugFlags } from '../engine/debug-flags';
 import { coverPixels } from '../app/album-colours';
+import { PreviewTap, type PreviewStats } from '../app/preview-tap';
 import { extractAlbum } from '../engine/album-palette';
 import type { MediaInfo } from '../app/stores';
 
@@ -80,6 +81,9 @@ export interface HarnessApi {
   currentPalette(): ResolvedPalette;
   /** Whether Auto Drift on preset `index` is crossing a skipped stretch at `phase`. */
   driftCrossing(index: number, phase: number): boolean;
+  /** Controller preview tap on this page's renderer (cost measurements): on/off, and
+   * capture every n-th frame (0 = the real rate, PREVIEW_FPS by time). */
+  previewTap(o: { on: boolean; every?: number }): PreviewStats | null;
   /** Album colours: extract a cover (data: URL) exactly as the app does. */
   albumExtract(src: string): Promise<{ kind: string; hues: unknown; resolved: ResolvedPalette | null; colours: { lch: number[]; share: number; neutral: boolean }[] }>;
 }
@@ -284,6 +288,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
   renderer.onEvent((e) => events.push(e));
   const gl = renderer.canvas.getContext('webgl2');
   const hits: { t: number; bass: number; mid: number; high: number }[] = [];
+  let tap: PreviewTap | null = null;
   source.subscribe((f) => hits.push({
     t: source.offlineTime, bass: Math.max(f.hits.sub_bass, f.hits.bass),
     mid: Math.max(f.hits.low_mid, f.hits.mid, f.hits.upper_mid), high: Math.max(f.hits.high, f.hits.air),
@@ -425,6 +430,15 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
     },
     currentPalette: () => renderer.colorEngine.getResolved(),
     driftCrossing: (index, phase) => driftCrossing(PALETTES[index], phase),
+    previewTap(o) {
+      if (!gl) return null;
+      tap ??= new PreviewTap(gl);
+      const t = tap;
+      t.forceEvery = o.every ?? 0;
+      t.setActive(o.on);
+      renderer.setFrameHook(o.on ? (_g, now) => t.onFrame(now) : null);
+      return { ...t.stats };
+    },
     async albumExtract(src: string) {
       const px = await coverPixels(src);
       if (!px) return { kind: 'unreadable', hues: null, resolved: null, colours: [] };

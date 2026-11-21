@@ -42,7 +42,7 @@ export default defineConfig(async () => ({
     // @ts-expect-error process is a nodejs global
     watch: process.env.SONORA_VITE_CACHE ? null : {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**", "**/media/**", "**/verify/**"],
+      ignored: ["**/src-tauri/**", "**/target/**", "**/media/**", "**/verify/**", "**/local-media/**", "**/site/**"],
     },
   },
 }));
