@@ -51,4 +51,5 @@ Add several reels to the queue in the studio, then run `npm run reel -- --queue`
 - Renders are deterministic: the same plan gives the same video. Analysis always starts at the beginning of the song, and every shot warms up for 8 s before its first frame, so nothing starts cold.
 - A plan is plain JSON (studio: *Save plan*, in `local-media/reels/plans/`). You can edit one and render it with `npm run reel -- <plan.json>` (`--draft` for a quick one).
 - Check how a reel survives Instagram's compression with `node scripts/reel/ig-check.mjs <reel.mp4>`: it re-encodes it Instagram-style and reports fidelity, banding in dark gradients, and added shimmer.
+- Warp is the hardest style for Instagram's compression: its full-frame fine streaks lose the most detail when Instagram re-encodes (a Warp-only reel kept SSIM 0.62 after the re-encode, the other styles 0.91–0.97, and softening it first didn't help). Use it as a short moment (a beat switch or a styles tour) rather than for a whole reel.
 - Never commit songs, covers or renders. `local-media/` is git-ignored for that reason.
