@@ -81,8 +81,9 @@ describe('album palette: extraction', () => {
 });
 
 describe('album palette: building', () => {
-  it('with only a primary it is exactly the custom-hue palette', () => {
+  it('with only a primary it is exactly the custom-hue palette (yellows aside: gold, not lime)', () => {
     for (let h = 0; h < 360; h += 7.5) {
+      if (h > 65 && h < 140) continue;   // the olive band splits at 118° for covers (102.5° for custom)
       const a = paletteFromCover({ primary: h }), b = paletteFromHue(h);
       expect({ ...a, name: '' }).toEqual({ ...b, name: '' });
     }
@@ -104,11 +105,26 @@ describe('album palette: building', () => {
     }
   });
 
-  it('a near-complementary cover accent is pulled back to 150° on its side', () => {
+  it('a near-complementary cover accent is pulled back to 165° on its side', () => {
     const p = paletteFromCover({ primary: 260, accent: 260 + 178 });
     const d = Math.abs(((p.accent[2] - p.primary[2] + 540) % 360) - 180);
-    expect(d).toBeLessThanOrEqual(151);
+    expect(d).toBeLessThanOrEqual(166);
     expect(d).toBeGreaterThanOrEqual(120);
+  });
+
+  it('a yellow cover reads gold, a green one lime; a gold accent on magenta is kept', () => {
+    expect(paletteFromCover({ primary: 108 }).primary[2]).toBeLessThan(70);
+    expect(paletteFromCover({ primary: 125 }).primary[2]).toBeGreaterThan(136);
+    // Magenta / purple with a yellow accent (a famous kind of cover): gold, not a derived blue.
+    const g = paletteFromCover({ primary: 343, secondary: 320, accent: 101 });
+    expect(g.accent[2]).toBeGreaterThan(55);
+    expect(g.accent[2]).toBeLessThan(72);
+  });
+
+  it('a cyan cover accent stays cyan, as a light colour', () => {
+    const p = paletteFromCover({ primary: 300, accent: 205 });
+    expect(near(p.accent[2], 205, 2)).toBe(true);
+    expect(p.accent[0]).toBeGreaterThan(0.74);
   });
 
   it('keeps the cover’s colours recognisable: hues within the band rules', () => {
@@ -116,9 +132,7 @@ describe('album palette: building', () => {
     expect(near(p.primary[2], 330, 6)).toBe(true);
     expect(near(p.secondary[2], 300, 6)).toBe(true);
     expect(near(p.accent[2], 250, 6)).toBe(true);
-    // A cyan accent leaves the dull cyan band like a custom one (Marble's second ink).
-    const c = paletteFromCover({ primary: 330, accent: 205 });
-    expect(c.accent[2] <= 165 || c.accent[2] >= 241).toBe(true);
+
     expect(near(hueOf(resolvePalette(p).primary), 330, 6)).toBe(true);
   });
 });

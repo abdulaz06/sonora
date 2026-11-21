@@ -81,7 +81,15 @@ const NEON_DRIFT_WINDOW: [number, number] = [-20, 40];
  * accent from COVER_ACC_RANGE[0] on, pulled back to COVER_ACC_RANGE[1] when it
  * is nearer complementary (Acid's 175° magenta whitened Wisp; 135–157° pass). */
 const COVER_SEC_RANGE: [number, number] = [18, 62];
-const COVER_ACC_RANGE: [number, number] = [45, 150];
+const COVER_ACC_RANGE: [number, number] = [45, 165];
+/** Album palettes: a cover hue in the olive band snaps to gold up to this hue
+ * and to lime above it (custom hue splits at the band's middle, 102.5°): a
+ * yellow cover reads gold, not lime. */
+const COVER_OLIVE_SPLIT = 118;
+/** Album palettes: a cover accent in the cyan band keeps its hue as a light
+ * cyan (Ocean's accent: L 0.77, C 0.12 passes every gate) instead of turning azure. */
+const COVER_CYAN_ACCENT_L = 0.77;
+const COVER_CYAN_ACCENT_C = 0.125;
 
 export type RGB = [number, number, number];
 
@@ -371,36 +379,62 @@ export interface CoverHues {
  * it equals paletteFromHue(primary) (tested). Paper stays bone (Sumi). */
 export function paletteFromCover(c: CoverHues, name = 'Album'): Palette {
   const h0 = wrapHue(c.primary);
-  const h = bandHue(h0, true);
+  const h = coverSnap(h0);
   const moved = Math.abs(angDiff(h, h0)) > 12;
   let sec = moved && !inOlive(h0) ? h0 : inOlive(h + 35) && !inOlive(h - 35) ? h - 35 : h + 35;
   let secFromCover = false;
   if (c.secondary !== undefined) {
     // An olive secondary snaps to its band's nearer edge; a cyan one is kept
     // (as a picked cyan is for custom); either way it must stay analogous.
-    const s = inOlive(c.secondary) ? bandHue(c.secondary, true) : wrapHue(c.secondary);
+    const s = inOlive(c.secondary) ? coverSnap(c.secondary) : wrapHue(c.secondary);
     const d = Math.abs(angDiff(s, h));
     if (d >= COVER_SEC_RANGE[0] && d <= COVER_SEC_RANGE[1]) { sec = s; secFromCover = true; }
   }
   let acc = arcHitsOlive(h, h - ACCENT_OFFSET) ? h + ACCENT_OFFSET : h - ACCENT_OFFSET;
+  let cyanAccent = false;
   if (c.accent !== undefined) {
     // Complementary accents add up to white with the core (Wisp's flames):
     // nudge them back to COVER_ACC_RANGE[1] on their own side.
     const d = angDiff(c.accent, h);
     const ad = Math.abs(d);
     if (ad >= COVER_ACC_RANGE[0]) {
-      const a = bandHue(h + Math.sign(d || 1) * Math.min(ad, COVER_ACC_RANGE[1]), true);
-      if (!arcHitsOlive(h, a) && Math.abs(angDiff(a, h)) >= COVER_ACC_RANGE[0]) acc = a;
+      const raw = wrapHue(h + Math.sign(d || 1) * Math.min(ad, COVER_ACC_RANGE[1]));
+      const cyan = raw > BANDS[1][0] && raw < BANDS[1][1];
+      const a = cyan ? raw : coverSnap(raw);
+      if (!arcCrossesOlive(h, a) && Math.abs(angDiff(a, h)) >= COVER_ACC_RANGE[0]) { acc = a; cyanAccent = cyan; }
     }
   }
   const warm = h < 90 || h >= 300;
   const hh = warm ? h + Math.max(-15, Math.min(15, angDiff(80, h))) : h + Math.max(-15, Math.min(15, angDiff(195, h)));
   const primary = vivid(0.6, h, 0.22, 1);
   const secondary = vivid(0.55, secFromCover || sec === h0 ? sec : bandHue(sec, true), 0.2, 0.9);
-  const accent = vivid(0.64, bandHue(acc, true), 0.2, 0.9);
+  const accent: OKLCH = cyanAccent
+    ? [COVER_CYAN_ACCENT_L, Math.min(COVER_CYAN_ACCENT_C, maxChroma(COVER_CYAN_ACCENT_L, acc) * 0.95), acc]
+    : vivid(0.64, bandHue(acc, true), 0.2, 0.9);
   const hl = warm ? 0.88 : 0.86;
   const highlight: OKLCH = [hl, Math.min(0.13, maxChroma(hl, hh) * 0.95), wrapHue(hh)];
   return pal(name, [0.14, 0.02, h], primary, secondary, accent, highlight);
+}
+
+/** Through the bands like a still custom pick, but the olive band splits at
+ * COVER_OLIVE_SPLIT: yellows go gold, greens go lime. */
+function coverSnap(x: number): number {
+  const h = wrapHue(x);
+  const [a, b] = BANDS[0];
+  if (h > a && h < b) return h <= COVER_OLIVE_SPLIT ? a + ((h - a) / (COVER_OLIVE_SPLIT - a)) * 3 : b - 3 + ((h - COVER_OLIVE_SPLIT) / (b - COVER_OLIVE_SPLIT)) * 3;
+  return bandHue(h, true);
+}
+
+/** Does the shorter arc between two hues pass through the olive band? Only
+ * its inside counts: a gold or lime end at the band's edge is fine (magenta
+ * to gold blends through red and orange, never olive). */
+function arcCrossesOlive(a: number, b: number): boolean {
+  const d = angDiff(b, a);
+  for (let i = 1; i < 16; i++) {
+    const x = wrapHue(a + (d * i) / 16);
+    if (x > BANDS[0][0] + 4 && x < BANDS[0][1] - 4) return true;
+  }
+  return false;
 }
 
 function lerpPalette(a: Palette, b: Palette, t: number): Palette {
