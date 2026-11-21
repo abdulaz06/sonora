@@ -97,7 +97,7 @@ const COVER_CYAN_ACCENT_C = 0.125;
  * slightly tinted floor, as Aurora and Acid do (D67): against the darkest
  * floor Ink Glow Depth's hits swung 2.58–2.67/s (gate 2.5) with those bright
  * hues. Weight 1 from COVER_FLOOR_HUES[1] to [2], easing in and out over 20°. */
-const COVER_FLOOR_HUES = [50, 70, 170, 190];
+const COVER_FLOOR_HUES = [40, 55, 170, 190];
 const COVER_FLOOR_L = 0.02;
 const COVER_FLOOR_C = 0.008;
 
