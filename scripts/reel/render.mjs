@@ -54,9 +54,9 @@ const dataUrl = (file) => `data:${/\.png$/i.test(file) ? 'image/png' : 'image/jp
 // ── Frames ──────────────────────────────────────────────────────
 async function renderFrames(browser, plan, song, dirFrames, draft) {
   const [OW, OH] = plan.size;
-  const ss = draft ? 0.5 : plan.supersample ?? 1.333;
+  const ss = plan.supersample ?? 1.333;
   const RW = Math.round((OW * ss) / 2) * 2, RH = Math.round((OH * ss) / 2) * 2;
-  const fps = draft ? 30 : plan.fps ?? 60;
+  const fps = plan.fps ?? 60;
   const { start: W0, end: W1 } = plan.window;
   const total = Math.round((W1 - W0) * fps);
   const portrait = OH > OW ? 1 : 0;
@@ -71,7 +71,7 @@ async function renderFrames(browser, plan, song, dirFrames, draft) {
     page.on('pageerror', (e) => console.log('  [page]', e.message));
     await page.goto(`http://localhost:${PORT}/web.html?harness=1`);
     await page.waitForFunction(() => window.__sonora?.ready === true, null, { timeout: 60000 });
-    await page.evaluate((c) => window.__sonora.configure(c), { style: s.style, variant: s.variant, depth: !!s.depth, light: s.light ?? 'auto', quality: draft ? 'medium' : plan.quality ?? 'high', drift: false, camera: s.camera, responsiveness: plan.responsiveness, debug: { portrait } });
+    await page.evaluate((c) => window.__sonora.configure(c), { style: s.style, variant: s.variant, depth: !!s.depth, light: s.light ?? 'auto', quality: plan.quality ?? 'high', drift: false, camera: s.camera, responsiveness: plan.responsiveness, debug: { portrait } });
     const pal = s.palette ?? 0;
     if (pal === 'album' || pal?.album) {
       if (!albumResolved) {
@@ -228,8 +228,10 @@ function caption(plan, song) {
   void s0;
 }
 
-export async function renderPlan(plan, opts = {}) {
+export async function renderPlan(planIn, opts = {}) {
   const draft = !!opts.draft;
+  // Drafts: half size, 30 fps, Medium quality, encoded at that size (small files to look through).
+  const plan = draft ? { ...planIn, size: [Math.round(planIn.size[0] / 4) * 2, Math.round(planIn.size[1] / 4) * 2], supersample: 1, fps: 30, quality: 'medium' } : planIn;
   const song = songFor(plan);
   song.cover = plan.cover ?? (plan.track ? null : findCover(listSongs().find((x) => x.slug === song.slug)));
   const analysis = plan.track ? null : analyse(listSongs().find((x) => x.slug === song.slug));
@@ -243,7 +245,7 @@ export async function renderPlan(plan, opts = {}) {
   try {
     const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
     if (!opts.encodeOnly) info = await renderFrames(browser, plan, song, dirFrames, draft);
-    else info = { fps: draft ? 30 : plan.fps ?? 60 };
+    else info = { fps: plan.fps ?? 60 };
     const layerDir = join(dirFrames, 'layers');
     mkdirSync(layerDir, { recursive: true });
     const layers = opts.framesOnly ? [] : await renderLayers(browser, plan, song, layerDir);
