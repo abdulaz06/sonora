@@ -7,8 +7,8 @@
    "look": "circle",
    "view": null,
    "stills": {
-    "1280": "aura-1280.webp",
-    "640": "aura-640.webp"
+    "640": "aura-640.webp",
+    "1280": "aura-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -268,8 +268,8 @@
    "look": "soft",
    "view": null,
    "stills": {
-    "1280": "halo-1280.webp",
-    "640": "halo-640.webp"
+    "640": "halo-640.webp",
+    "1280": "halo-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -289,8 +289,8 @@
    "look": "glow",
    "view": "depth",
    "stills": {
-    "1280": "ink-1280.webp",
-    "640": "ink-640.webp"
+    "640": "ink-640.webp",
+    "1280": "ink-1280.webp"
    },
    "loop": "ink.webm",
    "loopSeconds": 4,
@@ -310,8 +310,8 @@
    "look": "glow",
    "view": "depth",
    "stills": {
-    "1280": "ink-glow-1280.webp",
-    "640": "ink-glow-640.webp"
+    "640": "ink-glow-640.webp",
+    "1280": "ink-glow-1280.webp"
    },
    "loop": "ink-glow.webm",
    "loopSeconds": 4,
@@ -331,8 +331,8 @@
    "look": "marble",
    "view": "depth",
    "stills": {
-    "1280": "ink-marble-1280.webp",
-    "640": "ink-marble-640.webp"
+    "640": "ink-marble-640.webp",
+    "1280": "ink-marble-1280.webp"
    },
    "loop": "ink-marble.webm",
    "loopSeconds": 4,
@@ -352,8 +352,8 @@
    "look": "sumi",
    "view": "depth",
    "stills": {
-    "1280": "ink-sumi-1280.webp",
-    "640": "ink-sumi-640.webp"
+    "640": "ink-sumi-640.webp",
+    "1280": "ink-sumi-1280.webp"
    },
    "loop": "ink-sumi.webm",
    "loopSeconds": 4,
@@ -373,8 +373,8 @@
    "look": "glow",
    "view": "depth",
    "stills": {
-    "1280": "ink-view-depth-1280.webp",
-    "640": "ink-view-depth-640.webp"
+    "640": "ink-view-depth-640.webp",
+    "1280": "ink-view-depth-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -394,8 +394,8 @@
    "look": "glow",
    "view": "flat",
    "stills": {
-    "1280": "ink-view-flat-1280.webp",
-    "640": "ink-view-flat-640.webp"
+    "640": "ink-view-flat-640.webp",
+    "1280": "ink-view-flat-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -1315,8 +1315,8 @@
    "look": "silk",
    "view": "flat",
    "stills": {
-    "1280": "silk-1280.webp",
-    "640": "silk-640.webp"
+    "640": "silk-640.webp",
+    "1280": "silk-1280.webp"
    },
    "loop": "silk.webm",
    "loopSeconds": 4,
@@ -1336,8 +1336,8 @@
    "look": "silk",
    "view": "depth",
    "stills": {
-    "1280": "silk-view-depth-1280.webp",
-    "640": "silk-view-depth-640.webp"
+    "640": "silk-view-depth-640.webp",
+    "1280": "silk-view-depth-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -1357,8 +1357,8 @@
    "look": "silk",
    "view": "flat",
    "stills": {
-    "1280": "silk-view-flat-1280.webp",
-    "640": "silk-view-flat-640.webp"
+    "640": "silk-view-flat-640.webp",
+    "1280": "silk-view-flat-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -1378,8 +1378,8 @@
    "look": "void",
    "view": null,
    "stills": {
-    "1280": "voyage-1280.webp",
-    "640": "voyage-640.webp"
+    "640": "voyage-640.webp",
+    "1280": "voyage-1280.webp"
    },
    "loop": "voyage.webm",
    "loopSeconds": 4,
@@ -1399,8 +1399,8 @@
    "look": "city",
    "view": null,
    "stills": {
-    "1280": "voyage-city-1280.webp",
-    "640": "voyage-city-640.webp"
+    "640": "voyage-city-640.webp",
+    "1280": "voyage-city-1280.webp"
    },
    "loop": "voyage-city.webm",
    "loopSeconds": 3.5,
@@ -1420,8 +1420,8 @@
    "look": "ocean",
    "view": null,
    "stills": {
-    "1280": "voyage-ocean-1280.webp",
-    "640": "voyage-ocean-640.webp"
+    "640": "voyage-ocean-640.webp",
+    "1280": "voyage-ocean-1280.webp"
    },
    "loop": "voyage-ocean.webm",
    "loopSeconds": 3.5,
@@ -1441,8 +1441,8 @@
    "look": "void",
    "view": null,
    "stills": {
-    "1280": "voyage-void-1280.webp",
-    "640": "voyage-void-640.webp"
+    "640": "voyage-void-640.webp",
+    "1280": "voyage-void-1280.webp"
    },
    "loop": "voyage-void.webm",
    "loopSeconds": 2.5,
@@ -1462,8 +1462,8 @@
    "look": "warp",
    "view": null,
    "stills": {
-    "1280": "warp-1280.webp",
-    "640": "warp-640.webp"
+    "640": "warp-640.webp",
+    "1280": "warp-1280.webp"
    },
    "loop": "warp.webm",
    "loopSeconds": 4,
@@ -1483,8 +1483,8 @@
    "look": "ground",
    "view": "flat",
    "stills": {
-    "1280": "wisp-1280.webp",
-    "640": "wisp-640.webp"
+    "640": "wisp-640.webp",
+    "1280": "wisp-1280.webp"
    },
    "loop": "wisp.webm",
    "loopSeconds": 4,
@@ -1504,8 +1504,8 @@
    "look": "ground",
    "view": "depth",
    "stills": {
-    "1280": "wisp-ground-1280.webp",
-    "640": "wisp-ground-640.webp"
+    "640": "wisp-ground-640.webp",
+    "1280": "wisp-ground-1280.webp"
    },
    "loop": "wisp-ground.webm",
    "loopSeconds": 4,
@@ -1525,8 +1525,8 @@
    "look": "tunnel",
    "view": "depth",
    "stills": {
-    "1280": "wisp-tunnel-1280.webp",
-    "640": "wisp-tunnel-640.webp"
+    "640": "wisp-tunnel-640.webp",
+    "1280": "wisp-tunnel-1280.webp"
    },
    "loop": "wisp-tunnel.webm",
    "loopSeconds": 4,
@@ -1546,8 +1546,8 @@
    "look": "ground",
    "view": "depth",
    "stills": {
-    "1280": "wisp-view-depth-1280.webp",
-    "640": "wisp-view-depth-640.webp"
+    "640": "wisp-view-depth-640.webp",
+    "1280": "wisp-view-depth-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -1567,8 +1567,8 @@
    "look": "ground",
    "view": "flat",
    "stills": {
-    "1280": "wisp-view-flat-1280.webp",
-    "640": "wisp-view-flat-640.webp"
+    "640": "wisp-view-flat-640.webp",
+    "1280": "wisp-view-flat-1280.webp"
    },
    "loop": null,
    "loopSeconds": null,
@@ -1580,6 +1580,40 @@
     "camera": null,
     "quality": "high",
     "responsiveness": 0.6
+   }
+  },
+  "explain-album": {
+   "kind": "explain",
+   "style": "ink",
+   "look": "glow",
+   "view": "depth",
+   "stills": {
+    "640": "explain-album-640.webp"
+   },
+   "loop": null,
+   "loopSeconds": null,
+   "source": {
+    "track": "house-124",
+    "time": 56,
+    "palette": "album:twotone-01-30-270.jpg",
+    "light": "auto",
+    "camera": "glide",
+    "quality": "high",
+    "responsiveness": 0.6
+   }
+  },
+  "explain-album-cover": {
+   "kind": "explain",
+   "style": null,
+   "look": null,
+   "view": null,
+   "stills": {
+    "640": "explain-album-cover-640.webp"
+   },
+   "loop": null,
+   "loopSeconds": null,
+   "source": {
+    "cover": "twotone-01-30-270.jpg"
    }
   }
  }
