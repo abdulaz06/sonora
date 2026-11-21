@@ -36,9 +36,9 @@
 
      Everything in this trailer was rendered by the engine itself, frame by frame, on an original demo track made for sonora. Nothing was added but the cuts.
 
-     Download for Windows: https://sonora-visual.vercel.app
-     Try it in your browser: https://sonora-visual.vercel.app/live
-     How it works: https://sonora-visual.vercel.app/engineering
+     Download for Windows: https://sonoravisuals.com
+     Try it in your browser: https://sonoravisuals.com/live
+     How it works: https://sonoravisuals.com/engineering
      Source: https://github.com/abdulaz06/sonora
      ```
    - Tags: `music visualizer, audio visualizer, visualizer, windows, wasapi, webgl, rust, webassembly, generative art, vj, music visualization, sonora`

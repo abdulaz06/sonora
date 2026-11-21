@@ -272,3 +272,6 @@ Instead of a separate UI, `/live` runs the app's shell (home menu with moving th
 
 ## D79 — Trailer from the harness, one warmed-up shot per cut
 The trailer is rendered by the verify harness (real GPU, audio time, fixed 1/60 s) on the demo track: 14 shots on bar lines from bar 7 to the end, both drops on a cut, each shot warmed up for 6 s first so it opens full, a palette per shot and the nine palettes on the beat through the second build, then the lockup and "see your music." over the last kick. Master 1080p60 (H.264 CRF 16) in git-ignored `local-media/`; web encodes (VP9 and H.264, 720p30) under 5 MB in the site; an animated WebP of the drop for the README. A 4K master was skipped: four times the pixels for a page that streams 720p.
+
+## D80 — Site address: `sonoravisuals.com` (supersedes D77)
+The site now lives on its own domain, `sonoravisuals.com`, with `www` redirecting to it on Vercel. `SITE_URL` in `site/site.config.mjs` and the Sitemap line in `site/public/robots.txt` point there, so canonical URLs, Open Graph / Twitter image URLs and the sitemap follow (checked in both the static and the Vercel build output). The README's links and the trailer's YouTube description in the sprint log use it too.

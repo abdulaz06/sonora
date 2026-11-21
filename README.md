@@ -10,9 +10,9 @@
 <p align="center">
   <a href="https://github.com/abdulaz06/sonora/releases/latest"><img alt="Download the latest release for Windows" src="https://img.shields.io/github/v/release/abdulaz06/sonora?label=download%20for%20windows&style=for-the-badge&color=ECE7DF&labelColor=08080A"></a>
 </p>
-<p align="center"><a href="https://sonora-visual.vercel.app"><strong>sonora-visual.vercel.app</strong></a> · <a href="https://sonora-visual.vercel.app/live">try it live in your browser</a> · <a href="https://sonora-visual.vercel.app/media/sonora-trailer.mp4">watch the trailer</a> · <a href="https://sonora-visual.vercel.app/engineering">how it works</a></p>
+<p align="center"><a href="https://sonoravisuals.com"><strong>sonoravisuals.com</strong></a> · <a href="https://sonoravisuals.com/live">try it live in your browser</a> · <a href="https://sonoravisuals.com/media/sonora-trailer.mp4">watch the trailer</a> · <a href="https://sonoravisuals.com/engineering">how it works</a></p>
 
-<p align="center"><a href="https://sonora-visual.vercel.app/media/sonora-trailer.mp4"><img src="DOCS/assets/sonora-trailer.webp" alt="The sonora trailer: the drop of the demo track across Warp, Ink and Silk" width="900"></a></p>
+<p align="center"><a href="https://sonoravisuals.com/media/sonora-trailer.mp4"><img src="DOCS/assets/sonora-trailer.webp" alt="The sonora trailer: the drop of the demo track across Warp, Ink and Silk" width="900"></a></p>
 <p align="center"><sub>rendered by the engine on an original demo track · <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI">early version (v0.1) demo</a></sub></p>
 
 ## Styles
@@ -32,7 +32,7 @@ Looks: Ink (Glow, Marble, Sumi), Wisp Depth (Ground, Tunnel), Voyage (Void, City
 - **Nine palettes on keys 1–9**, tuned in OKLCH to stay vivid in every style, look and view: Ocean, Aurora, Ember, Neon, Crimson, Solar, Violet, Sunset, Acid. Voyage now takes the palette across the whole fractal, its sky and its sea; Wisp's smoke stays coloured; custom colours and colour drift never go muddy, and palette changes fade without passing through grey.
 - **Smoother Ink.** Drops grow into the flow instead of popping in, Marble's fine lines no longer break up, and Ink looks the same at any refresh rate.
 - **Frame rate matches the display** by default (every frame on 144 or 165 Hz screens), with even half / third rates, and an optional FPS counter (`P`).
-- **The website**, with the engine running live on an original demo track, a [try-it-live page](https://sonora-visual.vercel.app/live) (a file, the microphone or a browser tab) and the [engineering story](https://sonora-visual.vercel.app/engineering).
+- **The website**, with the engine running live on an original demo track, a [try-it-live page](https://sonoravisuals.com/live) (a file, the microphone or a browser tab) and the [engineering story](https://sonoravisuals.com/engineering).
 
 ## What’s new in 1.0
 
