@@ -73,9 +73,10 @@ const BAND_STEP = 8;
 const ACCENT_OFFSET = 70;
 /** Neon's Auto Drift window (turn degrees): its magenta / cyan / yellow triad,
  * turned further, lands on complementary pairs whose light adds up to olive in
- * Wisp and Voyage (90–150°) or on dull Warp streaks (−35° and beyond). Measured
- * with the palette matrix in 5° steps (D81). */
-const NEON_DRIFT_WINDOW: [number, number] = [-20, 40];
+ * Wisp and Voyage (90–150°) or on dull Warp streaks. Measured with the palette
+ * matrix in 5° steps (D81): −20…+40° pass every gate, −25° and +45° fail Warp's
+ * chroma floor (0.093); the window keeps a margin (Warp ≥ 0.100). */
+const NEON_DRIFT_WINDOW: [number, number] = [-15, 35];
 /** Album palettes (paletteFromCover): a cover colour is used as the secondary
  * when it sits this far from the primary (degrees, analogous), and as the
  * accent from COVER_ACC_RANGE[0] on, pulled back to COVER_ACC_RANGE[1] when it
