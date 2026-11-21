@@ -5,7 +5,7 @@
 //   node scripts/reel/templates.mjs carousel   five 1080×1350 slides, each real frames plus a few words
 // Outputs: local-media/reels/out/<date>-origin-story/ and local-media/reels/out/<date>-carousel/.
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { ffmpeg, REELS, ROOT } from './lib.mjs';
@@ -79,7 +79,9 @@ if (what === 'origin') {
   await frame(join(tmp, 's1.png'), W, H, { style: 'ink', variant: 'glow', depth: true, camera: 'glide', palette: 0 }, drop);
   // 2 · five styles: five vertical slices of real frames.
   const five = [['silk', 'silk', true, 'planet', 7], ['ink', 'glow', true, 'glide', 0], ['wisp', 'tunnel', true, null, 3], ['warp', 'warp', false, null, 8], ['voyage', 'void', false, null, 6]];
-  for (const [i, [style, variant, depth, camera, palette]] of five.entries()) await frame(join(tmp, `s2-${i}.png`), Math.round(W / 5), H, { style, variant, depth, camera, palette }, i % 2 ? drop2 : drop);
+  // (Silk away from its drop: the drop's inversion cut is a white frame.)
+  const fiveAt = [B(20) + 0.6, drop, drop2, drop2 + 0.4, drop + 1.2];
+  for (const [i, [style, variant, depth, camera, palette]] of five.entries()) await frame(join(tmp, `s2-${i}.png`), Math.round(W / 5), H, { style, variant, depth, camera, palette }, fiveAt[i]);
   // 3 · nine palettes: a 3 × 3 grid of Silk Depth in each.
   for (let p = 0; p < 9; p++) await frame(join(tmp, `s3-${p}.png`), W / 3, H / 3, { style: 'ink', variant: 'glow', depth: false, palette: p }, drop + 0.4);
   // 4 · works with anything: Voyage with the app's now-playing toast.
@@ -106,7 +108,9 @@ if (what === 'origin') {
     await page.screenshot({ path: join(tmp, `t${s.n}.png`), omitBackground: true });
   }
   // Slide 4 also carries the app's own now-playing toast.
-  await page.evaluate((l) => window.__overlay.render(l), { kind: 'toast', title: 'Night Drive', artist: 'Lumen Field', album: 'Low Light', art: '' });
+  // A synthetic cover (never a real album on a public slide).
+  const art = `data:image/jpeg;base64,${readFileSync(join(ROOT, 'local-media', 'covers', 'test', 'gradient-05-sunset.jpg')).toString('base64')}`;
+  await page.evaluate((l) => window.__overlay.render(l), { kind: 'toast', title: 'Night Drive', artist: 'Lumen Field', album: 'Low Light', art });
   await page.screenshot({ path: join(tmp, 'toast.png'), omitBackground: true });
   await browser.close();
   kill();
