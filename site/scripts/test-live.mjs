@@ -228,6 +228,10 @@ async function otherControls(p, source) {
   // Fullscreen.
   await wake(p);
   const fs = p.locator('.hud-bar button[title^="Fullscreen"]');
+  // Set Mode's toast and crossfade may still be on screen: wait until the button is what a click hits.
+  let fsReach = { ok: false, why: '' };
+  await poll(async () => { await wake(p); fsReach = await reachable(fs); return fsReach.ok; });
+  check(fsReach.ok, `${source}: fullscreen button clickable`, fsReach.ok ? '' : fsReach.why);
   await fs.click();
   s = await until(p, (x) => x.fullscreen);
   check(s.fullscreen, `${source}: fullscreen on`);
