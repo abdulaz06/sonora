@@ -189,14 +189,17 @@ async function quickSwitcher(p, source) {
       await open();
       const t = p.locator('.qs .qs-grp').nth(gi).locator('.s-thumb').nth(k);
       const label = (await t.locator('.s-thumb-title').textContent())?.trim() ?? '';
+      // Palettes are titled "1 Ocean" … "9 Acid"; other tiles in that row (an Album tile) aren't presets.
+      const preset = title === 'palette' ? /^(\d)\s/.exec(label) : null;
+      if (title === 'palette' && !preset) continue;
       const r = await reachable(t);
       check(r.ok, `${source}: quick switcher ${title} "${label}" clickable`, r.ok ? '' : r.why);
       await t.click();
       let s;
       if (title === 'look') s = await until(p, (x) => x.variant === label.toLowerCase());
       else if (title === 'view') s = await until(p, (x) => x.depth === (label === 'Depth'));
-      else s = await until(p, (x) => x.palette === k);
-      const ok = title === 'look' ? s.variant === label.toLowerCase() : title === 'view' ? s.depth === (label === 'Depth') : s.palette === k;
+      else s = await until(p, (x) => x.palette === Number(preset[1]) - 1);
+      const ok = title === 'look' ? s.variant === label.toLowerCase() : title === 'view' ? s.depth === (label === 'Depth') : s.palette === Number(preset[1]) - 1;
       check(ok, `${source}: engine took ${title} "${label}"`, `engine: ${s.variant} ${s.depth ? 'depth' : 'flat'} palette ${s.palette}`);
     }
   }
