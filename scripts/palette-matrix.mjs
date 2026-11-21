@@ -14,6 +14,8 @@
 //                       { name, resolved: { bg, paper, primary, secondary, accent, highlight } }
 //   --hues <step>       instead: custom hue every <step> degrees
 //   --drift <step>      instead: Auto Drift at every <step> degrees on preset --base <i>
+//   --turns <list>      instead: preset --base <i> held at these exact drift turns (degrees,
+//                       e.g. -30,-25,40), to find a wide palette's drift window
 //   --only <names>      comma list of palette names to keep
 //   --combos <ids>      comma list (default all, see COMBOS)
 //   --tracks <names>    comma list (default house-124 + ref-song when present)
@@ -71,6 +73,7 @@ function parseArgs(argv) {
     else if (a === '--set') o.set = next();
     else if (a === '--hues') o.hues = Number(next());
     else if (a === '--drift') o.drift = Number(next());
+    else if (a === '--turns') o.turns = next().split(',').map(Number);
     else if (a === '--base') o.base = Number(next());
     else if (a === '--only') o.only = next();
     else if (a === '--combos') o.combos = next();
@@ -248,6 +251,8 @@ try {
   if (opts.hues > 0) {
     pals = [];
     for (let h = 0; h < 360; h += opts.hues) pals.push({ name: `hue-${String(h).padStart(3, '0')}`, def: { hue: h } });
+  } else if (opts.turns) {
+    pals = opts.turns.map((d) => ({ name: `turn-${d < 0 ? 'm' : 'p'}${String(Math.abs(d)).padStart(3, '0')}`, def: { index: opts.base, driftDeg: 0, driftTurn: d } }));
   } else if (opts.drift > 0) {
     pals = [];
     for (let d = 0; d < 360; d += opts.drift) {

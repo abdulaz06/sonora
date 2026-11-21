@@ -12,6 +12,7 @@ import type { Platform } from '../app/platform';
 import { initShell } from '../app/shell';
 import { gpuReason, showGpuFallback } from '../ui/screens/gpu';
 import { audioStatus, nowPlaying } from '../app/stores';
+import { announceMedia, fileMedia } from '../app/file-media';
 import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
 import { createSourceUi, type SourceUi } from './source-ui';
@@ -70,7 +71,7 @@ export interface HarnessApi {
   /** Palette research: the preset list as ready RGB. */
   palettes(): { name: string; resolved: ResolvedPalette }[];
   /** Palette research: show any palette (RGB), a custom hue, or Auto Drift at a phase. */
-  setPalette(p: { resolved?: ResolvedPalette; index?: number; hue?: number; driftDeg?: number; holdDrift?: boolean }): void;
+  setPalette(p: { resolved?: ResolvedPalette; index?: number; hue?: number; driftDeg?: number; holdDrift?: boolean; driftTurn?: number }): void;
   /** The palette the styles currently receive. */
   currentPalette(): ResolvedPalette;
   /** Whether Auto Drift on preset `index` is crossing a skipped stretch at `phase`. */
@@ -224,10 +225,12 @@ function buildBar(source: WasmFrameSource, tracks: Record<string, TrackMeta>, re
   const fpsEl = bar.querySelector<HTMLSpanElement>('#fps')!;
 
   const playData = async (data: Blob | ArrayBuffer, label: string): Promise<void> => {
+    // Tags first: decoding detaches an ArrayBuffer.
+    const info = await fileMedia(data instanceof Blob ? data : data.slice(0), label);
     const buf = await source.loadFile(data);
     await source.playBuffer(buf, 0, () => { playBtn.textContent = 'Play'; }, label);
     playBtn.textContent = 'Pause';
-    renderer.events.notifyTrackChange({ title: label.replace(/\.[a-z0-9]+$/i, '') });
+    announceMedia(info, renderer);
   };
   const ui = createSourceUi(source, Object.entries(tracks).map(([id, m]) => ({ id, file: m.file })), playData);
   bar.querySelector('#src-slot')!.replaceWith(ui.chip);
@@ -402,6 +405,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       ce.setAutoDrift(p.driftDeg !== undefined);
       if (p.driftDeg !== undefined) ce.setDriftPhase(p.driftDeg);
       ce.holdDrift(p.driftDeg !== undefined && p.holdDrift !== false);
+      ce.setTurnOverride(p.driftTurn ?? null);
       ce.update(0);
     },
     currentPalette: () => renderer.colorEngine.getResolved(),

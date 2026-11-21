@@ -1,3 +1,35 @@
+# Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — in progress
+
+> Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
+> Local-only media (songs, covers, renders, reels, trailer drafts): `local-media/` (git-ignored). Render scratch: `C:/Users/abdul/sonora-palette-frames/`, `C:/Users/abdul/sonora-reel-frames/` (outside OneDrive, deleted after).
+
+## Summary
+(written at the review stop)
+
+## Checklist
+- [x] 0 Read CLAUDE.md, README, log, decisions, DOCS/16 §8, brand, colour engine + palette harness, now playing, Set Mode, settings, UI kit, trailer + media scripts; `.claude/settings.json` attribution off; committed the previous session's site stylesheet split (checked /live and / on the production build)
+- [ ] A1 Neon Auto Drift: drift window for wide-hue palettes, turn sweep in 5° steps, drift + flicker gates
+- [ ] A2.1 Extraction (OKLab k-means, area × chroma ranking) + palette builder through the OKLCH rules; unit tests
+- [ ] A2.2 Engine + controller: album palette crossfade (~2.5 s), same-album no-op, fallbacks (no cover, ads, podcasts, B&W), Auto Drift paused, Set Mode, Sumi paper bone
+- [ ] A2.3 UI: Album tile first (settings, quick switcher), cover thumbnail, greyed hint; setting + (i) card with picture; settings v9 (new installs on, existing users off + one-time toast)
+- [ ] A2.4 Web /live: embedded artwork from dropped files (ID3 APIC, MP4 covr, FLAC picture)
+- [ ] A2.5 Test set ≥ 40 covers (synthetic + local real), palette matrix + flicker for every album palette, review sheet
+- [ ] A3.1 Controller window (Tauri second window): state link, commands, keyboard forwarding, open from Set Mode / tray / shortcut, one-time offer on a second display
+- [ ] A3.2 Preview: async downscaled readback (PBO + fence) streamed to the controller; cost ≤ +0.3 ms, pacing unchanged, 20–30 fps, < 150 ms latency (measured)
+- [ ] A3.3 Controller UI: preview, now playing, Set Mode (on, lock style, next, interval, styles, calm/driving bias), style/look/view, palettes + Album, responsiveness / glow / camera, output display, blackout / freeze, all settings (reused sheet); screenshots at laptop sizes
+- [ ] A3.4 Output safety: closing the controller never touches the output; unplugging the TV brings the output back (runtime safety net)
+- [ ] A4 LICENSE (PolyForm Noncommercial 1.0.0), SPDX fields, README + site footer, third-party notices
+- [ ] A5 Full app gates (sync, flicker, motion, pop, jaggedness, dt sweep, pacing, palette gates, cost) before/after; `npm run tauri build` runs
+- [ ] B1.1 Reel studio: song analysis strip, window picking (drops, drag, presets, bar snap, 3 suggestions), 9:16 live preview + safe zones
+- [ ] B1.2 Formats (Song, Beat switch, Showcase, Styles tour, Album colours), portrait framing for every style / look / view (screenshots)
+- [ ] B1.3 Offline render (High, supersampled 1080×1920 60 fps, 8 s pre-roll), encodes, outputs, Instagram-like re-encode check, per-style export tuning, queue
+- [ ] B1.4 House style (title, style line, mark, text modes, now-playing toast), caption template
+- [ ] B1.5 Launch templates (origin story reel, 5-slide carousel), DOCS/REELS.md
+- [ ] B2 "I Wonder": analysis, three windows, cut plans, now-playing overlay, three low-res drafts in `local-media/trailer/drafts/`
+- [ ] R Review summary at the top of this section → stop and wait
+
+## Notes
+
 # Website, live demo, trailer, hosting — done, live on sonoravisuals.com
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.

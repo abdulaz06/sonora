@@ -75,6 +75,7 @@ describe('colour engine', () => {
 
   it('Auto Drift turns smoothly and crosses the olive / cyan spans quickly', () => {
     for (const p of PALETTES) {
+      if (p.driftWindow) continue;   // sways inside its window instead (next test)
       let prev = 0, inOlive = 0, inCyan = 0;
       for (let ph = 0.5; ph < 360; ph += 0.5) {
         const t = driftTurn(p, ph);
@@ -102,6 +103,45 @@ describe('colour engine', () => {
       // Only the quick crossings (12% of each forbidden stretch's width).
       expect(inOlive, p.name).toBeLessThanOrEqual(24);
       expect(inCyan, p.name).toBeLessThanOrEqual(24);
+    }
+  });
+
+  it('wide-hue palettes (Neon) sway inside their drift window, smoothly, from turn 0', () => {
+    const wide = PALETTES.filter((p) => p.driftWindow);
+    expect(wide.map((p) => p.name)).toEqual(['Neon']);
+    for (const p of wide) {
+      const [lo, hi] = p.driftWindow!;
+      const signed = (t: number): number => (t > 180 ? t - 360 : t);
+      expect(driftTurn(p, 0)).toBeCloseTo(0, 9);
+      let prev = 0, min = Infinity, max = -Infinity;
+      for (let ph = 0.5; ph <= 360; ph += 0.5) {
+        const t = signed(driftTurn(p, ph));
+        expect(Math.abs(t - prev), `${p.name} at ${ph}`).toBeLessThan(0.6);   // smooth, no jump
+        expect(t).toBeGreaterThanOrEqual(lo - 1e-9);
+        expect(t).toBeLessThanOrEqual(hi + 1e-9);
+        min = Math.min(min, t); max = Math.max(max, t); prev = t;
+      }
+      expect(min).toBeCloseTo(lo, 1);
+      expect(max).toBeCloseTo(hi, 1);
+    }
+    // Every other palette keeps the full turn.
+    for (const p of PALETTES.filter((x) => !x.driftWindow)) expect(driftTurn(p, 359.5), p.name).toBeGreaterThan(354);
+  });
+
+  it('a crossfade between a windowed and a full-turn palette under Auto Drift never jumps', () => {
+    const e = new ColorEngine();
+    const neon = PALETTES.findIndex((p) => p.name === 'Neon');
+    e.setPalette(neon, true);
+    e.setAutoDrift(true);
+    e.setDriftPhase(150);
+    e.update(0);
+    e.setPalette(0);
+    let prev = e.getResolved().primary;
+    for (let i = 0; i < 120; i++) {
+      e.update(1 / 30);
+      const cur = e.getResolved().primary;
+      expect(Math.max(...cur.map((v, k) => Math.abs(v - prev[k]))), `step ${i}`).toBeLessThan(0.06);
+      prev = cur;
     }
   });
 

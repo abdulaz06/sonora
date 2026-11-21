@@ -28,6 +28,8 @@ export const MIN_DRIFT_PERIOD_S = 60;
 export const MAX_DRIFT_PERIOD_S = 600;
 /** Palette crossfade speed (1 / seconds). */
 const TRANSITION_SPEED = 0.35;
+/** Album colours crossfade on a track change (s), with the now-playing toast. */
+export const ALBUM_FADE_S = 2.5;
 /** Brand bone, the base for paper backgrounds (OKLCH of the old HSL 36/0.22/0.9). */
 const BONE: OKLCH = [0.9285, 0.0103, 78.28];
 /** Hue-dependent lightness: how far a colour moves toward its hue's gamut
@@ -69,6 +71,17 @@ const BAND_STEP = 8;
 /** Custom palettes: accent offset from the core (a ~150° accent added up to
  * white with the core in Wisp's flames). */
 const ACCENT_OFFSET = 70;
+/** Neon's Auto Drift window (turn degrees): its magenta / cyan / yellow triad,
+ * turned further, lands on complementary pairs whose light adds up to olive in
+ * Wisp and Voyage (90–150°) or on dull Warp streaks (−35° and beyond). Measured
+ * with the palette matrix in 5° steps (D81). */
+const NEON_DRIFT_WINDOW: [number, number] = [-20, 40];
+/** Album palettes (paletteFromCover): a cover colour is used as the secondary
+ * when it sits this far from the primary (degrees, analogous), and as the
+ * accent from COVER_ACC_RANGE[0] on, pulled back to COVER_ACC_RANGE[1] when it
+ * is nearer complementary (Acid's 175° magenta whitened Wisp; 135–157° pass). */
+const COVER_SEC_RANGE: [number, number] = [18, 62];
+const COVER_ACC_RANGE: [number, number] = [45, 150];
 
 export type RGB = [number, number, number];
 
@@ -84,6 +97,10 @@ export interface Palette {
   highlight: OKLCH;
   /** Paper background for light variants. */
   paper: OKLCH;
+  /** Wide-hue palettes (Neon): Auto Drift sways between these turns (degrees,
+   * min < 0 < max) instead of turning all the way round; every turn inside
+   * passes the colour gates (D81). */
+  driftWindow?: [number, number];
 }
 
 export interface ResolvedPalette {
@@ -102,8 +119,8 @@ const css = (c: OKLCH): string => {
   return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
 };
 
-function pal(name: string, bg: OKLCH, primary: OKLCH, secondary: OKLCH, accent: OKLCH, highlight: OKLCH, paper: OKLCH = BONE): Palette {
-  return { name, preview: css(primary), previewAccent: css(accent), bg, primary, secondary, accent, highlight, paper };
+function pal(name: string, bg: OKLCH, primary: OKLCH, secondary: OKLCH, accent: OKLCH, highlight: OKLCH, paper: OKLCH = BONE, driftWindow?: [number, number]): Palette {
+  return { name, preview: css(primary), previewAccent: css(accent), bg, primary, secondary, accent, highlight, paper, ...(driftWindow ? { driftWindow } : {}) };
 }
 
 // ── Preset palettes (keys 1-9) ──────────────────────────────────
@@ -116,7 +133,7 @@ export const PALETTES: Palette[] = [
   pal('Ocean', [0.1329, 0.0141, 284.31], [0.5716, 0.1737, 262.35], [0.4569, 0.1735, 293.7], [0.7702, 0.1213, 194.93], [0.7925, 0.0987, 231.59]),
   pal('Aurora', [0.16, 0.022, 200], [0.66, 0.16, 158], [0.62, 0.11, 195], [0.62, 0.22, 315], [0.88, 0.12, 170]),
   pal('Ember', [0.142, 0.0098, 33.14], [0.6259, 0.1978, 36.83], [0.6548, 0.1307, 69.52], [0.522, 0.1732, 16.58], [0.8471, 0.1549, 89.45]),
-  pal('Neon', [0.14, 0.012, 301.7], [0.6685, 0.2799, 328.16], [0.8714, 0.1478, 194.78], [0.9519, 0.2028, 109.7], [0.687, 0.1997, 352.66]),
+  pal('Neon', [0.14, 0.012, 301.7], [0.6685, 0.2799, 328.16], [0.8714, 0.1478, 194.78], [0.9519, 0.2028, 109.7], [0.687, 0.1997, 352.66], BONE, NEON_DRIFT_WINDOW),
   pal('Crimson', [0.1391, 0.0118, 6.31], [0.5907, 0.2277, 21.33], [0.6084, 0.1667, 38.18], [0.6267, 0.2212, 344.54], [0.6832, 0.174, 27.75]),
   pal('Solar', [0.15, 0.02, 60], [0.68, 0.155, 68], [0.63, 0.18, 48], [0.66, 0.22, 355], [0.9, 0.13, 80]),
   pal('Violet', [0.1387, 0.0122, 308.25], [0.5475, 0.2295, 301.97], [0.5541, 0.1989, 327.85], [0.4896, 0.2058, 275.67], [0.7023, 0.1775, 313.42]),
@@ -239,6 +256,7 @@ export function driftCrossing(p: Palette, phase: number): boolean {
 }
 
 function driftMap(p: Palette, phase: number): { turn: number; crossing: boolean } {
+  if (p.driftWindow) return { turn: windowTurn(p.driftWindow, phase), crossing: false };
   const P = p.primary[2], S = p.secondary[2];
   // Forbidden turns as [start, length] on the circle, relative to turn 0.
   const raw: [number, number][] = [
@@ -280,15 +298,22 @@ function driftMap(p: Palette, phase: number): { turn: number; crossing: boolean 
   return { turn: Math.min(360, turn + x / k), crossing: false };
 }
 
+/** A windowed drift: one smooth sway (sine) between the window's ends per full
+ * phase cycle, starting from turn 0 at phase 0 (the palette as chosen). */
+function windowTurn([lo, hi]: [number, number], phase: number): number {
+  const c = (lo + hi) / 2, a = (hi - lo) / 2;
+  const theta0 = Math.asin(Math.max(-1, Math.min(1, -c / a)));
+  return wrapHue(c + a * Math.sin(theta0 + (wrapHue(phase) * Math.PI) / 180));
+}
+
 /** Turn a palette's hues (Auto Drift): rigidly by driftTurn(phase), so the
  * analogous core stays together; the chromatic slots follow the hue lift (a
  * blue palette turned to gold brightens instead of going dull), and the accent
  * and highlight still step through the bands on their own (relative to where
  * they start).
  * Paper takes only a whisper of the turn. */
-function shiftPalette(p: Palette, phase: number): Palette {
-  if (phase === 0) return p;
-  const dh = driftTurn(p, phase);
+function shiftPalette(p: Palette, dh: number): Palette {
+  if (dh === 0) return p;
   const s = (c: OKLCH, lift: boolean, band = false): OKLCH => {
     const h = band ? bandShift(c, dh) : wrapHue(c[2] + dh);
     if (!lift) return [c[0], c[1], h];
@@ -331,6 +356,53 @@ export function paletteFromHue(hue: number): Palette {
   return pal('Custom', [0.14, 0.02, h], primary, secondary, accent, highlight);
 }
 
+/** Hues taken from album art (album-palette.ts): the dominant vivid colour,
+ * and when the cover has them, an analogous one and a distinct second one. */
+export interface CoverHues {
+  primary: number;
+  secondary?: number;
+  accent?: number;
+}
+
+/** Album palette: the same structure and rules as paletteFromHue (lightness
+ * matched, full chroma, olive and cyan bands, accent arc clear of olive), with
+ * the secondary and accent taken from the cover where they fit the rules and
+ * derived exactly as for a custom hue where they don't. With only a primary
+ * it equals paletteFromHue(primary) (tested). Paper stays bone (Sumi). */
+export function paletteFromCover(c: CoverHues, name = 'Album'): Palette {
+  const h0 = wrapHue(c.primary);
+  const h = bandHue(h0, true);
+  const moved = Math.abs(angDiff(h, h0)) > 12;
+  let sec = moved && !inOlive(h0) ? h0 : inOlive(h + 35) && !inOlive(h - 35) ? h - 35 : h + 35;
+  let secFromCover = false;
+  if (c.secondary !== undefined) {
+    // An olive secondary snaps to its band's nearer edge; a cyan one is kept
+    // (as a picked cyan is for custom); either way it must stay analogous.
+    const s = inOlive(c.secondary) ? bandHue(c.secondary, true) : wrapHue(c.secondary);
+    const d = Math.abs(angDiff(s, h));
+    if (d >= COVER_SEC_RANGE[0] && d <= COVER_SEC_RANGE[1]) { sec = s; secFromCover = true; }
+  }
+  let acc = arcHitsOlive(h, h - ACCENT_OFFSET) ? h + ACCENT_OFFSET : h - ACCENT_OFFSET;
+  if (c.accent !== undefined) {
+    // Complementary accents add up to white with the core (Wisp's flames):
+    // nudge them back to COVER_ACC_RANGE[1] on their own side.
+    const d = angDiff(c.accent, h);
+    const ad = Math.abs(d);
+    if (ad >= COVER_ACC_RANGE[0]) {
+      const a = bandHue(h + Math.sign(d || 1) * Math.min(ad, COVER_ACC_RANGE[1]), true);
+      if (!arcHitsOlive(h, a) && Math.abs(angDiff(a, h)) >= COVER_ACC_RANGE[0]) acc = a;
+    }
+  }
+  const warm = h < 90 || h >= 300;
+  const hh = warm ? h + Math.max(-15, Math.min(15, angDiff(80, h))) : h + Math.max(-15, Math.min(15, angDiff(195, h)));
+  const primary = vivid(0.6, h, 0.22, 1);
+  const secondary = vivid(0.55, secFromCover || sec === h0 ? sec : bandHue(sec, true), 0.2, 0.9);
+  const accent = vivid(0.64, bandHue(acc, true), 0.2, 0.9);
+  const hl = warm ? 0.88 : 0.86;
+  const highlight: OKLCH = [hl, Math.min(0.13, maxChroma(hl, hh) * 0.95), wrapHue(hh)];
+  return pal(name, [0.14, 0.02, h], primary, secondary, accent, highlight);
+}
+
 function lerpPalette(a: Palette, b: Palette, t: number): Palette {
   const m = (x: OKLCH, y: OKLCH): OKLCH => {
     // A near-grey end has no meaningful hue: take the other end's.
@@ -345,6 +417,16 @@ function lerpPalette(a: Palette, b: Palette, t: number): Palette {
     bg: m(a.bg, b.bg), primary: m(a.primary, b.primary), secondary: m(a.secondary, b.secondary),
     accent: m(a.accent, b.accent), highlight: m(a.highlight, b.highlight), paper: m(a.paper, b.paper),
   };
+}
+
+/** Auto Drift turn during a crossfade: each end's own turn, blended along the
+ * shorter arc (a windowed palette and a full-turn one would otherwise jump). */
+function blendTurn(a: Palette, b: Palette, t: number, phase: number): number {
+  if (phase === 0) return 0;
+  const ta = driftTurn(a, phase), tb = driftTurn(b, phase);
+  if (t <= 0) return ta;
+  if (t >= 1) return tb;
+  return wrapHue(ta + angDiff(tb, ta) * t);
 }
 
 export function resolvePalette(p: Palette): ResolvedPalette {
@@ -393,36 +475,68 @@ export class ColorEngine {
   /** Harness only: a palette given as ready RGB, shown instead of the presets. */
   private override: ResolvedPalette | null = null;
   private driftHeld = false;
+  private turnOverride: number | null = null;
+  /** The user's palette (preset or custom): shown unless album colours drive. */
+  private chosen: Palette;
+  /** Album colours from the cover of what's playing (null: none). */
+  private album: Palette | null = null;
+  private speed = TRANSITION_SPEED;
 
   constructor() {
     this.from = PALETTES[0];
     this.to = PALETTES[0];
     this.current = PALETTES[0];
+    this.chosen = PALETTES[0];
     this.resolved = resolvePalette(PALETTES[0]);
   }
 
   get paletteIndex(): number { return this._paletteIndex; }
   get driftEnabled(): boolean { return this.autoDrift; }
   get driftPeriodSeconds(): number { return this.driftPeriod; }
-  /** Current Auto Drift hue offset in degrees. */
-  get driftDegrees(): number { return this.autoDrift ? this.driftPhase : 0; }
+  /** Album colours are driving the palette right now. */
+  get albumActive(): boolean { return this.album !== null; }
+  /** Current Auto Drift hue offset in degrees (0 while album colours drive: D82). */
+  get driftDegrees(): number { return this.autoDrift && !this.album ? this.driftPhase : 0; }
 
-  /** Select a preset; `immediate` skips the crossfade. */
+  /** Select a preset; `immediate` skips the crossfade. While album colours
+   * drive, this only changes the palette they fall back to. */
   setPalette(index: number, immediate = false): void {
     const idx = ((index % PALETTES.length) + PALETTES.length) % PALETTES.length;
-    if (idx === this._paletteIndex && this.progress >= 1) return;
+    if (idx === this._paletteIndex && this.progress >= 1 && this.chosen === PALETTES[idx]) return;
     this._paletteIndex = idx;
+    this.chosen = PALETTES[idx];
+    if (this.album) return;
     this.from = this.basePalette();
-    this.to = PALETTES[idx];
+    this.to = this.chosen;
+    this.speed = TRANSITION_SPEED;
     this.progress = immediate ? 1 : 0;
     if (immediate) this.update(0);
   }
 
   setCustomHue(hue: number): void {
     this._paletteIndex = -1;
+    this.chosen = paletteFromHue(hue);
+    if (this.album) return;
     this.from = this.basePalette();
-    this.to = paletteFromHue(hue);
+    this.to = this.chosen;
+    this.speed = TRANSITION_SPEED;
     this.progress = 0.85;
+  }
+
+  /** Album colours: crossfade (from what's on screen, drift included) to the
+   * album palette, or back to the chosen palette with null. Auto Drift pauses
+   * at turn 0 while an album drives and restarts from the chosen palette as
+   * it is (D82). The same colours again change nothing. */
+  setAlbum(p: Palette | null, fadeS = ALBUM_FADE_S, immediate = false): void {
+    if (p === this.album || (p && this.album && samePalette(p, this.album))) return;
+    const shown = this.current;
+    this.album = p;
+    this.from = shown;
+    this.to = p ?? this.chosen;
+    this.driftPhase = 0;
+    this.speed = 1 / Math.max(0.05, fadeS);
+    this.progress = immediate ? 1 : 0;
+    if (immediate) this.update(0);
   }
 
   setAutoDrift(on: boolean): void { this.autoDrift = on; }
@@ -441,13 +555,26 @@ export class ColorEngine {
   }
 
   update(dt: number): void {
-    if (this.progress < 1) this.progress = Math.min(1, this.progress + TRANSITION_SPEED * dt);
-    if (this.autoDrift && !this.driftHeld) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
+    if (this.progress < 1) this.progress = Math.min(1, this.progress + this.speed * dt);
+    if (this.autoDrift && !this.driftHeld && !this.album) this.driftPhase = wrapHue(this.driftPhase + (360 * dt) / this.driftPeriod);
     // The crossfade runs in OKLCH along the shorter hue arc (basePalette):
     // chroma never dips through grey, as an RGB crossfade between distant hues does.
-    this.current = shiftPalette(this.basePalette(), this.driftDegrees);
+    const base = this.basePalette();
+    this.current = shiftPalette(base, this.turnNow(base));
     this.resolved = this.override ?? resolvePalette(this.current);
   }
+
+  /** The Auto Drift turn applied right now (degrees). */
+  private turnNow(base: Palette): number {
+    if (this.turnOverride !== null) return this.turnOverride;
+    const phase = this.driftDegrees;
+    if (phase === 0) return 0;
+    if (this.progress < 1 && (this.from.driftWindow || this.to.driftWindow)) return blendTurn(this.from, this.to, smoothT(this.progress), phase);
+    return driftTurn(base, phase);
+  }
+
+  /** Harness only: hold the palette at this exact drift turn (degrees); null clears. */
+  setTurnOverride(deg: number | null): void { this.turnOverride = deg === null ? null : wrapHue(deg); }
 
   /** Active palette (with transition and Auto Drift applied). */
   getPalette(): Palette { return this.current; }
@@ -481,6 +608,15 @@ export class ColorEngine {
       [Math.max(0.3, base[0] - 0.1), base[1] * 0.85, wrapHue(base[2] + 15)],
     ];
   }
+}
+
+/** Two palettes with (nearly) the same colours: a new track from the same album. */
+function samePalette(a: Palette, b: Palette): boolean {
+  const slots: (keyof Palette)[] = ['bg', 'primary', 'secondary', 'accent', 'highlight'];
+  return slots.every((k) => {
+    const x = a[k] as OKLCH, y = b[k] as OKLCH;
+    return Math.abs(x[0] - y[0]) < 0.01 && Math.abs(x[1] - y[1]) < 0.01 && Math.abs(angDiff(x[2], y[2])) < 2;
+  });
 }
 
 function smoothT(t: number): number {
