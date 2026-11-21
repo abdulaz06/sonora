@@ -1,9 +1,54 @@
-# Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — review stop (awaiting your reply)
+# Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — shipped (v1.0.2; trailer A2 on the site)
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Local-only media (songs, covers, renders, reels, trailer drafts): `local-media/` (git-ignored). Render scratch: `C:/Users/abdul/sonora-palette-frames/`, `C:/Users/abdul/sonora-reel-frames/` (outside OneDrive, deleted after).
 
 ## Summary
+
+### Shipped (after "Ship it, trailer A2")
+- **Release:** [v1.0.2](https://github.com/abdulaz06/sonora/releases/tag/v1.0.2), tag on `40ba24d`, published 2026-11-21 07:56 UTC by the release workflow: `sonora_1.0.2_x64-setup.exe` (17.6 MB) and `sonora_1.0.2_x64_en-US.msi` (18.9 MB), each with its `.sig`, and `latest.json` (version 1.0.2; its signatures match the `.sig` files, signed with the updater key whose id matches the pubkey in `tauri.conf.json`). Release notes: `DOCS/release-notes/v1.0.2.md`.
+- **Website:** the Download button and `/download` point at 1.0.2: the landing page's Download buttons read "v1.0.2 · 17.6 MB · Windows 10 / 11" and link `releases/download/v1.0.2/sonora_1.0.2_x64-setup.exe`; `sonoravisuals.com/download` redirects (302) to the same installer. The site workflow redeployed on the release (`workflow_run`), after the push that put the trailer live.
+
+### Trailer files ("I Wonder", window A2)
+- **16:9 master** (local): `local-media/sonora-trailer-iwonder-1080p60.mp4`, 1080p60, supersampled 1.5× (rendered at 2880×1620), High quality, CRF 15, AAC 320k, 209 MB. 3,614 frames, none held or repeated before the lockup (3,132 of 3,132 distinct). Render folder: `local-media/trailer/final/16x9/` (plan, meta, cover).
+- **9:16, full length** (re-rendered in portrait, not cropped): `local-media/trailer/final/9x16/reel.mp4`, 1080×1920 at 60 fps, supersampled 1.333×, 231 MB; 3,614 frames, all accounted for.
+- **9:16, ~30 s cut** opening on the drop: `local-media/trailer/final/9x16-30s/reel.mp4`, 134 MB, 2,068 of 2,068 frames distinct. 18 bars (0:35.1–1:09.6): Silk Depth through the drop and his line, Voyage, Ink, Warp, Silk Flat, Voyage under the lockup.
+- **Web** (in the site, ≤ 5 MB as before): `site/public/media/sonora-trailer.webm` (4.3 MB VP9) and `.mp4` (4.2 MB H.264), both 720p30; poster `sonora-trailer-poster.webp`. The lightbox starts muted and follows the page's sound toggle; its controls can unmute.
+- **README clip:** `DOCS/assets/sonora-trailer.webp`, 8 s silent animated WebP, 1.5 MB.
+- **YouTube thumbnail:** `local-media/youtube-thumbnail-iwonder.jpg` (1280×720).
+- **Drafts and plans:** `local-media/trailer/drafts/` (A, B, C, A2 and every plan JSON). Rebuild any of them with `npm run reel -- <plan.json>`, or `scripts/trailer/trailer-a2.mjs` (env `ASPECT=9:16`, `CUT=1`, `SS`, `CRF`, `NAME`, `OUT`), then `node scripts/trailer/finalize.mjs <master>` for the web encodes, README clip and thumbnail.
+
+### If the trailer ever has to come down (takedown)
+The original demo-track trailer is still in the repo:
+- `site/public/media/sonora-trailer-demo.webm`, `.mp4` and `-poster.webp`;
+- `DOCS/assets/sonora-trailer-demo.webp`;
+- the master `local-media/sonora-trailer-1080p60.mp4`.
+
+To swap back:
+1. `site/site.config.mjs`: `export const TRAILER = 'sonora-trailer-demo';` (one line: the landing page's video sources and poster follow it).
+2. `README.md` line 15: `<img src="DOCS/assets/sonora-trailer-demo.webp" …>` and the link `https://sonoravisuals.com/media/sonora-trailer-demo.mp4` (alt text: "The sonora trailer: the drop of the demo track across Warp, Ink and Silk").
+3. Optional: `git rm` the "I Wonder" files `site/public/media/sonora-trailer.webm`, `.mp4`, `-poster.webp` and `DOCS/assets/sonora-trailer.webp` (they then also disappear from the deployed site).
+4. Commit and push: the site workflow redeploys in a few minutes.
+
+On YouTube, take the video down or set it private; the original upload (the demo track) can stay.
+
+### YouTube text ("I Wonder" trailer)
+- Title: `sonora — see your music (trailer)`
+- Description:
+  ```
+  sonora is a free music visualizer for Windows. It listens to whatever your PC plays and paints it live, in time with every beat: liquid ink, threads of light, flames, hyperspace and a flight through a 3D fractal, in nine palettes or in the colours of the album you're playing.
+
+  Everything in this trailer was rendered by the engine itself, frame by frame, from the song's audio. Nothing was added but the cuts. Here it takes its colours from the cover of Graduation.
+
+  music: Kanye West — I Wonder
+
+  Download for Windows: https://sonoravisuals.com
+  Try it in your browser: https://sonoravisuals.com/live
+  How it works: https://sonoravisuals.com/engineering
+  Source: https://github.com/abdulaz06/sonora
+  ```
+- Tags: `music visualizer, audio visualizer, visualizer, kanye west, i wonder, graduation, windows, webgl, rust, generative art, vj, sonora`
+- Files: `local-media/sonora-trailer-iwonder-1080p60.mp4` and `local-media/youtube-thumbnail-iwonder.jpg`. For Shorts / Reels / TikTok: `local-media/trailer/final/9x16/reel.mp4` or the 30 s cut.
 
 ### Try it in the app (`npm run tauri dev`)
 Dev builds now keep their own settings (`settings.dev.json`), so the first run shows the intro; your installed settings are untouched.
@@ -15,7 +60,7 @@ Dev builds now keep their own settings (`settings.dev.json`), so the first run s
 - **Album colours:**
   - Review sheets: `verify/album/review-1…6.jpg`, one row per cover: the cover, its colour clusters, the palette, and a frame in each style.
   - The 52-cover test set: 51 synthetic covers plus Graduation. Black-and-white, grey and near-black-only covers fall back to your own palette.
-  - Colour gates and flicker: ALBUM_RESULTS
+  - Colour gates and flicker: **colour gates 47 of 47 palettes** in every style / look / view (the full run passed 46; the cyan cover missed Warp's chroma floor (0.093) by less than 0.001 and passes since its secondary is light cyan, `verify/album-cyan.log`). **Flicker: 807 runs** (`verify/album-rerun.log`): every run outside Silk passes once the lighter floor starts at orange (the bright orange cover in Ink Glow Depth: 2.58 → 2.00 swings/s; the seven palettes that floor touches re-gated in full, 133 runs, `verify/album-orange.log`). Worst passing run: Graduation in Ink Glow Depth, 2.42 swings/s (gate 2.5), clip ≤ 4.3%. Silk fails only its known drop-inversion step (0.64–0.75, flash-guarded; D68), as every preset does: all 162 Silk failures are step-only. Metrics: `verify/palettes/album/`, `album-orange/`.
 - **Controller:** `verify/controller/controller-1366x768.png`, `-1440x900`, `-1920x1080`, `-settings.png` (the reused sheet), `-offer.png`, `-blackout.png`. Link checks: 25 fps preview, 17 ms latency, changes apply both ways, keys act on the output, closing it leaves the output running.
 - **Album colours UI:** `verify/ui/settings-album-*.png`, `visual-album-*.png`, `visual-quick-album-*.png`.
 
@@ -28,8 +73,8 @@ Dev builds now keep their own settings (`settings.dev.json`), so the first run s
 | frame cost (interleaved, 3 rounds, 1080p Medium) | unchanged: −0.06 to +0.09 ms in all 12 combos (`verify/gates-1.0.2/cost.log`) |
 | controller preview cost | +0.003 ms (Ink Glow Depth), +0.042 (Voyage Void), +0.132 (Silk Depth) per output frame at 60 Hz; gate ≤ 0.3 |
 | pacing with the preview on | match and 1/2: 0 held frames, off and on, three interleaved rounds |
-| palette colour gates | presets unchanged (no preset slot changed); Neon drift 12 / 12 phases; album set: ALBUM_GATE |
-| Lighthouse | /live 100·100·100·100 mobile, 47·92·100·100 desktop (unchanged; the app shell's load); landing 99 mobile, 100 desktop |
+| palette colour gates | presets unchanged (no preset slot changed); Neon drift 12 / 12 phases; album set: 47 / 47 palettes pass the colour gates; flicker clean apart from Silk's known inversion step |
+| Lighthouse | /live 100·100·100·100 mobile, 47·92·100·100 desktop (unchanged; the app shell's load); landing 99 mobile, 100 desktop; after the trailer swap: landing 99 mobile, 100 desktop; /live 97–100 mobile, 46–48 desktop over two runs (the usual spread; the swap only touches the landing page's lightbox) |
 | tests | `npx tsc --noEmit` clean, `cargo clippy` clean, `npm test` 47 passed |
 | desktop build | `npm run tauri build`: NSIS 17.6 MB + MSI 19.0 MB; the release exe opens its window and migrates a 1.0.1 settings file to v9 as designed (your file restored afterwards) |
 
@@ -55,12 +100,12 @@ All have all five styles, cuts only on bar lines, a style label at each change, 
 - **Silk's drop response in A2:** holding Silk through the drop now shows its own drop inversion (bone for about 3 s). It's how Silk answers drops in the app. I kept it; I can switch it off for the trailer only.
 - **Warp and Instagram:** a Warp-only reel keeps SSIM 0.62 after Instagram's re-encode (other styles 0.91–0.97). Softening it first made it worse. Extra dither didn't help any style either, so the export adds none. In trailers at full quality and in this palette Warp looks much better than in the drafts; in reels, use it as a short moment.
 - **The "first sentence" cut:** the DSP's vocal detector doesn't fire on this track, so I took it from the voice band: his line ends about 0:41.0, quiet until 0:43.2, and the cut is on the bar at 0:42.7. If you'd rather it land at 0:40.85 (the bar at 19.9 s, on the line's last syllable), it's a one-number change.
-- **Album colours rules that changed after the gates:** gold-to-teal primaries sit on a lighter floor (Ink Glow Depth flicker, as Aurora and Acid); far cover accents are capped at 100° from the primary (beyond that they whitened Wisp); a cover's cyan secondary is kept light. Graduation's palette moved by one degree.
+- **Album colours rules that changed after the gates:** orange-to-teal primaries sit on a lighter floor (Ink Glow Depth flicker, as Aurora and Acid); far cover accents are capped at 100° from the primary (beyond that they whitened Wisp); a cover's cyan secondary is kept light. Graduation's palette moved by one degree.
 - **Pacing measurements on a busy desktop:** two headed runs gave erratic held frames on different caps regardless of the preview; quiet interleaved A/B runs were clean. Worth a glance at the FPS readout (P) during your own test.
 - **Another session worked in this checkout** during the batch (the /live picker fix, the story on the site): I committed by path and rebased before pushing; our decisions are numbered D81 (theirs) and D82–D85 (mine).
 
 ### Reply
-"Ship it, trailer A2" (or A / B / C), with any tweaks: then I release 1.0.2 and render the final trailers (16:9 1080p60 supersampled master and web encode, 9:16 full and ~30 s cut re-rendered in portrait, the README clip, the YouTube thumbnail).
+Abdul: "Ship it, trailer A2". Release, final trailers and the site swap: "Shipped" at the top of this summary.
 
 ## Checklist
 - [x] 0 Read CLAUDE.md, README, log, decisions, DOCS/16 §8, brand, colour engine + palette harness, now playing, Set Mode, settings, UI kit, trailer + media scripts; `.claude/settings.json` attribution off; committed the previous session's site stylesheet split (checked /live and / on the production build)
@@ -69,20 +114,24 @@ All have all five styles, cuts only on bar lines, a style label at each change, 
 - [x] A2.2 Engine + controller: album palette crossfade (~2.5 s), same-album no-op, fallbacks (no cover, ads, podcasts, B&W), Auto Drift paused, Set Mode, Sumi paper bone
 - [x] A2.3 UI: Album tile first (settings, quick switcher), cover thumbnail, greyed hint; setting + (i) card with picture; settings v9 (new installs on, existing users off + one-time toast)
 - [x] A2.4 Web /live: embedded artwork from dropped files (ID3 APIC, MP4 covr, FLAC picture)
-- [ ] A2.5 Test set ≥ 40 covers (synthetic + local real), palette matrix + flicker for every album palette, review sheet
+- [x] A2.5 Test set ≥ 40 covers (synthetic + local real), palette matrix + flicker for every album palette, review sheet
 - [x] A3.1 Controller window (Tauri second window): state link, commands, keyboard forwarding, open from Set Mode / tray / shortcut, one-time offer on a second display
-- [x] A3.2 Preview: async downscaled readback (PBO + fence) streamed to the controller; cost ≤ +0.3 ms, pacing unchanged, 20–30 fps, < 150 ms latency (measured)
+- [x] A3.2 Preview: GPU-side downscaled snapshot (createImageBitmap; the PBO + fence readback kept as an option) streamed to the controller; cost ≤ +0.3 ms, pacing unchanged, 20–30 fps, < 150 ms latency (measured)
 - [x] A3.3 Controller UI: preview, now playing, Set Mode (on, lock style, next, interval, styles, calm/driving bias), style/look/view, palettes + Album, responsiveness / glow / camera, output display, blackout / freeze, all settings (reused sheet); screenshots at laptop sizes
 - [x] A3.4 Output safety: closing the controller never touches the output; unplugging the TV brings the output back (runtime safety net)
 - [x] A4 LICENSE (PolyForm Noncommercial 1.0.0), SPDX fields, README + site footer, third-party notices
-- [ ] A5 Full app gates (sync, flicker, motion, pop, jaggedness, dt sweep, pacing, palette gates, cost) before/after; `npm run tauri build` runs
+- [x] A5 Full app gates (sync, flicker, motion, pop, jaggedness, dt sweep, pacing, palette gates, cost) before/after; `npm run tauri build` runs
 - [x] B1.1 Reel studio: song analysis strip, window picking (drops, drag, presets, bar snap, 3 suggestions), 9:16 live preview + safe zones
 - [x] B1.2 Formats (Song, Beat switch, Showcase, Styles tour, Album colours), portrait framing for every style / look / view (screenshots)
 - [x] B1.3 Offline render (High, supersampled 1080×1920 60 fps, 8 s pre-roll), encodes, outputs, Instagram-like re-encode check, per-style export tuning, queue
 - [x] B1.4 House style (title, style line, mark, text modes, now-playing toast, optional style labels at style changes), caption template
 - [x] B1.5 Launch templates (origin story reel, 5-slide carousel), DOCS/REELS.md
 - [x] B2 "I Wonder": analysis, three windows, cut plans (all five styles; Silk Depth planet on builds and Voyage Void on drops lead; Ink / Warp / Wisp at least one clear moment each), now-playing overlay, style labels, three low-res drafts in `local-media/trailer/drafts/`
-- [ ] R Review summary at the top of this section → stop and wait
+- [x] R Review summary at the top of this section → stop and wait
+- [x] S1 After "Ship it, trailer A2": album rules re-gated (cyan secondary, floor from orange), trailer variants (portrait, 30 s cut)
+- [x] S2 Release 1.0.2: versions, release notes, tag, installers + signatures + latest.json, site Download and /download
+- [x] S3 Final trailers: 16:9 1080p60 master, web encodes, 9:16 full and 30 s cut in portrait, README clip, YouTube thumbnail
+- [x] S4 Site and README on the "I Wonder" trailer (sound off by default, the demo trailer as a one-line fallback, swap-back documented); Lighthouse re-run; YouTube text
 
 ## Notes
 
@@ -98,6 +147,7 @@ All have all five styles, cuts only on bar lines, a style label at each change, 
   - *dt sweep* (Ink Marble Depth, planet, the private song at 20 s): 60 / 120 / 165 fps agree (seen 100%, rise 23.4 / 24.1 / 24.7%, fine share 72% each, pop p99 0.10–0.11): **PASS**.
 - **Album colours test set (A2.5):** 51 synthetic covers (`scripts/album-covers.py` → `local-media/covers/test/`) + the Graduation cover. Extraction through the app's own path (`scripts/album-set.mjs`, harness): 47 of 52 give a palette; no palette (the chosen one stays) for both black-and-white covers, the grey photo, white-with-black-type, black-with-white-type and the dim violet near-black. Three rules refined from it (D83): yellow → gold not lime, gold accent on magenta kept (Graduation: magenta 343°, purple 320°, gold accent), cyan accents stay light cyan.
 - **Bar grid:** drops and breakdowns re-anchor the bar grid (the event layer reports a drop ~0.2 s after its hit); "I Wonder"'s first drop starts mid-bar (a phrase shift), so every drop now lands on a bar line.
+- **Ship order (after "Ship it, trailer A2"):** the album rules changed twice after the gates (cyan secondary, floor from orange), so the tag waited for the full album flicker run and the two re-gates; main was pushed first (the site went live with the trailer, CI green), then `v1.0.2` was tagged on the same commit once every gate was clean. Lighthouse ran on an idle GPU after the gates (no renders running). The engineering page no longer lists Neon's drift as a known gate miss.
 - **Trailer rules (Abdul, mid-batch):** every candidate shows all five styles; Silk Depth (planet camera) carries the builds and Voyage Void the big drops, with the most screen time; Ink, Warp and Wisp each get one clear moment where the music suits them; cuts only on bar lines, never faster than the music. Style labels (`silk · depth`, lowercase IBM Plex Mono, Bone ~60%, one fixed corner inside the safe zones, same in 16:9 and 9:16; 0.3 s in, ~1.5 s hold, out; never over the now-playing toast or the lockup) on the drafts, and as a reel-studio option.
 
 # Website, live demo, trailer, hosting — done, live on sonoravisuals.com
