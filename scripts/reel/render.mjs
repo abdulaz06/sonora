@@ -161,10 +161,14 @@ async function renderLayers(browser, plan, song, dir) {
   if (text !== 'none' && plan.format !== 'trailer') {
     const tEnd = text === 'intro' ? 3.5 : D;
     await shot('title', { kind: 'title', text: lower(`${song.title} — ${song.artist}`.replace(/ — $/, '')) }, 0, tEnd, 0, text === 'intro' ? 0.4 : 0);
-    // The style line follows the shots (beat switch, tour).
-    for (const [i, s] of plan.shots.entries()) {
-      const a = Math.max(0, s.at - W0), b = Math.min(text === 'intro' ? tEnd : D, (plan.shots[i + 1]?.at ?? W1) - W0);
-      if (b > a) await shot(`styleline-${i}`, { kind: 'styleline', text: styleLine(s) }, a, b, 0, 0);
+    // The style line follows the shots (beat switch, tour) and palette changes (showcase).
+    const marks = [...plan.shots.map((s) => ({ at: s.at, shot: s })), ...(plan.changes ?? []).filter((c) => c.palette !== undefined).map((c) => ({ at: c.at, palette: c.palette }))].sort((x, y) => x.at - y.at);
+    let cur = null;
+    const segs = [];
+    for (const m of marks) { cur = m.shot ? { ...m.shot } : { ...cur, palette: m.palette }; segs.push({ at: m.at, s: cur }); }
+    for (const [i, g] of segs.entries()) {
+      const a = Math.max(0, g.at - W0), b = Math.min(text === 'intro' ? tEnd : D, (segs[i + 1]?.at ?? W1) - W0);
+      if (b > a) await shot(`styleline-${i}`, { kind: 'styleline', text: styleLine(g.s) }, a, b, 0, 0);
     }
   }
   if (plan.mark !== false && plan.format !== 'trailer') await shot('mark', { kind: 'mark' }, 0, D);
@@ -284,7 +288,7 @@ export async function renderPlan(planIn, opts = {}) {
     const reel = encode(plan, song, dirFrames, layers, info, outDir, draft);
     // Every frame rendered and encoded once: count them in the master (no drops, no doubles by construction; proven here).
     const expected = Math.round((plan.window.end - plan.window.start) * info.fps);
-    const probe = spawnSync(ffmpeg, ['-hide_banner', '-i', reel, '-map', '0:v:0', '-c', 'copy', '-f', 'null', '-'], { encoding: 'utf8' }).stderr ?? '';
+    const probe = spawnSync(ffmpeg, ['-hide_banner', '-i', reel, '-map', '0:v:0', '-f', 'null', '-'], { encoding: 'utf8' }).stderr ?? '';
     const counted = Number([...probe.matchAll(/frame=\s*(\d+)/g)].pop()?.[1] ?? NaN);
     const frameCheck = { expected, counted, ok: Math.abs(counted - expected) <= 1 };
     console.log(`  frames: ${counted} of ${expected} expected at ${info.fps} fps ${frameCheck.ok ? 'OK' : 'MISMATCH'}`);
