@@ -31,4 +31,10 @@ export interface Platform {
   onTray?(cb: (action: string) => void): void;
   /** Tell the tray Set Mode's state. */
   setTraySetMode?(on: boolean): void;
+  /** Open the controller (the remote) on the display the output isn't on; `offer` asks first. */
+  openController?(offer?: boolean): void;
+  /** Move the output to a display (by monitor name), fullscreen there. */
+  moveOutput?(monitor: string): Promise<void>;
+  /** The display the output window is on (monitor name), '' if unknown. */
+  outputMonitor?(): Promise<string>;
 }

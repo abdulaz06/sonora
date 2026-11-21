@@ -1,5 +1,6 @@
 mod audio;
 mod config;
+mod controller;
 mod ipc;
 mod media;
 mod tray;
@@ -7,6 +8,13 @@ mod tray;
 use std::sync::Arc;
 
 use audio::devices::DeviceState;
+
+/// Development builds only (the frontend calls it under `import.meta.env.DEV`):
+/// a line from a webview on the dev console, for checks without devtools.
+#[tauri::command]
+fn dev_log(window: tauri::WebviewWindow, msg: String) {
+    eprintln!("[{}] {msg}", window.label());
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,6 +38,9 @@ pub fn run() {
             media::get_media_session,
             media::media_control,
             tray::set_tray_set_mode,
+            controller::open_controller,
+            controller::close_controller,
+            dev_log,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

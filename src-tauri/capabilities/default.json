@@ -1,8 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Only what the main window uses: events from the backend, window placement and fullscreen, updates.",
-  "windows": ["main"],
+  "description": "What the main window and the controller use: events from the backend, window placement and fullscreen, updates.",
+  "windows": ["main", "controller"],
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
@@ -19,6 +19,10 @@
     "core:window:allow-show",
     "core:window:allow-set-focus",
     "core:window:allow-unminimize",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-is-visible",
+    "core:window:allow-current-monitor",
     "updater:allow-check",
     "updater:allow-download-and-install",
     "process:allow-restart"

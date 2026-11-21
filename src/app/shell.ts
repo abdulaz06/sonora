@@ -32,6 +32,10 @@ export interface Shell {
   goMenu(): void;
   goVisual(): void;
   openStyle(id: StyleId): void;
+  /** Set Mode on / off (switching to the visual when it starts). */
+  setSetMode(on: boolean): void;
+  /** Run a keyboard shortcut as if pressed here (the controller forwards keys). */
+  key(k: string): void;
 }
 
 export interface ShellOptions {
@@ -81,6 +85,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
   const settings = createSettings(ctl, platform, {
     replayIntro: () => startIntro(),
     setSetMode,
+    openController: platform.openController ? () => platform.openController?.() : undefined,
   });
   const openAudio = (): void => {
     if (platform.kind === 'web' && platform.openSourceChooser) platform.openSourceChooser();
@@ -200,10 +205,18 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
 
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.altKey || e.metaKey || typing(e.target)) return;
-    const k = e.key;
+    if (e.key === 'F11') e.preventDefault();
+    if (e.key.startsWith('Arrow') && !settings.isOpen() && (screen === 'menu' || screen === 'detail')) e.preventDefault();
+    handleKey(e.key, false);
+  });
+
+  /** One shortcut; `remote` = forwarded by the controller (the output's own
+   * settings sheet being open doesn't block it). */
+  function handleKey(k: string, remote: boolean): void {
     const lower = k.toLowerCase();
-    if (k === 'F11' || lower === 'f') { e.preventDefault(); platform.toggleFullscreen(); return; }
-    if (settings.isOpen() || screen === 'intro' || screen === 'boot') return;
+    if (k === 'F11' || lower === 'f') { platform.toggleFullscreen(); return; }
+    if ((!remote && settings.isOpen()) || screen === 'intro' || screen === 'boot') return;
+    if (lower === 'r') { platform.openController?.(); return; }
     if (k === 'Escape') {
       if (screen === 'visual') { if (hud.isClean()) hud.setClean(false); else if (platform.isFullscreen() && !s.fullscreen) platform.toggleFullscreen(); else goMenu(); }
       else if (screen === 'detail') goMenu();
@@ -223,11 +236,12 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
       else if (lower === 'c') ctl.cycleCameraPreset();
       else if (lower === 'p') { ctl.setShowFps(!s.showFps); toast(s.showFps ? 'fps on' : 'fps off', { ms: 900 }); }
       else if (/^[1-9]$/.test(k)) ctl.setPalette(Number(k) - 1);
+      else if (k === '0') ctl.setPalette(9);
       else if (lower === 'a') { ctl.setAlbumColours(!s.albumColours); toast(s.albumColours ? (ctl.album.get().status === 'cover' ? 'album colours' : 'album colours · when a cover plays') : 'album colours off', { ms: 1400 }); }
       return;
     }
-    if (k.startsWith('Arrow')) { e.preventDefault(); spatialMove(k); }
-  });
+    if (k.startsWith('Arrow') && !remote) spatialMove(k);
+  }
 
   // Arrow keys move focus to the nearest control in that direction (gamepad style).
   function spatialMove(key: string): void {
@@ -257,6 +271,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
   platform.onTray?.((a) => {
     if (a === 'menu') goMenu();
     else if (a === 'setmode') setSetMode(!s.setMode.on);
+    else if (a === 'controller') platform.openController?.();
   });
 
   // ── Start ──
@@ -290,5 +305,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     goMenu,
     goVisual: () => { void goVisual(); },
     openStyle,
+    setSetMode,
+    key: (k) => handleKey(k, true),
   };
 }

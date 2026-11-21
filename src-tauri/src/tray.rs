@@ -1,4 +1,4 @@
-//! System tray: Show, Menu, Set Mode (checkable), Fullscreen, Quit.
+//! System tray: Show, Menu, Set Mode (checkable), Controller, Fullscreen, Quit.
 //! Left-click toggles the window. Actions the web side owns (menu, Set Mode,
 //! fullscreen) are sent to it as `tray` events; `set_tray_set_mode` keeps the
 //! Set Mode check in sync when it changes in the app.
@@ -34,10 +34,11 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let show_i = MenuItem::with_id(app, "show", "Show sonora", true, None::<&str>)?;
     let menu_i = MenuItem::with_id(app, "menu", "Menu", true, None::<&str>)?;
     let set_i = CheckMenuItem::with_id(app, "setmode", "Set Mode", true, false, None::<&str>)?;
+    let ctl_i = MenuItem::with_id(app, "controller", "Controller (second screen)", true, None::<&str>)?;
     let fs_i = MenuItem::with_id(app, "fullscreen", "Fullscreen", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_i, &menu_i, &set_i, &fs_i, &sep, &quit_i])?;
+    let menu = Menu::with_items(app, &[&show_i, &menu_i, &set_i, &ctl_i, &fs_i, &sep, &quit_i])?;
     *app.state::<TrayState>().set_mode.lock() = Some(set_i);
 
     TrayIconBuilder::with_id("sonora-tray")
@@ -50,6 +51,10 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             "menu" | "setmode" | "fullscreen" => {
                 show(app);
                 let _ = app.emit("tray", event.id.as_ref());
+            }
+            "controller" => {
+                // The output decides where (the display it isn't on): it opens the window.
+                let _ = app.emit("tray", "controller");
             }
             "quit" => app.exit(0),
             _ => {}

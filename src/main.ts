@@ -2,8 +2,8 @@ import {
   LogicalPosition,
   LogicalSize,
   availableMonitors,
+  currentMonitor,
   getCurrentWindow,
-  primaryMonitor,
   type Monitor,
 } from '@tauri-apps/api/window';
 
@@ -13,7 +13,9 @@ import { listen } from '@tauri-apps/api/event';
 import { TauriFrameSource } from './audio/tauri-source';
 import { initController } from './app/controller';
 import type { MediaAction, Platform } from './app/platform';
+import { initRemoteHost } from './app/remote-host';
 import { initShell } from './app/shell';
+import { isOffScreen, isPositionVisible, monitorRect, recentre, watchVisibility, type LogicalRect } from './app/window-safety';
 import { audioStatus, nowPlaying, type MediaInfo } from './app/stores';
 import { initRenderer } from './engine/renderer';
 import {
@@ -29,54 +31,15 @@ import { gpuReason, showGpuFallback } from './ui/screens/gpu';
 
 declare const __APP_VERSION__: string;
 
-/** Min logical-px overlap between window and a monitor we'll accept. */
-const MIN_VISIBLE_PX = 100;
-/** Approx title-bar height (logical px) — point we require on a monitor. */
-const TITLE_BAR_INSET = 16;
+/** Controller window size (logical px) on the other display. */
+const CONTROLLER_W = 1280;
+const CONTROLLER_H = 800;
 /** Tauri.conf.json minWidth/minHeight — must be respected when clamping. */
 const MIN_WIDTH = 640;
 const MIN_HEIGHT = 400;
 /** Margin left around a fullscreen-ish saved size so the window never fills
  *  every pixel of a smaller monitor than the one it was last sized on. */
 const MAX_MARGIN = 100;
-
-interface LogicalRect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-/** Convert a Monitor's physical bounds to a logical-px rect using its own
- *  scaleFactor (each monitor can have its own DPI on Windows). */
-function monitorRect(mon: Monitor): LogicalRect {
-  const sf = mon.scaleFactor || 1;
-  return {
-    x: mon.position.x / sf,
-    y: mon.position.y / sf,
-    width: mon.size.width / sf,
-    height: mon.size.height / sf,
-  };
-}
-
-/** A position is valid if a usable chunk of the window overlaps some monitor
- *  AND the title-bar centre is on that monitor (so the user can grab it). */
-function isPositionVisible(win: LogicalRect, monitors: Monitor[]): boolean {
-  const titleX = win.x + win.width / 2;
-  const titleY = win.y + TITLE_BAR_INSET;
-  for (const mon of monitors) {
-    const m = monitorRect(mon);
-    const titleOnMonitor =
-      titleX >= m.x && titleX < m.x + m.width &&
-      titleY >= m.y && titleY < m.y + m.height;
-    if (!titleOnMonitor) continue;
-
-    const ix = Math.max(0, Math.min(win.x + win.width, m.x + m.width) - Math.max(win.x, m.x));
-    const iy = Math.max(0, Math.min(win.y + win.height, m.y + m.height) - Math.max(win.y, m.y));
-    if (ix >= MIN_VISIBLE_PX && iy >= MIN_VISIBLE_PX) return true;
-  }
-  return false;
-}
 
 /** Cap a saved size so a stale 4K size doesn't make the window wider than a
  *  1920 monitor. Respects the tauri.conf.json minWidth/minHeight floor. */
@@ -165,50 +128,9 @@ function armWindowVisibilitySafetyNet(): void {
 }
 
 async function recentreIfOffScreen(): Promise<void> {
-  const win = getCurrentWindow();
-  let offScreen: boolean;
-  try {
-    const [pos, size, sf, monitors] = await Promise.all([
-      win.outerPosition(),
-      win.outerSize(),
-      win.scaleFactor(),
-      availableMonitors(),
-    ]);
-    const rect: LogicalRect = {
-      x: pos.x / sf,
-      y: pos.y / sf,
-      width: size.width / sf,
-      height: size.height / sf,
-    };
-    offScreen = monitors.length === 0 || !isPositionVisible(rect, monitors);
-  } catch (err) {
-    console.warn('Could not query window position for safety net:', err);
-    // Couldn't tell — assume the worst and recentre anyway, since the user
-    // hasn't interacted in 3s and that's already a strong "invisible" signal.
-    offScreen = true;
-  }
-
-  if (!offScreen) return;
-
+  if (!(await isOffScreen())) return;
   console.warn('Window appears off-screen after 3s with no interaction; recentring.');
-  try {
-    const primary = await primaryMonitor();
-    if (primary) {
-      const m = monitorRect(primary);
-      const inner = await win.innerSize();
-      const sf = primary.scaleFactor || 1;
-      const winW = inner.width / sf;
-      const winH = inner.height / sf;
-      const cx = Math.round(m.x + (m.width - winW) / 2);
-      const cy = Math.round(m.y + (m.height - winH) / 2);
-      await win.setPosition(new LogicalPosition(cx, cy));
-    }
-    await win.unminimize();
-    await win.show();
-    await win.setFocus();
-  } catch (err) {
-    console.warn('Failed to recentre window:', err);
-  }
+  await recentre();
 }
 
 function watchWindowState(
@@ -258,6 +180,9 @@ async function main(): Promise<void> {
   // to the end of async setup. If anything below stalls or throws, the net
   // still fires and the user gets a visible window.
   armWindowVisibilitySafetyNet();
+  // And for the whole session: a display that goes away (the TV unplugged)
+  // brings the window back to one that's there.
+  watchVisibility();
 
   const canvas = document.getElementById('canvas');
   if (!(canvas instanceof HTMLCanvasElement)) {
@@ -316,7 +241,16 @@ async function main(): Promise<void> {
   source.subscribe((frame) => controller.onFrame(frame));
   await source.start();
 
-  await initShell(controller, platform);
+  const shell = await initShell(controller, platform);
+  const host = initRemoteHost(controller, shell, platform);
+  if (import.meta.env.DEV) {
+    // Dev checks without devtools: the link and preview cost on the dev console.
+    window.setInterval(() => {
+      const t = host.tap?.stats;
+      void invoke('dev_log', { msg: `linked=${host.linked()} tap=${host.tap?.isActive()} captures=${t?.captures} sent=${t?.sent} dropped=${t?.dropped} hookMs=${t?.hookMs.toFixed(3)} frameMs=${controller.renderer.stats().frameMs.toFixed(2)} fps=${controller.renderer.stats().fps.toFixed(0)}` }).catch(() => undefined);
+    }, 3000);
+    if (import.meta.env.VITE_SONORA_OPEN_CONTROLLER) window.setTimeout(() => platform.openController?.(), 4000);
+  }
 
   // ── Updates: a quiet notice with one-click install ──
   if (settings.checkUpdates) {
@@ -346,6 +280,31 @@ async function desktopPlatform(settings: PersistedSettings, persist: () => void)
   };
   try { fs = await win.isFullscreen(); } catch { fs = false; }
   void win.onResized(async () => { try { setFs(await win.isFullscreen()); } catch { /* ignore */ } });
+
+  /** The controller opens on the display the output isn't on (or centred when there's one). */
+  async function openController(offer = false): Promise<void> {
+    try {
+      const [mons, cur] = await Promise.all([availableMonitors(), currentMonitor()]);
+      const other = mons.find((m) => m.name !== cur?.name) ?? null;
+      const args: Record<string, unknown> = { offer };
+      if (other) {
+        const r = monitorRect(other);
+        const w = Math.min(CONTROLLER_W, r.width - 40), h = Math.min(CONTROLLER_H, r.height - 80);
+        Object.assign(args, { x: Math.round(r.x + (r.width - w) / 2), y: Math.round(r.y + (r.height - h) / 2), width: w, height: h });
+      }
+      await invoke('open_controller', args);
+    } catch (err) { console.warn('Could not open the controller:', err); }
+  }
+  // Offer the controller once: the visual full screen on one display, another display there.
+  listeners.push((on) => {
+    if (!on || settings.controllerOffered) return;
+    void availableMonitors().then((mons) => {
+      if (mons.length < 2 || settings.controllerOffered) return;
+      settings.controllerOffered = true;
+      persist();
+      void openController(true);
+    }).catch(() => undefined);
+  });
 
   /** Fullscreen on the chosen display: move the window there first. */
   async function enterFullscreen(): Promise<void> {
@@ -395,6 +354,21 @@ async function desktopPlatform(settings: PersistedSettings, persist: () => void)
     installUpdate,
     onTray: (cb) => { trayListeners.push(cb); },
     setTraySetMode: (on) => { void invoke('set_tray_set_mode', { on }).catch(() => undefined); },
+    openController: (offer) => { void openController(offer); },
+    async moveOutput(name: string) {
+      settings.fullscreenMonitor = name;
+      persist();
+      try {
+        const m = (await availableMonitors()).find((x) => x.name === name);
+        if (!m) return;
+        if (await win.isFullscreen()) await win.setFullscreen(false);
+        const r = monitorRect(m);
+        await win.setPosition(new LogicalPosition(Math.round(r.x + 40), Math.round(r.y + 40)));
+        await win.setFullscreen(true);
+        setFs(true);
+      } catch (err) { console.warn('Could not move the output:', err); }
+    },
+    outputMonitor: async () => { try { return (await currentMonitor())?.name ?? ''; } catch { return ''; } },
   };
 }
 

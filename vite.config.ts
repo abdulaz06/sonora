@@ -14,6 +14,12 @@ export default defineConfig(async () => ({
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
   define: { __APP_VERSION__: JSON.stringify(pkg.version) },
+  // The app ships two pages: the output (index.html) and the controller window.
+  build: {
+    rollupOptions: {
+      input: { main: "index.html", controller: "controller.html" },
+    },
+  },
   // The verify harness runs its own server next to `npm run dev:web`; a
   // separate dependency cache keeps the two from invalidating each other.
   // @ts-expect-error process is a nodejs global

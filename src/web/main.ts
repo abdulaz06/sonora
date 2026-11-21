@@ -10,6 +10,7 @@
 import { initController } from '../app/controller';
 import type { Platform } from '../app/platform';
 import { initShell } from '../app/shell';
+import { initRemoteHost } from '../app/remote-host';
 import { gpuReason, showGpuFallback } from '../ui/screens/gpu';
 import { audioStatus, nowPlaying } from '../app/stores';
 import { announceMedia, fileMedia } from '../app/file-media';
@@ -177,6 +178,8 @@ async function main(): Promise<void> {
     toggleFullscreen: () => { if (document.fullscreenElement) void document.exitFullscreen(); else void document.documentElement.requestFullscreen(); },
     isFullscreen: () => !!document.fullscreenElement,
     onFullscreenChange: (cb) => document.addEventListener('fullscreenchange', () => cb(!!document.fullscreenElement)),
+    // The controller in another tab or window (same origin: the link is a BroadcastChannel).
+    openController: () => { window.open('/controller.html', 'sonora-controller', 'width=1280,height=800'); },
   };
   const demo = params.has('demo');
   if (demo) startDemo();
@@ -184,11 +187,12 @@ async function main(): Promise<void> {
     nowPlaying: (m) => nowPlaying.set(m ? { title: '', artist: '', album: '', art: '', playing: true, app: 'dev', canPrev: true, canNext: true, canPlayPause: true, ...m } : null),
   };
   const screen = params.get('screen');
-  await initShell(controller, platform, {
+  const shell = await initShell(controller, platform, {
     noLaunch: params.has('nolaunch'),
     start: screen === 'menu' || screen === 'detail' || screen === 'visual' || screen === 'intro' ? screen : undefined,
     startStyle: (params.get('style') as StyleId | null) ?? undefined,
   });
+  initRemoteHost(controller, shell, platform);
   // ?track=<name> plays a test track straight away (UI reviews with live audio).
   const track = params.get('track');
   if (track && tracks[track]) {

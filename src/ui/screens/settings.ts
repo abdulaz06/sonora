@@ -28,8 +28,11 @@ export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now 
 export type SectionId = typeof SECTIONS[number];
 
 export interface SettingsHandlers {
-  replayIntro(): void;
+  /** Absent in the controller window (the intro plays on the output). */
+  replayIntro?(): void;
   setSetMode(on: boolean): void;
+  /** Open the controller (second screen); absent where there is none. */
+  openController?(): void;
 }
 
 export interface SettingsSheet { open(section?: string): void; close(): void; isOpen(): boolean }
@@ -98,7 +101,12 @@ const INFO = {
   }),
   include: (): InfoContent => ({ title: 'what it can choose', body: ['Untick anything you never want Set Mode to pick. With nothing ticked it uses everything.'] }),
   interval: (): InfoContent => ({ title: 'at most every', body: ['The shortest time between switches. Track changes and drops can only switch once this much time has passed.'] }),
-  setpal: (): InfoContent => ({ title: 'change palettes', body: ['Also pick a fresh palette at each switch. Off keeps each style’s own colours.'] }),
+  setpal: (): InfoContent => ({ title: 'change palettes', body: ['Also pick a fresh palette at each switch. Off keeps each style’s own colours. While album colours are on, the cover chooses the colours instead.'] }),
+  controller: (): InfoContent => ({
+    title: 'controller', scope: 'second screen',
+    body: ['For a TV setup: the visual stays full screen on the TV, and a controller window on your laptop works as the remote, with a live preview of what the TV shows, now playing, Set Mode, styles, palettes and every setting.',
+      'Keys pressed in the controller act on the visual. Closing it never stops the visual. Shortcut: R. Also in the tray menu.'],
+  }),
   np: (): InfoContent => ({
     title: 'now playing',
     body: ['Shows the song your music app reports to Windows (Spotify, browsers, most players): title, artist and cover. It appears for a few seconds when the track changes or the mouse moves, then fades.',
@@ -271,7 +279,8 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       row('What it can choose', INFO.include(), s.setMode.include.length ? `${s.setMode.include.length} of ${PIECES.length}` : 'everything', inc),
       row('At most every', INFO.interval(), fmtInterval(s.setMode.minInterval),
         segmented(SET_MODE_INTERVALS.map((n) => ({ value: String(n), label: fmtInterval(n) })), String(s.setMode.minInterval), (v) => { s.setMode.minInterval = Number(v); ctl.commit(); }, 'Interval').el),
-      row('Change palettes too', INFO.setpal(), null, toggle('', s.setMode.palettes, (v) => { s.setMode.palettes = v; ctl.commit(); }).el, true));
+      row('Change palettes too', INFO.setpal(), null, toggle('', s.setMode.palettes, (v) => { s.setMode.palettes = v; ctl.commit(); }).el, true),
+      on.openController ? row('Controller', INFO.controller(), null, button('Open on a second screen', { size: 'sm', icon: 'expand', onClick: () => { sh.close(); on.openController?.(); } })) : null);
 
     // Now playing
     const np = section('now playing', 'now playing', null,
@@ -315,7 +324,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       platform.listMonitors ? row('Fullscreen display', INFO.monitor(), null,
         select([{ value: '', label: 'Current' }, ...monitors], s.fullscreenMonitor ?? '', (v) => { s.fullscreenMonitor = v || null; ctl.commit(); }, 'Fullscreen display').el) : null,
       platform.checkForUpdate ? row('Check for updates', INFO.updates(), null, toggle('', s.checkUpdates, (v) => { s.checkUpdates = v; ctl.commit(); }).el, true) : null,
-      h('div', { class: 'st-row', style: { display: 'flex', gap: '8px' } }, button('Show the intro again', { size: 'sm', onClick: () => { sh.close(); on.replayIntro(); } })));
+      on.replayIntro ? h('div', { class: 'st-row', style: { display: 'flex', gap: '8px' } }, button('Show the intro again', { size: 'sm', onClick: () => { sh.close(); on.replayIntro?.(); } })) : null);
 
     const keys = section('keys', 'keys', null, keyList([...SHORTCUTS, [['C'], 'Next camera preset (Depth)']]));
     const about = section('about', 'about', null, h('div', { class: 'st-about' }, lockup(),
