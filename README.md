@@ -27,6 +27,12 @@ Five art styles, each with its own looks and views. Every frame below is a real 
 
 Looks: Ink (Glow, Marble, Sumi), Wisp Depth (Ground, Tunnel), Voyage (Void, City, Ocean). Views: **Depth** (a 3D camera that glides, banks on beats and lurches on drops) or **Flat** (a 2D canvas) for Ink, Silk and Wisp. Aura and Halo from v0.1 live under *Show classic styles*.
 
+## What’s new in 1.0.2
+
+- **Colours from your album art.** The visuals take their palette from the cover of what’s playing, fading to the new album’s colours on a track change. They stay vivid in every style (never muddy or grey); with no cover, an advert or a black-and-white cover your own palette stays. The Album tile comes first in every palette picker; `A` toggles it. The cover is analysed on your computer and never leaves it.
+- **The controller for TV setups.** The visual full screen on the TV, a remote on your laptop: a live preview of exactly what the TV shows, now playing, Set Mode (lock to a style, next now, calm ↔ driving), styles, palettes, glow, camera, the output display, blackout and freeze, and every setting. `R`, the tray, or Settings › Set Mode.
+- **Neon’s colour drift** sways around its colours instead of turning into olive or dull shades.
+
 ## What’s new in 1.0.1
 
 - **Nine palettes on keys 1–9**, tuned in OKLCH to stay vivid in every style, look and view: Ocean, Aurora, Ember, Neon, Crimson, Solar, Violet, Sunset, Acid. Voyage now takes the palette across the whole fractal, its sky and its sea; Wisp's smoke stays coloured; custom colours and colour drift never go muddy, and palette changes fade without passing through grey.
