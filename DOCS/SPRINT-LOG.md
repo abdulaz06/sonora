@@ -1,21 +1,21 @@
-# Website, live demo, trailer, hosting — done (deploy waits on your Vercel login)
+# Website, live demo, trailer, hosting — done, live on sonoravisuals.com
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Site: `site/` (Astro, static). Review output: `verify/site/` (git-ignored). Trailer master: `local-media/` (git-ignored).
 
 ## Summary
 
-**Live URL:** not deployed yet: the first Vercel login and link need you (steps right below, about five minutes). The site is built for **https://sonora-visual.vercel.app** (`sonora`, `sonora-app`, `sonora-visualizer` and `sonora-music` are taken on vercel.app; D77). Until then everything was verified on the local production build (`cd site && npm run build && npm run preview`, http://localhost:4321). The deploy workflow already runs on every push and builds the site on Linux (green); it deploys as soon as the three secrets exist.
+**Live URL:** **https://sonoravisuals.com** (`www` redirects to it; D80). The site workflow deploys it to the Vercel project `sonora`, whose Root Directory is `site` (the workflow runs the CLI from the repository root for that). The repo homepage points there. Before it went live everything was verified on the local production build (`cd site && npm run build && npm run preview`, http://localhost:4321).
 
-### Do this by hand
+### Done by hand (kept for reference)
 1. **Vercel login and link** (from the repo):
    ```
    cd site
    npx vercel login            # browser opens; sign in (GitHub is easiest)
-   npx vercel link             # set up? yes · scope: your account · link to existing? no · name: sonora-visual · directory: ./
+   npx vercel link             # links the project `sonora` (Root Directory: site)
    cat .vercel/project.json    # PowerShell: type .vercel\project.json → note "orgId" and "projectId"
    ```
-   If `link` offers to connect the GitHub repository, either answer is fine: `site/vercel.json` turns Vercel's own Git builds off (they would fail: no Rust there). If `sonora-visual` is taken by then, pick another name and change `SITE_URL` in `site/site.config.mjs` and the Sitemap line in `site/public/robots.txt`.
+   If `link` offers to connect the GitHub repository, either answer is fine: `site/vercel.json` turns Vercel's own Git builds off (they would fail: no Rust there). The site's address is `SITE_URL` in `site/site.config.mjs` plus the Sitemap line in `site/public/robots.txt`.
 2. **A Vercel token:** https://vercel.com/account/tokens → Create (your account, 1 year) → copy it.
 3. **Three GitHub secrets** (repo root):
    ```
@@ -26,8 +26,8 @@
    ```
    From then on: pushes to `main` that touch `site/` or the engine deploy to production, every release redeploys (so `/download` and the button move to the new installer at once), a daily run refreshes it, and other branches get preview URLs.
 4. **Web Analytics** (cookieless, no banner): Vercel → project → Analytics → Enable. The script is already in production builds only.
-5. **Repo homepage**, once the URL answers: `gh repo edit --homepage https://sonora-visual.vercel.app` (the README already links it).
-6. **Custom domain later** (optional): Vercel → project → Settings → Domains → Add; set the DNS records it shows (A `76.76.21.21` for an apex domain, or CNAME `cname.vercel-dns.com`); change `SITE_URL` in `site/site.config.mjs` and `site/public/robots.txt`; push.
+5. **Repo homepage:** `gh repo edit --homepage https://sonoravisuals.com` (done; the README links it too).
+6. **Custom domain:** `sonoravisuals.com` is the primary domain in Vercel → project → Settings → Domains, with `www` redirecting to it (308). `SITE_URL` in `site/site.config.mjs` and `site/public/robots.txt` match.
 7. **YouTube** (you upload): `local-media/sonora-trailer-1080p60.mp4` (58.95 s, 1080p60, H.264 + AAC 256k, 169 MB), thumbnail `local-media/youtube-thumbnail.jpg` (1280×720).
    - Title: `sonora — see your music (trailer)`
    - Description:
