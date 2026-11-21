@@ -9,6 +9,7 @@ import { initController } from '../../../src/app/controller';
 import type { Platform } from '../../../src/app/platform';
 import { initShell, type Shell } from '../../../src/app/shell';
 import { audioStatus } from '../../../src/app/stores';
+import { announceMedia, fileMedia } from '../../../src/app/file-media';
 import { WasmFrameSource, type SourceStatus } from '../../../src/audio/wasm-source';
 import { initRenderer } from '../../../src/engine/renderer';
 import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../../../src/ipc/settings';
@@ -104,11 +105,14 @@ export async function bootLive(): Promise<void> {
   fileInput.type = 'file';
   fileInput.accept = 'audio/*,.mp3,.wav,.ogg,.oga,.m4a,.flac,.opus,.webm';
 
-  const playData = async (data: Blob | ArrayBuffer, label: string, from = 0): Promise<void> => {
+  const playData = async (data: Blob | ArrayBuffer, label: string, from = 0, artist = ''): Promise<void> => {
     try {
+      // Tags (title, artist, embedded cover) first: decoding detaches an ArrayBuffer.
+      const info = await fileMedia(data instanceof Blob ? data : data.slice(0), label);
+      if (artist && !info.artist) info.artist = artist;
       const buf = await source.loadFile(data);
       await source.playBuffer(buf, from, () => undefined, label);
-      renderer.events.notifyTrackChange({ title: label.replace(/\.[a-z0-9]+$/i, '') });
+      announceMedia(info, renderer);
       closeSheet();
       say('');
       shell.goVisual();
@@ -122,7 +126,7 @@ export async function bootLive(): Promise<void> {
     const probe = document.createElement('audio');
     const url = probe.canPlayType('audio/webm; codecs="opus"') ? DEMO.webm : DEMO.m4a;
     const data = await fetch(url).then((r) => r.arrayBuffer());
-    await playData(data, 'sonora demo', DEMO_START_S);
+    await playData(data, 'sonora demo', DEMO_START_S, 'made for sonora');
   };
 
   sheet.addEventListener('click', (e) => {

@@ -202,7 +202,7 @@ export function meter(segments = 18): Meter {
 
 // ── Toast ───────────────────────────────────────────────────────
 let toastHost: HTMLDivElement | null = null;
-export interface ToastOpts { action?: { label: string; onClick: () => void }; ms?: number }
+export interface ToastOpts { action?: { label: string; onClick: () => void }; ms?: number; dismissible?: boolean; onClose?: () => void }
 export function toast(message: string, o: ToastOpts = {}): () => void {
   if (!toastHost) { toastHost = h('div', { class: 's-toasts s-root', role: 'status', 'aria-live': 'polite' }); document.body.append(toastHost); }
   const t = h('div', { class: 's-toast' }, h('span', null, message));
@@ -212,8 +212,10 @@ export function toast(message: string, o: ToastOpts = {}): () => void {
     closed = true;
     t.classList.remove('is-in');
     window.setTimeout(() => t.remove(), 450);
+    o.onClose?.();
   };
   if (o.action) t.append(button(o.action.label, { size: 'sm', onClick: () => { o.action?.onClick(); close(); } }));
+  if (o.dismissible) t.append(button('', { size: 'sm', variant: 'ghost', icon: 'close', title: 'Dismiss', onClick: close }));
   toastHost.append(t);
   requestAnimationFrame(() => requestAnimationFrame(() => t.classList.add('is-in')));
   if (o.ms !== 0) window.setTimeout(close, o.ms ?? 3200);

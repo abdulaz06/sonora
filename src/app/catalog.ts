@@ -161,6 +161,7 @@ export const SHORTCUTS: [string[], string][] = [
   [['S'], 'Next style'],
   [['V'], 'Next look or view'],
   [['1–9'], 'Palettes'],
+  [['A'], 'Album colours on / off'],
   [['D'], 'Audio signals (advanced)'],
   [['P'], 'Show / hide FPS'],
 ];

@@ -45,8 +45,9 @@ describe('settings migration', () => {
       },
     };
     const s = mergeWithDefaults(v5);
-    expect(s.styles.ink).toEqual(v5.styles.ink);
-    expect(s.styles.silk).toEqual(v5.styles.silk);
+    // v9 added glow (1 = as designed) to every style.
+    expect(s.styles.ink).toEqual({ ...v5.styles.ink, glow: 1 });
+    expect(s.styles.silk).toEqual({ ...v5.styles.silk, glow: 1 });
     expect(s.quality).toBe('high');
     expect(s.fpsCap).toBe(144);
     expect(s.onboarded).toBe(true);
@@ -117,6 +118,38 @@ describe('settings migration', () => {
     expect(name(s.styles.voyage!.paletteIndex)).toBe('Violet');
     // A v8 save is read as is.
     expect(mergeWithDefaults({ settingsVersion: 8, paletteIndex: 7 }).paletteIndex).toBe(7);
+  });
+
+  it('v9: album colours on for new installs, off with a one-time toast for anyone updating', () => {
+    const fresh = mergeWithDefaults({ settingsVersion: SETTINGS_VERSION });
+    expect(fresh.albumColours).toBe(true);
+    expect(fresh.albumIntro).toBe(false);
+    expect(mergeWithDefaults(null).albumColours).toBe(true);
+    // A 1.0.1 save (v8): palette kept, album colours off, the toast pending once.
+    const old = mergeWithDefaults({ settingsVersion: 8, paletteIndex: 4, styles: { ink: { paletteIndex: 6 } } });
+    expect(old.albumColours).toBe(false);
+    expect(old.albumIntro).toBe(true);
+    expect(PALETTES[old.paletteIndex].name).toBe('Crimson');
+    expect(PALETTES[old.styles.ink!.paletteIndex].name).toBe('Violet');
+    // Once seen or chosen, a v9 save is read as is.
+    const v9 = mergeWithDefaults({ settingsVersion: 9, albumColours: false, albumIntro: false });
+    expect([v9.albumColours, v9.albumIntro]).toEqual([false, false]);
+    expect(mergeWithDefaults({ settingsVersion: 9, albumColours: true, albumIntro: true }).albumColours).toBe(true);
+  });
+
+  it('v9: Set Mode lock and bias, glow per style, clamped', () => {
+    const s = mergeWithDefaults({
+      settingsVersion: 9, mode: 'warp', controllerOffered: true,
+      setMode: { on: true, include: [], minInterval: 120, palettes: true, lockStyle: true, bias: 4 },
+      styles: { warp: { glow: 9 }, ink: { glow: 0.7 } },
+    });
+    expect(s.setMode.lockStyle).toBe(true);
+    expect(s.setMode.bias).toBe(1);
+    expect(s.styles.warp!.glow).toBe(1.5);
+    expect(s.styles.ink!.glow).toBe(0.7);
+    expect(s.glow).toBe(1.5);
+    expect(s.controllerOffered).toBe(true);
+    expect(mergeWithDefaults({ settingsVersion: 8 }).setMode).toMatchObject({ lockStyle: false, bias: 0 });
   });
 
   it('frame-rate choices pace evenly on the measured display', () => {

@@ -223,6 +223,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
       else if (lower === 'c') ctl.cycleCameraPreset();
       else if (lower === 'p') { ctl.setShowFps(!s.showFps); toast(s.showFps ? 'fps on' : 'fps off', { ms: 900 }); }
       else if (/^[1-9]$/.test(k)) ctl.setPalette(Number(k) - 1);
+      else if (lower === 'a') { ctl.setAlbumColours(!s.albumColours); toast(s.albumColours ? (ctl.album.get().status === 'cover' ? 'album colours' : 'album colours · when a cover plays') : 'album colours off', { ms: 1400 }); }
       return;
     }
     if (k.startsWith('Arrow')) { e.preventDefault(); spatialMove(k); }
@@ -270,6 +271,15 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
   else if (start === 'detail') { screen = 'boot'; openStyle(opts.startStyle ?? ART_STYLES[0]); }
   else goMenu();
   if (s.setMode.on && start === 'visual') setMode.switchNow(false);
+
+  // One time, for people updating from 1.0.1: album colours are new (and off for them).
+  if (s.albumIntro && s.onboarded) {
+    window.setTimeout(() => {
+      s.albumIntro = false;
+      ctl.commit();
+      toast('new: colours from your album art.', { ms: 0, dismissible: true, action: { label: 'try it', onClick: () => ctl.setAlbumColours(true) } });
+    }, 2500);
+  }
 
   // Audio status line for the debug / device name is filled by the entry.
   void audioStatus;

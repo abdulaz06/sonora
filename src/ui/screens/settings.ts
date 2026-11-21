@@ -20,6 +20,7 @@ import {
   button, infoButton, keyList, meter, segmented, select, sheet, slider, thumb, toggle, type InfoContent,
 } from '../ds/components';
 import { h } from '../ds/dom';
+import { albumInfo, albumTile } from './album-tile';
 import { lockup } from './brand';
 
 const PRESET_MATCH = 0.03;
@@ -198,23 +199,29 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       row('Show classic styles', INFO.classic(), null, toggle('', s.showClassic, (v) => ctl.setShowClassic(v)).el, true));
     if (!visual.querySelector('.st-row:not(.inline)')) visual.insertBefore(h('p', { class: 'st-note', style: { marginTop: '0', marginBottom: '14px' } }, `${info.label} has one look and one view.`), visual.children[1]);
 
-    // Colour: swatches applied to a thumbnail of this style.
+    // Colour: Album first, then swatches applied to a thumbnail of this style.
     const pals = h('div', { class: 'st-pals' });
+    const web = platform.kind === 'web';
+    const alb = ctl.album.get();
+    pals.append(albumTile(alb, s.albumColours, web, () => ctl.setAlbumColours(!s.albumColours)));
     PALETTES.forEach((p, i) => {
-      const t = thumb({ media: mediaFor(`pal-${id}-${i}`, `pal-ink-${i}`), title: p.name, selected: s.paletteIndex === i, hoverPlay: false, onClick: () => ctl.setPalette(i) });
+      const t = thumb({ media: mediaFor(`pal-${id}-${i}`, `pal-ink-${i}`), title: p.name, selected: !s.albumColours && s.paletteIndex === i, hoverPlay: false, onClick: () => ctl.setPalette(i) });
       t.el.classList.add('pal-thumb');
       t.media.el.append(h('i', { class: 'pal-chip', style: { background: swatchCss(p) } }));
       pals.append(t.el);
     });
-    const custom = h('button', { class: 's-thumb pal-thumb', type: 'button', 'aria-pressed': String(s.paletteIndex < 0) },
+    const custom = h('button', { class: 's-thumb pal-thumb', type: 'button', 'aria-pressed': String(!s.albumColours && s.paletteIndex < 0) },
       h('div', { class: 's-media', style: { background: paletteFromHue(s.customHue).preview, position: 'relative' } },
         h('i', { class: 'pal-chip', style: { background: swatchCss(paletteFromHue(s.customHue)) } })),
       h('span', { class: 's-thumb-row' }, h('span', { class: 's-thumb-title' }, 'Custom')));
     custom.addEventListener('click', () => ctl.setCustomHue(s.customHue));
     pals.append(custom);
-    const palName = s.paletteIndex >= 0 ? PALETTES[s.paletteIndex]?.name ?? '' : 'Custom';
+    const ownName = s.paletteIndex >= 0 ? PALETTES[s.paletteIndex]?.name ?? '' : 'Custom';
+    const palName = s.albumColours ? (alb.status === 'cover' ? 'album' : `album · ${ownName.toLowerCase()} for now`) : ownName;
     const colour = section('colour', 'colour', colourScope,
+      row('Colours from album art', albumInfo(web), null, toggle('', s.albumColours, (v) => ctl.setAlbumColours(v)).el, true),
       row('Palette', INFO.palette(name, s.matchColours), palName, pals),
+      s.albumColours ? h('p', { class: 'st-note', style: { marginTop: '-6px' } }, `When there's no cover, ${ownName} is used${s.matchColours ? '' : ` for ${name}`}. Picking a palette turns album colours off.`) : null,
       s.paletteIndex < 0 ? row('Custom colour', { title: 'custom colour', body: ['Pick any colour; sonora builds a matching palette around it.'] }, `${s.customHue}°`,
         slider({ min: 0, max: 360, value: s.customHue, hue: true, onInput: (v) => ctl.setCustomHue(v) }).el) : null,
       row('Colour drift', INFO.drift(name, s.matchColours), null, toggle('', s.autoDrift, (v) => ctl.setAutoDrift(v)).el, true),
@@ -333,6 +340,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
     build();
   };
   ctl.subscribe(rebuild);
+  ctl.album.subscribe(rebuild, false);
 
   return {
     open(sec?: string) {

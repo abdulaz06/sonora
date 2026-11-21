@@ -26,6 +26,8 @@ const FALLBACK_INTERVALS = 3;
 const HISTORY = 3;
 /** Width of the energy match (smaller = stricter). */
 const MATCH_SIGMA = 0.24;
+/** How far the calm / driving bias moves the music picture (at ±1). */
+const BIAS_SHIFT = 0.35;
 
 export interface SetMode {
   isOn(): boolean;
@@ -50,11 +52,14 @@ export function createSetMode(ctl: Controller, onChange: (on: boolean) => void, 
   const energy = (): number => {
     let e = 0.45 * intensity + 0.3 * four + 0.25 * conf - 0.3 * ambient;
     if (bpm > 125) e += 0.1; else if (bpm > 0 && bpm < 95) e -= 0.1;
+    e += (s.setMode.bias ?? 0) * BIAS_SHIFT;
     return Math.max(0, Math.min(1, e));
   };
 
   function choose(): { piece: Piece; depth: boolean; palette: number | null } | null {
-    const inc = s.setMode.include.length ? PIECES.filter((p) => s.setMode.include.includes(p.id)) : PIECES;
+    let inc = s.setMode.include.length ? PIECES.filter((p) => s.setMode.include.includes(p.id)) : PIECES;
+    // Locked: only the current style's looks and views.
+    if (s.setMode.lockStyle) inc = PIECES.filter((p) => p.style === s.mode);
     if (!inc.length) return null;
     const current = currentPieceId();
     let pool = inc.filter((p) => !history.includes(p.id) && p.id !== current);
@@ -69,7 +74,8 @@ export function createSetMode(ctl: Controller, onChange: (on: boolean) => void, 
     // Views: driving music leans to Depth for Ink (the camera banks and lurches), calm to Flat.
     const depth = piece.views.length > 1 ? rand() < (piece.style === 'ink' ? 0.35 + 0.5 * e : 0.5) : piece.views[0] === 'depth';
     let palette: number | null = null;
-    if (s.setMode.palettes) {
+    // Album colours on: the cover chooses the colours (D82).
+    if (s.setMode.palettes && !s.albumColours) {
       const list = PALETTES.map((_, i) => i).filter((i) => i !== s.paletteIndex);
       palette = list[Math.floor(rand() * list.length)] ?? null;
     }

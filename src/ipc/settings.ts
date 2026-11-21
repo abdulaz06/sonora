@@ -14,7 +14,7 @@ import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
 /** Bump when a default changes in a way saved settings must not override. */
-export const SETTINGS_VERSION = 8;
+export const SETTINGS_VERSION = 9;
 
 /** The palette list before v8, in index order (saves stored the index). */
 const PALETTES_V7 = ['Ocean', 'Aurora', 'Ember', 'Neon', 'Crimson', 'Gold', 'Violet',
@@ -47,7 +47,13 @@ export interface StylePrefs {
   responsiveness: number;
   camera: CameraView;
   flatZoom: number;
+  /** Glow (bloom) amount, 1 = the style as designed (v9). */
+  glow: number;
 }
+
+/** Glow range offered (bloom multiplier). */
+export const GLOW_MIN = 0.4;
+export const GLOW_MAX = 1.5;
 
 /** Where the now-playing overlay sits. */
 export type Corner = 'bottom-left' | 'bottom-right' | 'top-left' | 'top-right';
@@ -70,6 +76,10 @@ export interface SetModePrefs {
   minInterval: number;
   /** Change palettes too. */
   palettes: boolean;
+  /** v9: keep the current style; switch only its looks / views (and palettes). */
+  lockStyle: boolean;
+  /** v9: −1 calm … 0 follow the music … +1 driving. */
+  bias: number;
 }
 
 export const SET_MODE_INTERVALS = [60, 120, 180, 300, 600] as const;
@@ -143,6 +153,15 @@ export interface PersistedSettings {
   /** Frames-per-second readout in a corner (also the P key). */
   showFps: boolean;
   fpsCorner: Corner;
+  // ── v9 ──
+  /** Colours from the album art of what's playing (falls back to the chosen palette). */
+  albumColours: boolean;
+  /** Show the one-time "new: colours from your album art" toast (users updating from ≤ 1.0.1). */
+  albumIntro: boolean;
+  /** Mirrors the active style's glow (StylePrefs.glow). */
+  glow: number;
+  /** The controller (second screen) has been offered once. */
+  controllerOffered: boolean;
 }
 
 /** Fixed frame-rate caps offered on every display (and 90, kept for older saves). */
@@ -227,11 +246,15 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   onboarded: false,
   launches: 0,
   nowPlaying: { show: true, position: 'bottom-left', controls: true },
-  setMode: { on: false, include: [], minInterval: 120, palettes: true },
+  setMode: { on: false, include: [], minInterval: 120, palettes: true, lockStyle: false, bias: 0 },
   fullscreenMonitor: null,
   checkUpdates: true,
   showFps: false,
   fpsCorner: 'top-left',
+  albumColours: true,
+  albumIntro: false,
+  glow: 1,
+  controllerOffered: false,
 };
 
 /** Load saved settings from disk; returns DEFAULT_SETTINGS if none exist. */
@@ -440,12 +463,26 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     include: Array.isArray(sm.include) ? sm.include.filter((x): x is string => typeof x === 'string') : [],
     minInterval: typeof sm.minInterval === 'number' && Number.isFinite(sm.minInterval) ? clamp(Math.round(sm.minInterval), 30, 1800) : DEFAULT_SETTINGS.setMode.minInterval,
     palettes: typeof sm.palettes === 'boolean' ? sm.palettes : DEFAULT_SETTINGS.setMode.palettes,
+    lockStyle: typeof sm.lockStyle === 'boolean' ? sm.lockStyle : false,
+    bias: typeof sm.bias === 'number' && Number.isFinite(sm.bias) ? clamp(sm.bias, -1, 1) : 0,
   };
   if (typeof r.fullscreenMonitor === 'string' && r.fullscreenMonitor) out.fullscreenMonitor = r.fullscreenMonitor;
   if (typeof r.checkUpdates === 'boolean') out.checkUpdates = r.checkUpdates;
   // ── v7 ──
   if (typeof r.showFps === 'boolean') out.showFps = r.showFps;
   if (r.fpsCorner === 'bottom-left' || r.fpsCorner === 'bottom-right' || r.fpsCorner === 'top-left' || r.fpsCorner === 'top-right') out.fpsCorner = r.fpsCorner;
+  // ── v9 ──
+  // Album colours are on for new installs; anyone updating keeps the palette
+  // they chose and gets a one-time toast offering them (D82).
+  if (version < 9) {
+    out.albumColours = false;
+    out.albumIntro = true;
+  } else {
+    if (typeof r.albumColours === 'boolean') out.albumColours = r.albumColours;
+    if (typeof r.albumIntro === 'boolean') out.albumIntro = r.albumIntro;
+  }
+  if (typeof r.controllerOffered === 'boolean') out.controllerOffered = r.controllerOffered;
+  out.glow = out.styles[out.mode]?.glow ?? 1;
   return out;
 }
 
@@ -462,7 +499,7 @@ function clamp(v: number, lo: number, hi: number): number {
 export function stylePrefsOf(s: PersistedSettings): StylePrefs {
   return {
     paletteIndex: s.paletteIndex, customHue: s.customHue, autoDrift: s.autoDrift, driftPeriod: s.driftPeriod,
-    responsiveness: s.responsiveness, camera: { ...s.camera }, flatZoom: s.flatZoom,
+    responsiveness: s.responsiveness, camera: { ...s.camera }, flatZoom: s.flatZoom, glow: s.glow,
   };
 }
 
@@ -489,5 +526,6 @@ function parseStylePrefs(raw: unknown, fallback: StylePrefs, version: number): S
       curve: num(c.curve, -1, 1, fallback.camera.curve),
     },
     flatZoom: num(p.flatZoom, FLAT_ZOOM_MIN, FLAT_ZOOM_MAX, fallback.flatZoom),
+    glow: num(p.glow, GLOW_MIN, GLOW_MAX, 1),
   };
 }

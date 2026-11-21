@@ -14,6 +14,8 @@ import { getStyle, presetsFor } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 import { toggleDebugOverlay, updateDebugOverlay } from '../ui/debug-overlay';
 import type { AudioFeatureFrame } from '../types/audio-frame';
+import { createAlbumColours, type AlbumState } from './album-colours';
+import { nowPlaying, type Store } from './stores';
 
 /** Live audio level (0–1) from the last analysis frame, for meters. */
 export type LevelListener = (level: number, frame: AudioFeatureFrame) => void;
@@ -29,6 +31,8 @@ export interface ShowOptions {
 export interface Controller {
   readonly settings: PersistedSettings;
   readonly renderer: Renderer;
+  /** The current cover and its palette (album colours). */
+  readonly album: Store<AlbumState>;
   onFrame(frame: AudioFeatureFrame): void;
   onLevel(cb: LevelListener): () => void;
   subscribe(cb: ChangeListener): () => void;
@@ -48,13 +52,18 @@ export interface Controller {
   setMatchColours(on: boolean): void;
   setPalette(idx: number): void;
   setCustomHue(h: number): void;
+  /** Colours from the album art (on: the cover drives; off: the chosen palette). */
+  setAlbumColours(on: boolean): void;
+  setGlow(g: number): void;
+  setBlackout(on: boolean): void;
+  isBlackout(): boolean;
+  setFrozen(on: boolean): void;
   setAutoDrift(on: boolean): void;
   setDriftPeriod(s: number): void;
   setResponsiveness(t: number): void;
   setQuality(q: QualityPreset): void;
   setFpsCap(n: number): void;
   setShowFps(on: boolean): void;
-  /** Temporary A/B: Ink before the smoothness fix. */
   cycleCameraPreset(): void;
   toggleDebug(): void;
   /** Enable mouse camera control on the canvas (only while the visual shows). */
@@ -90,6 +99,16 @@ export function initController(opts: ControllerOptions): Controller {
 
   // ── Per-style preferences ──
   const prefsOf = (id: StyleId): StylePrefs => (settings.styles[id] ??= defaultStylePrefs());
+  // Album colours follow now playing (the cover drives the palette while on).
+  const album = createAlbumColours(renderer.colorEngine, () => settings.albumColours);
+  nowPlaying.subscribe((m) => album.feed(m));
+  let blackout = false;
+  /** Picking a palette by hand turns album colours off (the pick is what you want now). */
+  const leaveAlbum = (): void => {
+    if (!settings.albumColours) return;
+    settings.albumColours = false;
+    album.refresh();
+  };
   type Colours = Pick<StylePrefs, 'paletteIndex' | 'customHue' | 'autoDrift' | 'driftPeriod'>;
   /** Colour changes go to the active style, or to the shared set when colours are matched. */
   function setColours(c: Partial<Colours>): void {
@@ -112,7 +131,9 @@ export function initController(opts: ControllerOptions): Controller {
     settings.responsiveness = p.responsiveness;
     settings.camera = { ...p.camera };
     settings.flatZoom = p.flatZoom;
+    settings.glow = p.glow;
     applyColours();
+    renderer.setGlow(settings.glow);
     renderer.setResponsiveness(settings.responsiveness);
     renderer.camera.setView(settings.camera);
     renderer.camera.setFlatZoom(settings.flatZoom);
@@ -146,7 +167,7 @@ export function initController(opts: ControllerOptions): Controller {
   });
 
   const api: Controller = {
-    settings, renderer,
+    settings, renderer, album: album.state,
     onFrame(frame: AudioFeatureFrame): void {
       renderer.pushFrame(frame);
       const level = Math.min(1, Math.sqrt(frame.energy.instant) * 2.2);
@@ -208,16 +229,33 @@ export function initController(opts: ControllerOptions): Controller {
       changed();
     },
     setPalette(idx: number): void {
+      leaveAlbum();
       if (idx < 0) renderer.colorEngine.setCustomHue(settings.customHue);
       else renderer.colorEngine.setPalette(idx);
       setColours({ paletteIndex: idx });
       changed();
     },
     setCustomHue(hue: number): void {
+      leaveAlbum();
       renderer.colorEngine.setCustomHue(hue);
       setColours({ paletteIndex: -1, customHue: hue });
       changed();
     },
+    setAlbumColours(on: boolean): void {
+      settings.albumColours = on;
+      settings.albumIntro = false;
+      album.refresh();
+      changed();
+    },
+    setGlow(g: number): void {
+      renderer.setGlow(g);
+      settings.glow = g;
+      prefsOf(settings.mode).glow = g;
+      changed();
+    },
+    setBlackout(on: boolean): void { blackout = on; renderer.setBlackout(on); changed(); },
+    isBlackout: () => blackout,
+    setFrozen(on: boolean): void { renderer.setFrozen(on); changed(); },
     setAutoDrift(on: boolean): void { renderer.colorEngine.setAutoDrift(on); setColours({ autoDrift: on }); changed(); },
     setDriftPeriod(s: number): void { renderer.colorEngine.setDriftPeriod(s); setColours({ driftPeriod: s }); changed(); },
     setResponsiveness(t: number): void {

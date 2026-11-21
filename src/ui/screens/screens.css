@@ -218,6 +218,16 @@ body.sonora-idle { cursor: none; }
 .pal-thumb .s-media { position: relative; }
 .pal-thumb .pal-chip { position: absolute; left: 6px; bottom: 6px; width: 12px; height: 12px; outline: 1px solid rgba(8, 8, 10, 0.6); z-index: 1; }
 .qs .pal .s-thumb .s-thumb-title { font-size: 9.5px; }
+/* Album tile: the cover, then its colours as flat bands; dim when no cover can give colours. */
+.album-thumb .s-media { display: flex; background: var(--night); overflow: hidden; }
+.album-thumb .album-art { height: 100%; aspect-ratio: 1; object-fit: cover; flex: none; display: block; }
+.album-thumb .album-bands { flex: 1; display: flex; min-width: 0; }
+.album-thumb .album-bands i { flex: 1; }
+.album-thumb .album-ph { flex: 1; display: grid; place-items: center; }
+.album-thumb .album-ph i { width: 26%; aspect-ratio: 1; border: 1px solid var(--b40); position: relative; }
+.album-thumb .album-ph i::after { content: ''; position: absolute; inset: 34%; border: 1px solid var(--b25); }
+.album-thumb.is-dim .s-media > * { opacity: 0.38; }
+.album-thumb.is-dim .s-thumb-title { color: var(--b40); }
 
 .sm-label { position: fixed; top: clamp(16px, 2.2vh, 28px); right: var(--gutter); z-index: 880; display: flex; align-items: center; gap: 10px; transition: opacity var(--d4) var(--ease); pointer-events: none; }
 body.sonora-idle .sm-label { opacity: 0.45; }

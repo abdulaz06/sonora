@@ -14,6 +14,10 @@ const POLL_MS: u64 = 500;
 /// Largest cover accepted (bytes); bigger thumbnails are skipped.
 #[cfg(windows)]
 const MAX_ART_BYTES: usize = 1_500_000;
+/// Some players (browsers) set the cover a moment after the title: while a
+/// track has no cover yet, ask again on this many polls (album colours).
+#[cfg(windows)]
+const ART_RETRIES: u32 = 10;
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -71,7 +75,7 @@ pub fn start(app: tauri::AppHandle, state: SharedMedia) {
 
 #[cfg(windows)]
 mod imp {
-    use super::{MediaInfo, SharedMedia, MAX_ART_BYTES, POLL_MS};
+    use super::{MediaInfo, SharedMedia, ART_RETRIES, MAX_ART_BYTES, POLL_MS};
     use base64::Engine;
     use tauri::Emitter;
     use windows::Media::Control::{
@@ -86,11 +90,12 @@ mod imp {
         // Cover is fetched only when the track changes.
         let mut art_key = String::new();
         let mut art = String::new();
+        let mut art_tries = 0u32;
         loop {
             if manager.is_none() {
                 manager = Manager::RequestAsync().and_then(|op| op.get()).ok();
             }
-            let info = manager.as_ref().and_then(|m| read(m, &mut art_key, &mut art).ok().flatten());
+            let info = manager.as_ref().and_then(|m| read(m, &mut art_key, &mut art, &mut art_tries).ok().flatten());
             {
                 let mut cur = state.current.lock();
                 if *cur != info {
@@ -102,7 +107,7 @@ mod imp {
         }
     }
 
-    fn read(m: &Manager, art_key: &mut String, art: &mut String) -> windows::core::Result<Option<MediaInfo>> {
+    fn read(m: &Manager, art_key: &mut String, art: &mut String, art_tries: &mut u32) -> windows::core::Result<Option<MediaInfo>> {
         let session: Session = match m.GetCurrentSession() {
             Ok(s) => s,
             Err(_) => return Ok(None),
@@ -117,6 +122,10 @@ mod imp {
         let key = format!("{title}\u{0}{artist}\u{0}{album}");
         if key != *art_key {
             *art_key = key;
+            *art_tries = 0;
+            *art = props.Thumbnail().ok().and_then(|t| cover(&t).ok().flatten()).unwrap_or_default();
+        } else if art.is_empty() && *art_tries < ART_RETRIES {
+            *art_tries += 1;
             *art = props.Thumbnail().ok().and_then(|t| cover(&t).ok().flatten()).unwrap_or_default();
         }
         let playback = session.GetPlaybackInfo()?;

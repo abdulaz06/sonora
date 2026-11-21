@@ -73,6 +73,8 @@ const HOLD_TAU = 0.25;
 const STYLE_FADE_SECONDS = 0.6;
 /** Largest dt a single step may advance (s). */
 const MAX_DT = 0.05;
+/** Blackout (controller): fade to black and back over this long (s); never a cut. */
+const BLACKOUT_FADE_S = 0.4;
 /** Cap on the canvas backing store (pixels on the long side). */
 const MAX_BACKING_LONG_SIDE = 3840;
 /** Default post values for art styles. */
@@ -154,6 +156,16 @@ export interface Renderer {
   setDepth(on: boolean): void;
   getDepth(): boolean;
   setRingCount(n: number): void;
+  /** Glow (bloom) multiplier; 1 = the style as designed. */
+  setGlow(g: number): void;
+  /** Fade the picture to black (and back); analysis and events keep running. */
+  setBlackout(on: boolean): void;
+  /** Hold the current picture (nothing is drawn; analysis and events keep running). */
+  setFrozen(on: boolean): void;
+  isFrozen(): boolean;
+  /** Called after every drawn frame, with the canvas still holding it (the
+   * controller's preview tap reads it back asynchronously here). */
+  setFrameHook(cb: ((gl: WebGL2RenderingContext, timeMs: number) => void) | null): void;
   onEvent(cb: (e: SonoraEvent) => void): () => void;
   stats(): RendererStats;
 }
@@ -242,6 +254,10 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   quality.onChange((q) => style.setQuality?.(q));
 
   let fadeAlpha = 1;
+  let glow = 1;
+  let blackout = false, blackLevel = 1;
+  let frozen = false;
+  let frameHook: ((gl: WebGL2RenderingContext, timeMs: number) => void) | null = null;
   let pending: StyleDescriptor | null = null;
   /** Look / view to apply when the pending style swaps in (transition()). */
   let pendingLook: { variant: string; depth: boolean } | null = null;
@@ -275,8 +291,10 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   };
 
   function step(rawDt: number): void {
+    if (frozen) { for (const e of events.drain()) for (const l of eventListeners) l(e); return; }
     const dt = Math.min(Math.max(rawDt, 0), MAX_DT);
     time += dt;
+    blackLevel = blackout ? Math.max(0, blackLevel - dt / BLACKOUT_FADE_S) : Math.min(1, blackLevel + dt / BLACKOUT_FADE_S);
     sizeCanvas(canvas, maxPixelRatio);
 
     // Crossfade between styles
@@ -353,8 +371,9 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       gl.clear(gl.COLOR_BUFFER_BIT);
       style.render(ctx);
       gl.disable(gl.BLEND);
-      legacyPost.bloomStrength = classicBloomBase + ctx.intensitySmoothed * 0.2 * f.fade_in_out;
-      legacyPost.apply(quadVAO, time, [fadeAlpha, fadeAlpha, fadeAlpha]);
+      legacyPost.bloomStrength = (classicBloomBase + ctx.intensitySmoothed * 0.2 * f.fade_in_out) * glow;
+      const k = fadeAlpha * blackLevel;
+      legacyPost.apply(quadVAO, time, [k, k, k]);
     } else {
       const q = quality.params;
       sceneW = Math.max(1, Math.round(canvas.width * q.renderScale));
@@ -381,8 +400,10 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       }
       const holdWant = flash.current > 0.002 ? Math.min(HOLD_RANGE[1], Math.max(HOLD_RANGE[0], flash.target / flash.current)) : 1;
       holdSmooth += (1 + (holdWant - 1) * flash.damping - holdSmooth) * (1 - Math.exp(-dt / HOLD_TAU));
-      artPost.apply(quadVAO, post, time, fadeAlpha, holdSmooth);
+      post.bloom *= glow;
+      artPost.apply(quadVAO, post, time, fadeAlpha * blackLevel, holdSmooth);
     }
+    frameHook?.(gl, performance.now());
   }
 
   // Beat onsets arrive at analysis rate; latch so a render frame never misses one.
@@ -568,6 +589,11 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       ringCount = n;
       style.setRingCount?.(n);
     },
+    setGlow(g: number): void { glow = Number.isFinite(g) ? Math.max(0, g) : 1; },
+    setBlackout(on: boolean): void { blackout = on; },
+    setFrozen(on: boolean): void { frozen = on; },
+    isFrozen: () => frozen,
+    setFrameHook(cb): void { frameHook = cb; },
     onEvent(cb: (e: SonoraEvent) => void): () => void {
       eventListeners.push(cb);
       return () => {
