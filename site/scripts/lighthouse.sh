@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lighthouse (mobile + desktop) for the landing page, /engineering and /live
-# against `npm run preview` (:4321), using the system Edge with its GPU.
+# against `npm run preview` (:4321, or BASE=…), using the system Edge with its GPU.
 # Reports: ../verify/site/lighthouse/<page>-<form>.report.{html,json}; scores printed.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -8,11 +8,12 @@ OUT=../verify/site/lighthouse
 mkdir -p "$OUT"
 export CHROME_PATH="${CHROME_PATH:-/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe}"
 PAGES=${PAGES:-"home engineering live"}
+BASE=${BASE:-http://localhost:4321}
 for page in $PAGES; do
   path=$([ "$page" = home ] && echo "" || echo "$page")
   for form in mobile desktop; do
     preset=$([ "$form" = desktop ] && echo "--preset=desktop" || echo "")
-    npx --yes lighthouse@13 "http://localhost:4321/$path" $preset --quiet \
+    npx --yes lighthouse@13 "$BASE/$path" $preset --quiet \
       --only-categories=performance,accessibility,best-practices,seo \
       --chrome-flags="--headless=new --use-angle=d3d11 --enable-gpu --ignore-gpu-blocklist" \
       --output=json --output=html --output-path="$OUT/$page-$form" >/dev/null 2>&1 || echo "lighthouse failed: $page $form"
