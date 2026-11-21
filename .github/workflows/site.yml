@@ -80,11 +80,21 @@ jobs:
 
       - name: Deploy to Vercel
         if: env.VERCEL_TOKEN != ''
-        working-directory: site
         run: |
           if [ "$PRODUCTION" = "true" ]; then ENV=production; FLAG=--prod; else ENV=preview; FLAG=; fi
-          npx --yes vercel@66 pull --yes --environment=$ENV --token=$VERCEL_TOKEN
-          npx --yes vercel@66 build $FLAG --token=$VERCEL_TOKEN
-          url=$(npx --yes vercel@66 deploy --prebuilt $FLAG --token=$VERCEL_TOKEN)
+          vc() { npx --yes vercel@66 "$@" --token=$VERCEL_TOKEN; }
+          # The Vercel project may set Root Directory to "site" (then the CLI runs
+          # from the repository root) or leave it empty (then it runs from site/).
+          vc pull --yes --environment=$ENV
+          ROOT_DIR=$(node -p "(require('./.vercel/project.json').settings || {}).rootDirectory || ''")
+          if [ -z "$ROOT_DIR" ]; then cd site; vc pull --yes --environment=$ENV; fi
+          echo "Vercel Root Directory: '${ROOT_DIR}', running from $(pwd)"
+          vc build $FLAG
+          # The Astro adapter writes the Build Output API into site/.vercel/output;
+          # deploy --prebuilt reads .vercel/output where it runs.
+          if [ ! -f .vercel/output/config.json ] && [ -f site/.vercel/output/config.json ]; then
+            rm -rf .vercel/output && cp -r site/.vercel/output .vercel/output
+          fi
+          url=$(vc deploy --prebuilt $FLAG)
           echo "Deployed: $url"
           echo "### Deployed ($ENV): $url" >> "$GITHUB_STEP_SUMMARY"

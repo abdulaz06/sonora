@@ -65,3 +65,6 @@ local-reference/
 local-media/
 # The site's web trailer (Safari fallback, < 5 MB) is the one mp4 that ships
 !site/public/media/sonora-trailer.mp4
+
+# Vercel CLI link (project and org ids)
+.vercel/
