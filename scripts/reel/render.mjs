@@ -169,12 +169,15 @@ function encode(plan, song, dirFrames, layers, info, outDir, draft) {
   const D = W1 - W0;
   const fps = info.fps;
   const styles = [...new Set(plan.shots.map((s) => s.style))];
-  const dither = draft ? 0 : Math.max(...styles.map((s) => EXPORT.dither[s] ?? EXPORT.dither.default));
+  const dither = draft ? 0 : plan.export?.dither ?? Math.max(...styles.map((s) => EXPORT.dither[s] ?? EXPORT.dither.default));
   const inputs = ['-framerate', String(fps), '-i', join(dirFrames, 'f%05d.jpg'), '-ss', W0.toFixed(4), '-t', D.toFixed(4), '-i', song.wav];
   for (const l of layers) inputs.push('-loop', '1', '-framerate', String(fps), '-t', D.toFixed(4), '-i', l.file);
   const f = [];
   // Supersampled frames → output size (Lanczos); a little temporal dither keeps smooth gradients from banding after compression.
-  f.push(`[0:v]scale=${OW}:${OH}:flags=lanczos,format=yuv444p${dither > 0 ? `,noise=c0s=${dither}:c0f=t` : ''}[b0]`);
+  // Trailer format: a short fade in, and the picture fades to Night under the lockup (reels: neither).
+  const fadeIn = plan.fadeIn ? `,fade=t=in:st=0:d=${plan.fadeIn}` : '';
+  const toCard = plan.card ? `,fade=t=out:st=${(plan.card.at - W0 + 0.15).toFixed(3)}:d=1.6:color=0x08080A` : '';
+  f.push(`[0:v]scale=${OW}:${OH}:flags=lanczos,format=yuv444p${dither > 0 ? `,noise=c0s=${dither}:c0f=t` : ''}${fadeIn}${toCard}[b0]`);
   let cur = 'b0';
   layers.forEach((l, i) => {
     const src = `${i + 2}:v`;
@@ -184,7 +187,8 @@ function encode(plan, song, dirFrames, layers, info, outDir, draft) {
     cur = `b${i + 1}`;
   });
   f.push(`[${cur}]scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]`);
-  f.push(`[1:a]afade=t=in:st=0:d=0.05,afade=t=out:st=${(D - 0.25).toFixed(3)}:d=0.25[a]`);
+  const aOut = plan.card ? 0.6 : 0.25;
+  f.push(`[1:a]afade=t=in:st=0:d=${plan.fadeIn ? 0.25 : 0.05},afade=t=out:st=${(D - aOut).toFixed(3)}:d=${aOut}[a]`);
   const reel = join(outDir, 'reel.mp4');
   const vq = draft ? ['-preset', 'veryfast', '-crf', '24'] : ['-preset', 'slow', '-b:v', '18M', '-maxrate', '20M', '-bufsize', '36M'];
   execFileSync(ffmpeg, ['-y', '-loglevel', 'error', ...inputs, '-filter_complex', f.join(';'), '-map', '[v]', '-map', '[a]',

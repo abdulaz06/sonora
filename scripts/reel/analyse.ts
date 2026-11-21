@@ -131,7 +131,20 @@ for (let off = 0; off < 4; off++) {
   }
   if (s > bestScore) { bestScore = s; best = off; }
 }
-const bars = beats.filter((_, k) => k >= best && (k - best) % 4 === 0);
+// Drops and breakdowns are phrase starts: the grid re-anchors there (a pickup
+// or a half bar before a drop is common), so every drop lands on a bar line.
+// The event layer reports a drop a little after its hit (DROP_LAG).
+const DROP_LAG = 0.22;
+const nearestBeat = (t: number): number => { let k = 0, d = Infinity; beats.forEach((b, i) => { const x = Math.abs(b - t); if (x < d) { d = x; k = i; } }); return k; };
+const anchors = events.filter((e) => (e.type === 'drop' || e.type === 'breakdown') && e.strength >= 0.4).map((e) => nearestBeat(e.t - DROP_LAG)).sort((x, y) => x - y);
+const isBar = new Array<boolean>(beats.length).fill(false);
+let phase = best, from = 0;
+for (const kd of [...anchors, beats.length]) {
+  for (let k = from; k < kd; k++) if (((k - phase) % 4 + 4) % 4 === 0) isBar[k] = true;
+  if (kd < beats.length) { phase = kd; from = kd; }
+}
+const bars = beats.filter((_, k) => isBar[k]);
+for (const e of events) if (e.type === 'drop' || e.type === 'breakdown' || e.type === 'build') (e as { beat?: number }).beat = beats[nearestBeat(e.t - DROP_LAG)];
 const bpm = 60 / T;
 
 // ── Suggested windows (studio): build → release, bar-aligned ──
