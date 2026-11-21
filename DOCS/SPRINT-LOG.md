@@ -1,10 +1,66 @@
-# Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — in progress
+# Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — review stop (awaiting your reply)
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Local-only media (songs, covers, renders, reels, trailer drafts): `local-media/` (git-ignored). Render scratch: `C:/Users/abdul/sonora-palette-frames/`, `C:/Users/abdul/sonora-reel-frames/` (outside OneDrive, deleted after).
 
 ## Summary
-(written at the review stop)
+
+### Try it in the app (`npm run tauri dev`)
+Dev builds now keep their own settings (`settings.dev.json`), so the first run shows the intro; your installed settings are untouched.
+- **Album colours with Spotify:** play an album. The palette crossfades to the cover's colours over 2.5 s, with the now-playing toast. The next song from the same album changes nothing; an advert, a podcast without art, or a black-and-white cover leaves your own palette. The **Album** tile comes first in every palette picker (settings, the quick switcher, the controller); **A** toggles it; picking a palette (or 1–9) turns it off. Settings › Colour › "Colours from album art" has an (i) card with a picture. A new install has it on; updating from 1.0.1 keeps your palette and shows "new: colours from your album art." once (try it · ×).
+- **Controller on a second display:** put the visual full screen on one display. The first time, the controller opens on the other display asking "control sonora from this screen?" Later: **R**, Settings › Set Mode › Controller, or the tray's "Controller (second screen)". In it: the live preview, now playing, Set Mode (on, next now, lock to the style, how often, calm ↔ driving, what it can choose), style / look / view, palettes with Album, responsiveness, glow, camera, the output display chooser, blackout and freeze, and every setting (the app's own sheet). Keys pressed there act on the visual. Closing it never touches the visual; unplugging the TV brings the visual back to a display that's there.
+- **Neon drift:** palette 4 with Colour drift on. Neon now sways between −15° and +35° instead of turning all the way round; every phase passes every colour gate (1.0.1: 7 of 12), and the flicker gates pass as for the presets.
+
+### Look at
+- **Album colours:**
+  - Review sheets: `verify/album/review-1…6.jpg`, one row per cover: the cover, its colour clusters, the palette, and a frame in each style.
+  - The 52-cover test set: 51 synthetic covers plus Graduation. Black-and-white, grey and near-black-only covers fall back to your own palette.
+  - Colour gates and flicker: ALBUM_RESULTS
+- **Controller:** `verify/controller/controller-1366x768.png`, `-1440x900`, `-1920x1080`, `-settings.png` (the reused sheet), `-offer.png`, `-blackout.png`. Link checks: 25 fps preview, 17 ms latency, changes apply both ways, keys act on the output, closing it leaves the output running.
+- **Album colours UI:** `verify/ui/settings-album-*.png`, `visual-album-*.png`, `visual-quick-album-*.png`.
+
+### Gates, before → after (idle GPU for the timing ones)
+| gate | result |
+|---|---|
+| Ink look and motion | pixel-identical to the pre-batch code: 120 / 120 frames each for Glow Depth, Marble Depth, Sumi Flat, plus Silk Depth and Wisp Tunnel (`verify/gates-1.0.2/identical.log`) |
+| beat sync, flicker, motion (every style / look / view, `verify/gates-1.0.2/style/gates.log`) | 67 of 67 Ink / Silk / Wisp / Warp results identical to the 1.0.1-era log; Voyage within its usual run-to-run spread (step budget follows frame time); idle-GPU Voyage motion identical to before |
+| dt sweep (Ink Marble Depth, 60 / 120 / 165 fps) | PASS (seen 100%, rise 23.4 / 24.1 / 24.7%, fine share 72%, pop p99 0.10–0.11) |
+| frame cost (interleaved, 3 rounds, 1080p Medium) | unchanged: −0.06 to +0.09 ms in all 12 combos (`verify/gates-1.0.2/cost.log`) |
+| controller preview cost | +0.003 ms (Ink Glow Depth), +0.042 (Voyage Void), +0.132 (Silk Depth) per output frame at 60 Hz; gate ≤ 0.3 |
+| pacing with the preview on | match and 1/2: 0 held frames, off and on, three interleaved rounds |
+| palette colour gates | presets unchanged (no preset slot changed); Neon drift 12 / 12 phases; album set: ALBUM_GATE |
+| Lighthouse | /live 100·100·100·100 mobile, 47·92·100·100 desktop (unchanged; the app shell's load); landing 99 mobile, 100 desktop |
+| tests | `npx tsc --noEmit` clean, `cargo clippy` clean, `npm test` 47 passed |
+| desktop build | `npm run tauri build`: NSIS 17.6 MB + MSI 19.0 MB; the release exe opens its window and migrates a 1.0.1 settings file to v9 as designed (your file restored afterwards) |
+
+### Reel studio
+`npm run studio` (http://localhost:5300/studio.html) and `npm run reel -- <plan.json>` / `--queue`; the guide is `DOCS/REELS.md`. Demo outputs in `local-media/reels/out/`, each checked after an Instagram-like re-encode (SSIM vs the master):
+- `2026-11-21-demo-song`: Silk Depth in album colours, 0:26.7, 29.5 s, with the toast. SSIM 0.91.
+- `2026-11-21-demo-beatswitch`: Ink Glow → Voyage Void on the drop at 1:35.4. SSIM 0.97.
+- `2026-11-21-demo-showcase`: Warp, a palette per bar. SSIM 0.62: Warp is Instagram's worst case (see below).
+- `2026-11-21-origin-story`: the seven cards. SSIM 0.95.
+- `2026-11-21-carousel`: the five slides, 1080×1350.
+
+Each folder has `reel.mp4`, `reel-silent.mp4`, `cover.jpg`, `caption.txt` and `meta.json` (with the Instagram music start). Portrait framing checks: `verify/reels/portrait/`. Studio screenshots: `verify/reels/studio/`.
+
+### "I Wonder" trailer drafts (`local-media/trailer/drafts/`, `DRAFTS.txt` has the full cut lists)
+- **A** 0:21.0–1:21.2: the intro, the beat's first entry at 0:35.1, the verse. The planner's top pick: the strongest build → release arc.
+- **B** 1:21.2–2:21.4: the second drop at 1:35.4.
+- **C** 2:32.9–3:33.8: the late build and the last drop at 2:55.5.
+- **A2** (after your notes): Wisp Flat → Silk Depth planet through the drop until his first line ends → Voyage Void at 0:42.7 → Ink Glow → Warp → Silk Flat → Voyage under the lockup. One colour family (Graduation's purple-pink, no yellow) for every style. Every shot warmed up from the song's start. 1080p60 High: 3,614 frames, none held or repeated before the lockup.
+
+All have all five styles, cuts only on bar lines, a style label at each change, the toast at the start and once near the end, and the lockup over the last four bars.
+
+### Unsure / for your eyes
+- **Silk's drop response in A2:** holding Silk through the drop now shows its own drop inversion (bone for about 3 s). It's how Silk answers drops in the app. I kept it; I can switch it off for the trailer only.
+- **Warp and Instagram:** a Warp-only reel keeps SSIM 0.62 after Instagram's re-encode (other styles 0.91–0.97). Softening it first made it worse. Extra dither didn't help any style either, so the export adds none. In trailers at full quality and in this palette Warp looks much better than in the drafts; in reels, use it as a short moment.
+- **The "first sentence" cut:** the DSP's vocal detector doesn't fire on this track, so I took it from the voice band: his line ends about 0:41.0, quiet until 0:43.2, and the cut is on the bar at 0:42.7. If you'd rather it land at 0:40.85 (the bar at 19.9 s, on the line's last syllable), it's a one-number change.
+- **Album colours rules that changed after the gates:** gold-to-teal primaries sit on a lighter floor (Ink Glow Depth flicker, as Aurora and Acid); far cover accents are capped at 100° from the primary (beyond that they whitened Wisp); a cover's cyan secondary is kept light. Graduation's palette moved by one degree.
+- **Pacing measurements on a busy desktop:** two headed runs gave erratic held frames on different caps regardless of the preview; quiet interleaved A/B runs were clean. Worth a glance at the FPS readout (P) during your own test.
+- **Another session worked in this checkout** during the batch (the /live picker fix, the story on the site): I committed by path and rebased before pushing; our decisions are numbered D81 (theirs) and D82–D85 (mine).
+
+### Reply
+"Ship it, trailer A2" (or A / B / C), with any tweaks: then I release 1.0.2 and render the final trailers (16:9 1080p60 supersampled master and web encode, 9:16 full and ~30 s cut re-rendered in portrait, the README clip, the YouTube thumbnail).
 
 ## Checklist
 - [x] 0 Read CLAUDE.md, README, log, decisions, DOCS/16 §8, brand, colour engine + palette harness, now playing, Set Mode, settings, UI kit, trailer + media scripts; `.claude/settings.json` attribution off; committed the previous session's site stylesheet split (checked /live and / on the production build)
@@ -20,12 +76,12 @@
 - [x] A3.4 Output safety: closing the controller never touches the output; unplugging the TV brings the output back (runtime safety net)
 - [x] A4 LICENSE (PolyForm Noncommercial 1.0.0), SPDX fields, README + site footer, third-party notices
 - [ ] A5 Full app gates (sync, flicker, motion, pop, jaggedness, dt sweep, pacing, palette gates, cost) before/after; `npm run tauri build` runs
-- [ ] B1.1 Reel studio: song analysis strip, window picking (drops, drag, presets, bar snap, 3 suggestions), 9:16 live preview + safe zones
-- [ ] B1.2 Formats (Song, Beat switch, Showcase, Styles tour, Album colours), portrait framing for every style / look / view (screenshots)
-- [ ] B1.3 Offline render (High, supersampled 1080×1920 60 fps, 8 s pre-roll), encodes, outputs, Instagram-like re-encode check, per-style export tuning, queue
-- [ ] B1.4 House style (title, style line, mark, text modes, now-playing toast, optional style labels at style changes), caption template
-- [ ] B1.5 Launch templates (origin story reel, 5-slide carousel), DOCS/REELS.md
-- [ ] B2 "I Wonder": analysis, three windows, cut plans (all five styles; Silk Depth planet on builds and Voyage Void on drops lead; Ink / Warp / Wisp at least one clear moment each), now-playing overlay, style labels, three low-res drafts in `local-media/trailer/drafts/`
+- [x] B1.1 Reel studio: song analysis strip, window picking (drops, drag, presets, bar snap, 3 suggestions), 9:16 live preview + safe zones
+- [x] B1.2 Formats (Song, Beat switch, Showcase, Styles tour, Album colours), portrait framing for every style / look / view (screenshots)
+- [x] B1.3 Offline render (High, supersampled 1080×1920 60 fps, 8 s pre-roll), encodes, outputs, Instagram-like re-encode check, per-style export tuning, queue
+- [x] B1.4 House style (title, style line, mark, text modes, now-playing toast, optional style labels at style changes), caption template
+- [x] B1.5 Launch templates (origin story reel, 5-slide carousel), DOCS/REELS.md
+- [x] B2 "I Wonder": analysis, three windows, cut plans (all five styles; Silk Depth planet on builds and Voyage Void on drops lead; Ink / Warp / Wisp at least one clear moment each), now-playing overlay, style labels, three low-res drafts in `local-media/trailer/drafts/`
 - [ ] R Review summary at the top of this section → stop and wait
 
 ## Notes
