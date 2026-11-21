@@ -23,12 +23,15 @@
 - [ ] B1.1 Reel studio: song analysis strip, window picking (drops, drag, presets, bar snap, 3 suggestions), 9:16 live preview + safe zones
 - [ ] B1.2 Formats (Song, Beat switch, Showcase, Styles tour, Album colours), portrait framing for every style / look / view (screenshots)
 - [ ] B1.3 Offline render (High, supersampled 1080×1920 60 fps, 8 s pre-roll), encodes, outputs, Instagram-like re-encode check, per-style export tuning, queue
-- [ ] B1.4 House style (title, style line, mark, text modes, now-playing toast), caption template
+- [ ] B1.4 House style (title, style line, mark, text modes, now-playing toast, optional style labels at style changes), caption template
 - [ ] B1.5 Launch templates (origin story reel, 5-slide carousel), DOCS/REELS.md
-- [ ] B2 "I Wonder": analysis, three windows, cut plans, now-playing overlay, three low-res drafts in `local-media/trailer/drafts/`
+- [ ] B2 "I Wonder": analysis, three windows, cut plans (all five styles; Silk Depth planet on builds and Voyage Void on drops lead; Ink / Warp / Wisp at least one clear moment each), now-playing overlay, style labels, three low-res drafts in `local-media/trailer/drafts/`
 - [ ] R Review summary at the top of this section → stop and wait
 
 ## Notes
+
+- **Coordination (Abdul, mid-batch):** another instance works in this same checkout (the /live style-picker fix, the story on the site). Before every push: fetch, and rebase onto origin/main if it moved (resolve conflicts keeping both sides' intent); commit only my own files by path, never stash or reset (their uncommitted edits live in the same tree). No /live picker changes until that fix is on main (my /live change, file tags → now playing in `playData`, is outside the picker and was committed before the note). The GPU is shared: timing-sensitive gates (frame cost, pacing, Voyage motion) only while no other render or gate job runs; re-run any that may have overlapped.
+- **Trailer rules (Abdul, mid-batch):** every candidate shows all five styles; Silk Depth (planet camera) carries the builds and Voyage Void the big drops, with the most screen time; Ink, Warp and Wisp each get one clear moment where the music suits them; cuts only on bar lines, never faster than the music. Style labels (`silk · depth`, lowercase IBM Plex Mono, Bone ~60%, one fixed corner inside the safe zones, same in 16:9 and 9:16; 0.3 s in, ~1.5 s hold, out; never over the now-playing toast or the lockup) on the drafts, and as a reel-studio option.
 
 # Website, live demo, trailer, hosting — done, live on sonoravisuals.com
 

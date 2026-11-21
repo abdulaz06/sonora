@@ -25,6 +25,9 @@ import type { QualityPreset } from '../engine/quality';
 import type { SonoraEvent } from '../engine/events';
 import type { LightMode, StyleId } from '../styles/visual-style';
 import { setDebugFlags, type DebugFlags } from '../engine/debug-flags';
+import { coverPixels } from '../app/album-colours';
+import { extractAlbum } from '../engine/album-palette';
+import type { MediaInfo } from '../app/stores';
 
 declare const __APP_VERSION__: string;
 
@@ -76,10 +79,15 @@ export interface HarnessApi {
   currentPalette(): ResolvedPalette;
   /** Whether Auto Drift on preset `index` is crossing a skipped stretch at `phase`. */
   driftCrossing(index: number, phase: number): boolean;
+  /** Album colours: extract a cover (data: URL) exactly as the app does. */
+  albumExtract(src: string): Promise<{ kind: string; hues: unknown; resolved: ResolvedPalette | null; colours: { lch: number[]; share: number; neutral: boolean }[] }>;
 }
 
+/** Dev page only (not the harness, not the app): simulate a media session. */
+export interface DevApi { nowPlaying(m: Partial<MediaInfo> | null): void }
+
 declare global {
-  interface Window { __sonora?: HarnessApi }
+  interface Window { __sonora?: HarnessApi; __sonoraDev?: DevApi }
 }
 
 const BAR_CSS = `
@@ -172,6 +180,9 @@ async function main(): Promise<void> {
   };
   const demo = params.has('demo');
   if (demo) startDemo();
+  window.__sonoraDev = {
+    nowPlaying: (m) => nowPlaying.set(m ? { title: '', artist: '', album: '', art: '', playing: true, app: 'dev', canPrev: true, canNext: true, canPlayPause: true, ...m } : null),
+  };
   const screen = params.get('screen');
   await initShell(controller, platform, {
     noLaunch: params.has('nolaunch'),
@@ -410,6 +421,15 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
     },
     currentPalette: () => renderer.colorEngine.getResolved(),
     driftCrossing: (index, phase) => driftCrossing(PALETTES[index], phase),
+    async albumExtract(src: string) {
+      const px = await coverPixels(src);
+      if (!px) return { kind: 'unreadable', hues: null, resolved: null, colours: [] };
+      const r = extractAlbum(px.data, px.width, px.height);
+      return {
+        kind: r.kind, hues: r.hues, resolved: r.palette ? resolvePalette(r.palette) : null,
+        colours: r.colours.map((c) => ({ lch: [...c.lch], share: c.share, neutral: c.neutral })),
+      };
+    },
     time: () => source.offlineTime,
     events,
     stats: () => renderer.stats(),

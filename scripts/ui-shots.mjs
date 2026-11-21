@@ -17,7 +17,22 @@ const base = `http://localhost:${PORT}/web.html`;
 const q = 'onboarded=1&nolaunch=1&demo=1&fresh=1';
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Simulate a media session with a cover from local-media/covers (album colours). */
+const cover = async (p, file, title = 'Two Tone', artist = 'Test Artist') => {
+  await p.waitForFunction(() => !!window.__sonoraDev);
+  await p.evaluate(async ([f, t, a]) => {
+    const blob = await fetch(`/local-media/covers/${f}`).then((r) => r.blob());
+    const art = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(blob); });
+    window.__sonoraDev.nowPlaying({ title: t, artist: a, album: 'Synthetic', art });
+  }, [file, title, artist]);
+};
+
 const STATES = {
+  'visual-album': { url: `${base}?${q}&screen=visual&track=house-124&t=48`, after: 3000, act: async (p) => { await cover(p, process.env.UI_COVER || 'test/twotone-01-30-270.jpg'); await wait(3600); } },
+  'visual-quick-album': { url: `${base}?${q}&screen=visual&track=house-124&t=48`, after: 3000, act: async (p) => { await cover(p, process.env.UI_COVER || 'test/twotone-01-30-270.jpg'); await wait(3000); await p.mouse.move(500, 500); await p.click('.hud-bar .now'); await wait(900); } },
+  'settings-album': { url: `${base}?${q}&screen=menu`, after: 1000, act: async (p) => { await cover(p, process.env.UI_COVER || 'test/twotone-01-30-270.jpg'); await wait(800); await p.click('text=Settings'); await wait(700); await p.click('.st-nav button:nth-child(2)'); await wait(900); } },
+  'settings-album-none': { url: `${base}?${q}&screen=menu`, after: 1000, act: async (p) => { await p.click('text=Settings'); await wait(700); await p.click('.st-nav button:nth-child(2)'); await wait(900); } },
+  'settings-album-info': { url: `${base}?${q}&screen=menu`, after: 1000, act: async (p) => { await cover(p, process.env.UI_COVER || 'test/twotone-01-30-270.jpg'); await wait(800); await p.click('text=Settings'); await wait(700); await p.click('.st-nav button:nth-child(2)'); await wait(700); await p.click('.st-row:has-text("Colours from album art") .s-info'); await wait(900); } },
   menu: { url: `${base}?${q}&screen=menu`, after: 1600 },
   'menu-voyage': { url: `${base}?${q}&screen=menu`, after: 1400, act: async (p) => { await p.hover('.scard:nth-child(5)'); await wait(1400); } },
   'detail-ink': { url: `${base}?${q}&screen=detail&style=ink`, after: 1400 },

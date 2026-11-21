@@ -220,7 +220,7 @@ body.sonora-idle { cursor: none; }
 .qs .pal .s-thumb .s-thumb-title { font-size: 9.5px; }
 /* Album tile: the cover, then its colours as flat bands; dim when no cover can give colours. */
 .album-thumb .s-media { display: flex; background: var(--night); overflow: hidden; }
-.album-thumb .album-art { height: 100%; aspect-ratio: 1; object-fit: cover; flex: none; display: block; }
+.album-thumb .s-media > .album-art { position: static; inset: auto; width: auto; height: 100%; aspect-ratio: 1; object-fit: cover; flex: none; display: block; }
 .album-thumb .album-bands { flex: 1; display: flex; min-width: 0; }
 .album-thumb .album-bands i { flex: 1; }
 .album-thumb .album-ph { flex: 1; display: grid; place-items: center; }
