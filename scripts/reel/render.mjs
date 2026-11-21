@@ -12,7 +12,7 @@
 //
 // Outputs (plan.out, default local-media/reels/out/<date>-<slug>/): reel.mp4,
 // reel-silent.mp4, cover.jpg, caption.txt, meta.json (+ ig-check/ after --ig-check).
-import { spawn, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -49,6 +49,34 @@ async function startServer() {
   throw new Error('vite did not start');
 }
 
+// ── One colour family (trailers): the album palette with its contrasting accent
+// and highlight replaced by analogous tones, so every style shows the same shade.
+const dec = (x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+const enc = (x) => (x <= 0.0031308 ? 12.92 * x : 1.055 * Math.max(0, x) ** (1 / 2.4) - 0.055);
+function toLab([r, g, b]) {
+  const [R, G, B] = [dec(r), dec(g), dec(b)];
+  const l = Math.cbrt(0.4122214708 * R + 0.5363325363 * G + 0.0514459929 * B), m = Math.cbrt(0.2119034982 * R + 0.6806995451 * G + 0.1073969566 * B), q = Math.cbrt(0.0883024619 * R + 0.2817188376 * G + 0.6299787005 * B);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * q, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * q, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * q];
+}
+function fromLab([L, a, b]) {
+  // Reduce chroma until in gamut (keeps lightness and hue).
+  for (let k = 1; k > 0; k -= 0.02) {
+    const A = a * k, Bb = b * k;
+    const l = (L + 0.3963377774 * A + 0.2158037573 * Bb) ** 3, m = (L - 0.1055613458 * A - 0.0638541728 * Bb) ** 3, q = (L - 0.0894841775 * A - 1.291485548 * Bb) ** 3;
+    const rgb = [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * q];
+    if (rgb.every((v) => v >= -1e-4 && v <= 1.0001)) return rgb.map((v) => enc(Math.min(1, Math.max(0, v))));
+  }
+  return [L, L, L];
+}
+/** The album palette as one colour family: accent between primary and secondary (a touch lighter), highlight a light tint of the primary. */
+export function monoPalette(r) {
+  const P = toLab(r.primary), S = toLab(r.secondary);
+  const acc = [Math.min(0.72, (P[0] + S[0]) / 2 + 0.06), (P[1] + S[1]) / 2, (P[2] + S[2]) / 2];
+  const hl = [0.86, P[1] * 0.42, P[2] * 0.42];
+  const shade = r.primary.map((v) => v * 0.55);
+  return { ...r, accent: fromLab(acc), highlight: fromLab(hl), shade };
+}
+
 const dataUrl = (file) => `data:${/\.png$/i.test(file) ? 'image/png' : 'image/jpeg'};base64,${readFileSync(file).toString('base64')}`;
 
 // ── Frames ──────────────────────────────────────────────────────
@@ -81,14 +109,16 @@ async function renderFrames(browser, plan, song, dirFrames, draft) {
         if (!ex.resolved) throw new Error(`album colours: the cover gives no colours (${ex.kind})`);
         albumResolved = ex.resolved;
       }
-      await page.evaluate((r) => window.__sonora.setPalette({ resolved: r }), albumResolved);
+      await page.evaluate((r) => window.__sonora.setPalette({ resolved: r }), pal?.mono ? monoPalette(albumResolved) : albumResolved);
     } else if (typeof pal === 'number') await page.evaluate((i) => window.__sonora.setPalette({ index: i }), pal);
     else if (typeof pal.hue === 'number') await page.evaluate((hue) => window.__sonora.setPalette({ hue }), pal.hue);
     else if (pal.drift) await page.evaluate((i) => window.__sonora.setPalette({ index: i, driftDeg: 0, holdDrift: false }), pal.index ?? 0);
     await page.evaluate((u) => window.__sonora.loadTrackUrl(u), song.wavUrl);
     // Analysis from the song's start; the shot's own warm-up is rendered and discarded.
     const tStart = W0 + k0 / fps;
-    const warm = Math.min(plan.preroll ?? PREROLL_S, tStart);
+    // preroll 'full': the style has run since the song's start (a trailer cut shows it as if it
+    // had been playing the whole song); otherwise at least PREROLL_S.
+    const warm = plan.preroll === 'full' ? tStart : Math.min(plan.preroll ?? PREROLL_S, tStart);
     await page.evaluate((x) => window.__sonora.analyseOnly(x), tStart - warm);
     const warmSteps = Math.round(warm * fps);
     for (let k = 0; k < warmSteps; k += 120) await page.evaluate(([m, d]) => window.__sonora.advance(m * d, d), [Math.min(120, warmSteps - k), 1 / fps]);
@@ -252,6 +282,12 @@ export async function renderPlan(planIn, opts = {}) {
     await browser.close();
     if (opts.framesOnly) return { outDir };
     const reel = encode(plan, song, dirFrames, layers, info, outDir, draft);
+    // Every frame rendered and encoded once: count them in the master (no drops, no doubles by construction; proven here).
+    const expected = Math.round((plan.window.end - plan.window.start) * info.fps);
+    const probe = spawnSync(ffmpeg, ['-hide_banner', '-i', reel, '-map', '0:v:0', '-c', 'copy', '-f', 'null', '-'], { encoding: 'utf8' }).stderr ?? '';
+    const counted = Number([...probe.matchAll(/frame=\s*(\d+)/g)].pop()?.[1] ?? NaN);
+    const frameCheck = { expected, counted, ok: Math.abs(counted - expected) <= 1 };
+    console.log(`  frames: ${counted} of ${expected} expected at ${info.fps} fps ${frameCheck.ok ? 'OK' : 'MISMATCH'}`);
     const coverT = makeCover(plan, analysis, reel, outDir);
     writeFileSync(join(outDir, 'caption.txt'), caption(plan, song));
     const meta = {
@@ -260,7 +296,7 @@ export async function renderPlan(planIn, opts = {}) {
       instagramMusicStart: mmss(plan.window.start),
       format: plan.format ?? 'song', aspect: `${plan.size[0]}x${plan.size[1]}`, fps: info.fps, draft,
       shots: plan.shots.map((s) => ({ at: s.at, line: styleLine(s) })), coverAt: +coverT.toFixed(2),
-      bpm: analysis?.bpm, rendered: new Date().toISOString(), plan,
+      bpm: analysis?.bpm, frameCheck, rendered: new Date().toISOString(), plan,
     };
     writeFileSync(join(outDir, 'meta.json'), JSON.stringify(meta, null, 1));
     if (!opts.keepFrames && !draft) rmSync(dirFrames, { recursive: true, force: true });

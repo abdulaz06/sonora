@@ -93,4 +93,4 @@ export function analyse(song) {
 }
 
 /** m:ss.s (Instagram's music picker start). */
-export const mmss = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, '0')}`;
+export const mmss = (t) => { const d = Math.round(t * 10); return `${Math.floor(d / 600)}:${((d % 600) / 10).toFixed(1).padStart(4, '0')}`; };
