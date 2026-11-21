@@ -1,0 +1,50 @@
+/* Reel studio (local tool). Brand: Night and Bone only, mono labels, square
+ * corners, 1 px Bone/12% dividers; the only colour is the preview. */
+
+html, body { height: 100%; margin: 0; background: var(--night); overflow: hidden; }
+body.studio { display: flex; flex-direction: column; color: var(--b70); }
+
+.st-head { flex: none; display: flex; align-items: center; gap: 24px; height: 56px; padding: 0 20px; border-bottom: 1px solid var(--b12); }
+.st-brand { display: flex; align-items: center; gap: 16px; }
+.st-brand .s-lockup { font-size: 20px; }
+.st-brand .s-label { padding-left: 16px; border-left: 1px solid var(--b12); line-height: 20px; }
+.st-song { min-width: 0; flex: 0 1 460px; }
+.st-song .s-select { width: 100%; }
+.st-status { margin-left: auto; color: var(--b55); white-space: nowrap; }
+
+.st-main { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr auto; }
+.st-left { min-height: 0; overflow-y: auto; border-right: 1px solid var(--b12); scrollbar-width: thin; scrollbar-color: var(--b25) transparent; }
+.st-right { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 20px; }
+
+.st-panel { padding: 18px 24px 20px; border-bottom: 1px solid var(--b12); display: flex; flex-direction: column; gap: 12px; }
+.st-ph { display: flex; align-items: baseline; gap: 14px; }
+.st-ph h2 { margin: 0; margin-right: auto; }
+.st-strip { width: 100%; height: 150px; display: block; cursor: crosshair; outline: 1px solid var(--b12); outline-offset: -1px; background: #050506; }
+.st-row { display: flex; flex-direction: column; gap: 10px; }
+.st-r { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.st-rl { color: var(--b55); flex: none; width: 112px; }
+.st-note { color: var(--b55); }
+.st-num, .st-text { background: transparent; border: 1px solid var(--b25); color: var(--bone); font-family: var(--f-mono); font-size: 12px; padding: 8px 10px; }
+.st-num { width: 80px; }
+.st-text { width: min(520px, 100%); text-transform: lowercase; }
+.st-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 16px; flex: 1 1 560px; }
+.st-cover { width: 96px; height: 96px; object-fit: cover; outline: 1px solid var(--b12); }
+.st-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.st-log { margin: 0; min-height: 60px; max-height: 220px; overflow: auto; padding: 10px 12px; border: 1px solid var(--b12); font-family: var(--f-mono); font-size: 11px; line-height: 1.5; color: var(--b70); white-space: pre-wrap; }
+
+/* The 9:16 frame: preview canvas, the burned-in overlays, Instagram's safe zones. */
+.st-phone { position: relative; height: calc(100vh - 56px - 96px); aspect-ratio: 9 / 16; background: #050506; outline: 1px solid var(--b25); outline-offset: 0; }
+.st-phone canvas, .st-phone iframe { position: absolute; inset: 0; width: 100%; height: 100%; display: block; border: 0; }
+.st-phone iframe { pointer-events: none; background: transparent; color-scheme: normal; }
+.st-safe { position: absolute; inset: 0; pointer-events: none; }
+.st-safe i { position: absolute; display: block; background: rgba(236, 231, 223, 0.07); }
+.st-safe .top { left: 0; right: 0; top: 0; height: 14%; border-bottom: 1px dashed rgba(236, 231, 223, 0.3); }
+.st-safe .bottom { left: 0; right: 0; bottom: 0; height: 24%; border-top: 1px dashed rgba(236, 231, 223, 0.3); }
+.st-safe .side { right: 0; top: 50%; bottom: 24%; width: 13%; border-left: 1px dashed rgba(236, 231, 223, 0.3); }
+.st-safe .crop { left: 0; right: 0; top: 12.5%; bottom: 12.5%; background: none; outline: 1px solid rgba(236, 231, 223, 0.45); outline-offset: -1px; }
+.st-transport { display: flex; align-items: center; gap: 14px; max-width: calc((100vh - 152px) * 9 / 16 + 120px); flex-wrap: wrap; justify-content: center; }
+
+/* Format and option controls show their whole label. */
+.studio .s-seg { display: inline-flex; width: auto; }
+.studio .s-seg button { flex: none; width: auto; padding: 0 14px; white-space: nowrap; overflow: visible; text-overflow: clip; }
+.studio .st-note { font-size: 10.5px; letter-spacing: 0.1em; }

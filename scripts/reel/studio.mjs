@@ -84,7 +84,7 @@ const server = await createServer({
   root: ROOT,
   configFile: join(ROOT, 'vite.config.ts'),
   cacheDir: join(ROOT, 'node_modules', '.vite-studio'),
-  server: { port: PORT, strictPort: true, open: '/studio.html' },
+  server: { port: PORT, strictPort: true, open: process.env.STUDIO_NO_OPEN ? false : '/studio.html' },
   plugins: [api()],
 });
 await server.listen();
