@@ -102,6 +102,8 @@ function setupLightbox(): void {
     opener = b;
     lb.classList.add('is-open');
     $<HTMLButtonElement>('[data-lb-close]', lb)?.focus();
+    // Sound off by default: the trailer follows the page's sound toggle (its own controls can unmute).
+    video.muted = !$$('[data-sound]').some((s) => s.getAttribute('aria-pressed') === 'true');
     void video.play().catch(() => undefined);
   }));
   $('[data-lb-close]', lb)?.addEventListener('click', close);

@@ -12,7 +12,7 @@
 </p>
 <p align="center"><a href="https://sonoravisuals.com"><strong>sonoravisuals.com</strong></a> · <a href="https://sonoravisuals.com/live">try it live in your browser</a> · <a href="https://sonoravisuals.com/media/sonora-trailer.mp4">watch the trailer</a> · <a href="https://sonoravisuals.com/engineering">how it works</a></p>
 
-<p align="center"><a href="https://sonoravisuals.com/media/sonora-trailer.mp4"><img src="DOCS/assets/sonora-trailer.webp" alt="The sonora trailer: the drop of the demo track across Warp, Ink and Silk" width="900"></a></p>
+<p align="center"><a href="https://sonoravisuals.com/media/sonora-trailer.mp4"><img src="DOCS/assets/sonora-trailer.webp" alt="The sonora trailer (music: Kanye West, I Wonder): Silk and Voyage in the Graduation cover's colours" width="900"></a></p>
 <p align="center"><sub>rendered by the engine on an original demo track · <a href="https://www.youtube.com/watch?v=kDKyOMpcxeI">early version (v0.1) demo</a></sub></p>
 
 ## Styles

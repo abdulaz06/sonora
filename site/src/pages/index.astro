@@ -10,6 +10,7 @@ import { PALETTES, paletteFromHue } from '../../../src/engine/color-engine';
 import { release, metaLabel } from '../lib/release';
 import { SCENES, PALETTE_SCENE, HUES } from '../lib/scenes';
 import demo from '../generated/demo.json';
+import { TRAILER } from '../../site.config.mjs';
 
 const hero = { href: '/media/hero-1920.webp', srcset: '/media/hero-960.webp 960w, /media/hero-1600.webp 1600w, /media/hero-1920.webp 1920w', sizes: '100vw' };
 const sections = (demo.sections as [string, number, number][]).filter(([n]) => n !== 'silence');
@@ -268,9 +269,9 @@ const description = 'A visual instrument for whatever’s playing: a free Window
 
   <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="sonora trailer">
     <button class="btn lb-close" type="button" data-lb-close>Close</button>
-    <video id="lb-video" controls playsinline preload="none" poster="/media/trailer-poster.webp">
-      <source src="/media/sonora-trailer.webm" type="video/webm" />
-      <source src="/media/sonora-trailer.mp4" type="video/mp4" />
+    <video id="lb-video" controls playsinline muted preload="none" poster={`/media/${TRAILER}-poster.webp`}>
+      <source src={`/media/${TRAILER}.webm`} type="video/webm" />
+      <source src={`/media/${TRAILER}.mp4`} type="video/mp4" />
     </video>
   </div>
 
