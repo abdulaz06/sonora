@@ -4,6 +4,7 @@ description = "WebAssembly bindings for the Sonora analysis crate"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
+license.workspace = true
 
 [lib]
 crate-type = ["cdylib", "rlib"]

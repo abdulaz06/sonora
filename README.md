@@ -83,13 +83,15 @@ The same harness renders every thumbnail and preview loop in the app (`npm run m
 | `S` | Next style |
 | `V` | Next look (or view) |
 | `1`–`9` | Palettes |
+| `A` | Album colours on / off |
+| `R` | Controller on a second screen |
 | `D` | Audio signals (advanced) |
 | `C` | Next camera preset (Depth) |
 | Arrows / Enter | Move around the menu |
 
 ## Privacy
 
-sonora analyses sound on your computer only. No audio, song titles or usage data ever leave it. The only network request is the update check against GitHub Releases, which you can turn off in Settings › System.
+sonora analyses sound on your computer only. No audio, song titles, album covers or usage data ever leave it. The only network request is the update check against GitHub Releases, which you can turn off in Settings › System.
 
 ## Install
 
@@ -119,3 +121,7 @@ Rust (cpal WASAPI loopback, a platform-free DSP crate, wasm-bindgen, the Windows
 
 - Steam release
 - More styles
+
+## License
+
+sonora is free to use and study, but not for commercial use: it’s licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). For any other licensing, ask. Third-party parts keep their own licenses ([THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).

@@ -331,7 +331,9 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       h('p', { class: 's-h3', style: { margin: '0' } }, 'see your music.'),
       h('p', { class: 's-small', style: { margin: '0' } }, `version ${platform.version}. a visual instrument for whatever’s playing.`),
       h('p', { class: 's-small', style: { margin: '0' } }, 'sonora analyses sound on your computer only. no audio, song or usage data ever leaves it.'),
-      h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license')));
+      h('p', { class: 's-small', style: { margin: '0' } }, 'album covers are read on this computer for album colours and never leave it.'),
+      h('p', { class: 's-micro', style: { margin: '0' } }, 'free for non-commercial use: polyform noncommercial license 1.0.0. © 2026 abdul.'),
+      h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license. third-party licenses: third-party-notices.md in the install folder.')));
 
     const scroll = sh.body.scrollTop;
     content.replaceChildren(visual, colour, camera, feel, setmode, np, audio, perf, system, keys, about);

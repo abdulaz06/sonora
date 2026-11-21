@@ -6,6 +6,7 @@ members = ["src-tauri", "crates/sonora-dsp", "crates/sonora-dsp-wasm"]
 edition = "2021"
 authors = ["Abdul"]
 version = "1.0.1"
+license = "PolyForm-Noncommercial-1.0.0"
 
 [profile.release.package.sonora-dsp-wasm]
 opt-level = 3

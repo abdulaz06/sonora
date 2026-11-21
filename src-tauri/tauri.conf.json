@@ -52,7 +52,8 @@
     ],
     "publisher": "Abdul",
     "category": "Music",
-    "copyright": "Copyright © 2026 Abdul. All rights reserved.",
+    "copyright": "Copyright (c) 2026 Abdul. PolyForm Noncommercial License 1.0.0.",
+    "license": "PolyForm-Noncommercial-1.0.0",
     "shortDescription": "a visual instrument for whatever’s playing",
     "longDescription": "sonora listens to whatever your PC is playing and turns it into moving pictures, in time with every beat. Audio is analysed on your computer only.",
     "icon": [
@@ -77,6 +78,10 @@
       "wix": {
         "language": "en-US"
       }
+    },
+    "resources": {
+      "../LICENSE": "LICENSE.txt",
+      "../THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md"
     },
     "createUpdaterArtifacts": true
   },
