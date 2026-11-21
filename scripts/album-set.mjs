@@ -14,7 +14,7 @@ import { chromium } from 'playwright';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.ALBUM_PORT || 5202);
-const OUT = join(ROOT, 'verify', 'album');
+const OUT = process.env.ALBUM_OUT || join(ROOT, 'verify', 'album');
 const dirs = process.argv.slice(2).length ? process.argv.slice(2) : [join(ROOT, 'local-media', 'covers', 'test'), join(ROOT, 'local-media', 'covers')];
 mkdirSync(OUT, { recursive: true });
 
