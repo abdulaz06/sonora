@@ -13,6 +13,7 @@
  * FOV kick) through critically damped springs; beats add a gentle bank.
  */
 
+import { debugFlags } from './debug-flags';
 import type { EventState, SonoraEvent } from './events';
 import { simplex2 } from './noise';
 import {
@@ -39,6 +40,12 @@ const ALTITUDE_WANDER = 0.12;
 
 const PITCH_WANDER = 0.08;
 const FOV_BASE = (52 * Math.PI) / 180;
+/** Reel studio only (debugFlags.portrait, 0 in the app and site): in a tall
+ * frame the vertical field of view widens and the camera looks a little
+ * further down, so the Depth surface fills the frame instead of a thin band
+ * under an empty sky. */
+const PORTRAIT_FOV = (64 * Math.PI) / 180;
+const PORTRAIT_TILT = 0.26;
 /** Bank on beats (rad) and how fast it eases (s). */
 const BEAT_BANK = 0.045;
 const BANK_TAU = 0.35;
@@ -274,8 +281,9 @@ export class WorldCamera {
     const lift = section === 'breakdown' ? 0.12 : section === 'silence' ? 0.08 : 0;
     const altTarget = altitude * (1 + (ALTITUDE_WANDER / ALTITUDE_BASE) * 0.5 * simplex2(t * 0.025, this.seed + 71)) + lift;
     this.position[1] += expApproach(dt, 1.2) * (altTarget - this.position[1]);
-    this.pitch = clamp(-tilt + PITCH_WANDER * wander * simplex2(t * 0.02, this.seed + 3) + LURCH_PITCH * this.lurch, -1.53, -0.03);
-    this.fov = FOV_BASE + LURCH_FOV * this.lurch;
+    const portrait = this.aspect < 1 ? debugFlags.portrait : 0;
+    this.pitch = clamp(-tilt - PORTRAIT_TILT * portrait + PITCH_WANDER * wander * simplex2(t * 0.02, this.seed + 3) + LURCH_PITCH * this.lurch, -1.53, -0.03);
+    this.fov = FOV_BASE + (PORTRAIT_FOV - FOV_BASE) * portrait + LURCH_FOV * this.lurch;
 
     this.updateMatrices();
   }

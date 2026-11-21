@@ -47,6 +47,8 @@ export interface HarnessApi {
   ready: boolean;
   tracks: Record<string, TrackMeta>;
   loadTrack(name: string): Promise<{ duration: number; sampleRate: number }>;
+  /** Any 16-bit WAV served by the dev server (reel studio: a song from local-media). */
+  loadTrackUrl(url: string): Promise<{ duration: number; sampleRate: number }>;
   /** Advance audio + visuals by `seconds` in steps of `dt` (render each step). */
   advance(seconds: number, dt: number): number;
   /** Advance audio only (no rendering) — for fast seeking. */
@@ -300,6 +302,14 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       const meta = tracks[name];
       if (!meta) throw new Error(`unknown track ${name}`);
       const buf = await fetch(`/test-audio/${meta.file}`).then((r) => r.arrayBuffer());
+      const pcm = decodeWavMono(buf);
+      if (!pcm) throw new Error('could not decode wav');
+      source.loadOffline(pcm.mono, pcm.sampleRate);
+      hits.length = 0;
+      return { duration: pcm.mono.length / pcm.sampleRate, sampleRate: pcm.sampleRate };
+    },
+    async loadTrackUrl(url: string) {
+      const buf = await fetch(url).then((r) => r.arrayBuffer());
       const pcm = decodeWavMono(buf);
       if (!pcm) throw new Error('could not decode wav');
       source.loadOffline(pcm.mono, pcm.sampleRate);

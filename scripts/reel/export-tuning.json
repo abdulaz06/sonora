@@ -1,0 +1,4 @@
+{
+  "note": "Per-style export tuning so reels survive Instagram's re-encode (temporal dither strength for ffmpeg noise c0s, 0 = none). Measured with scripts/reel/ig-check.mjs; see the sprint log.",
+  "dither": { "default": 0, "ink": 0, "silk": 0, "wisp": 0, "warp": 0, "voyage": 0 }
+}

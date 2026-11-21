@@ -34,6 +34,15 @@ export interface Hud {
   flashNowPlaying(): void;
 }
 
+/** The now-playing toast's content (cover, title, artist · album, optional
+ * controls): the HUD and the reel overlays (the app's real toast) share it. */
+export function nowPlayingContent(m: Pick<MediaInfo, 'art' | 'title' | 'artist' | 'album'>, ctlRow: Node | null = null): (Node | null)[] {
+  return [
+    m.art ? h('img', { src: m.art, alt: '' }) : null,
+    h('div', { class: 'np-t' }, h('span', { class: 'np-title' }, m.title), h('span', { class: 'np-meta s-micro' }, [m.artist, m.album].filter(Boolean).join(' · ')), ctlRow),
+  ];
+}
+
 export function createHud(ctl: Controller, platform: Platform, on: HudHandlers): Hud {
   const s = ctl.settings;
   const nStyle = h('span', { class: 'n-style' });
@@ -141,10 +150,7 @@ export function createHud(ctl: Controller, platform: Platform, on: HudHandlers):
       m.canPlayPause ? h('button', { type: 'button', title: m.playing ? 'Pause' : 'Play', onclick: () => platform.mediaControl?.('playpause') }, icon(m.playing ? 'pause' : 'play')) : null,
       m.canNext ? h('button', { type: 'button', title: 'Next', onclick: () => platform.mediaControl?.('next') }, icon('next')) : null) : null;
     np.replaceChildren();
-    append(np, [
-      m.art ? h('img', { src: m.art, alt: '' }) : null,
-      h('div', { class: 'np-t' }, h('span', { class: 'np-title' }, m.title), h('span', { class: 'np-meta s-micro' }, [m.artist, m.album].filter(Boolean).join(' · ')), ctlRow),
-    ]);
+    append(np, nowPlayingContent(m, ctlRow));
   }
   function peekNowPlaying(ms: number): void {
     if (!lastMedia || !s.nowPlaying.show || !active() || clean) return;
