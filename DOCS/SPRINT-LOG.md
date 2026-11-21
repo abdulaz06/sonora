@@ -8,17 +8,17 @@
 
 ## Checklist
 - [x] 0 Read CLAUDE.md, README, log, decisions, DOCS/16 §8, brand, colour engine + palette harness, now playing, Set Mode, settings, UI kit, trailer + media scripts; `.claude/settings.json` attribution off; committed the previous session's site stylesheet split (checked /live and / on the production build)
-- [ ] A1 Neon Auto Drift: drift window for wide-hue palettes, turn sweep in 5° steps, drift + flicker gates
-- [ ] A2.1 Extraction (OKLab k-means, area × chroma ranking) + palette builder through the OKLCH rules; unit tests
-- [ ] A2.2 Engine + controller: album palette crossfade (~2.5 s), same-album no-op, fallbacks (no cover, ads, podcasts, B&W), Auto Drift paused, Set Mode, Sumi paper bone
-- [ ] A2.3 UI: Album tile first (settings, quick switcher), cover thumbnail, greyed hint; setting + (i) card with picture; settings v9 (new installs on, existing users off + one-time toast)
-- [ ] A2.4 Web /live: embedded artwork from dropped files (ID3 APIC, MP4 covr, FLAC picture)
+- [x] A1 Neon Auto Drift: drift window for wide-hue palettes, turn sweep in 5° steps, drift + flicker gates (D82)
+- [x] A2.1 Extraction (OKLab k-means, area × chroma ranking) + palette builder through the OKLCH rules; unit tests
+- [x] A2.2 Engine + controller: album palette crossfade (~2.5 s), same-album no-op, fallbacks (no cover, ads, podcasts, B&W), Auto Drift paused, Set Mode, Sumi paper bone
+- [x] A2.3 UI: Album tile first (settings, quick switcher), cover thumbnail, greyed hint; setting + (i) card with picture; settings v9 (new installs on, existing users off + one-time toast)
+- [x] A2.4 Web /live: embedded artwork from dropped files (ID3 APIC, MP4 covr, FLAC picture)
 - [ ] A2.5 Test set ≥ 40 covers (synthetic + local real), palette matrix + flicker for every album palette, review sheet
-- [ ] A3.1 Controller window (Tauri second window): state link, commands, keyboard forwarding, open from Set Mode / tray / shortcut, one-time offer on a second display
+- [x] A3.1 Controller window (Tauri second window): state link, commands, keyboard forwarding, open from Set Mode / tray / shortcut, one-time offer on a second display
 - [ ] A3.2 Preview: async downscaled readback (PBO + fence) streamed to the controller; cost ≤ +0.3 ms, pacing unchanged, 20–30 fps, < 150 ms latency (measured)
-- [ ] A3.3 Controller UI: preview, now playing, Set Mode (on, lock style, next, interval, styles, calm/driving bias), style/look/view, palettes + Album, responsiveness / glow / camera, output display, blackout / freeze, all settings (reused sheet); screenshots at laptop sizes
-- [ ] A3.4 Output safety: closing the controller never touches the output; unplugging the TV brings the output back (runtime safety net)
-- [ ] A4 LICENSE (PolyForm Noncommercial 1.0.0), SPDX fields, README + site footer, third-party notices
+- [x] A3.3 Controller UI: preview, now playing, Set Mode (on, lock style, next, interval, styles, calm/driving bias), style/look/view, palettes + Album, responsiveness / glow / camera, output display, blackout / freeze, all settings (reused sheet); screenshots at laptop sizes
+- [x] A3.4 Output safety: closing the controller never touches the output; unplugging the TV brings the output back (runtime safety net)
+- [x] A4 LICENSE (PolyForm Noncommercial 1.0.0), SPDX fields, README + site footer, third-party notices
 - [ ] A5 Full app gates (sync, flicker, motion, pop, jaggedness, dt sweep, pacing, palette gates, cost) before/after; `npm run tauri build` runs
 - [ ] B1.1 Reel studio: song analysis strip, window picking (drops, drag, presets, bar snap, 3 suggestions), 9:16 live preview + safe zones
 - [ ] B1.2 Formats (Song, Beat switch, Showcase, Styles tour, Album colours), portrait framing for every style / look / view (screenshots)
@@ -31,6 +31,11 @@
 ## Notes
 
 - **Coordination (Abdul, mid-batch):** another instance works in this same checkout (the /live style-picker fix, the story on the site). Before every push: fetch, and rebase onto origin/main if it moved (resolve conflicts keeping both sides' intent); commit only my own files by path, never stash or reset (their uncommitted edits live in the same tree). No /live picker changes until that fix is on main (my /live change, file tags → now playing in `playData`, is outside the picker and was committed before the note). The GPU is shared: timing-sensitive gates (frame cost, pacing, Voyage motion) only while no other render or gate job runs; re-run any that may have overlapped.
+- **A1 result (D82):** exact-turn sweep of Neon (`verify/palettes/neon-turns/`): every turn from −20° to +40° passes every colour gate; −25° (Warp chroma 0.088) and +45° (0.0926 < 0.093) fail. Window −15°…+35° (Warp ≥ 0.100). The windowed drift sweep (`verify/palettes/drift-neon-window/`, 12 phases × 19 combos × 2 tracks): **12 of 12 phases pass** (1.0.1: 7 of 12). Flicker gates for those phases: see A5.
+- **Dev builds and the real settings file:** the first `tauri dev` runs of this batch read and migrated Abdul's installed settings (v8 → v9; the one-time album toast consumed). Restored to v8 by hand (backup `%APPDATA%/com.abdul.sonora/settings.backup-devtest-v9.json`); debug builds now use `settings.dev.json`.
+- **Controller preview technique (D84):** first fenced PBO readback: 0.6–0.8 ms of main-thread time per output frame in the desktop app (clientWaitSync and getBufferSubData are synchronous round trips in Chromium). A GPU-side `createImageBitmap(canvas, resize)` snapshot handed to the encoder worker: 0.03–0.05 ms per frame, preview 22–23 fps (now 25 with interval-stepped due times), 25–28 ms latency (desktop dev build, other GPU jobs running). The PBO path stays as `mode: 'pbo'` for comparison. Definitive cost and pacing numbers: A5 (idle GPU).
+- **Album colours test set (A2.5):** 51 synthetic covers (`scripts/album-covers.py` → `local-media/covers/test/`) + the Graduation cover. Extraction through the app's own path (`scripts/album-set.mjs`, harness): 47 of 52 give a palette; no palette (the chosen one stays) for both black-and-white covers, the grey photo, white-with-black-type, black-with-white-type and the dim violet near-black. Three rules refined from it (D83): yellow → gold not lime, gold accent on magenta kept (Graduation: magenta 343°, purple 320°, gold accent), cyan accents stay light cyan.
+- **Bar grid:** drops and breakdowns re-anchor the bar grid (the event layer reports a drop ~0.2 s after its hit); "I Wonder"'s first drop starts mid-bar (a phrase shift), so every drop now lands on a bar line.
 - **Trailer rules (Abdul, mid-batch):** every candidate shows all five styles; Silk Depth (planet camera) carries the builds and Voyage Void the big drops, with the most screen time; Ink, Warp and Wisp each get one clear moment where the music suits them; cuts only on bar lines, never faster than the music. Style labels (`silk · depth`, lowercase IBM Plex Mono, Bone ~60%, one fixed corner inside the safe zones, same in 16:9 and 9:16; 0.3 s in, ~1.5 s hold, out; never over the now-playing toast or the lockup) on the drafts, and as a reel-studio option.
 
 # Website, live demo, trailer, hosting — done, live on sonoravisuals.com
