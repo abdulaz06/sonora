@@ -224,7 +224,10 @@ function encode(plan, song, dirFrames, layers, info, outDir, draft) {
   const aOut = plan.card ? 0.6 : 0.25;
   f.push(`[1:a]afade=t=in:st=0:d=${plan.fadeIn ? 0.25 : 0.05},afade=t=out:st=${(D - aOut).toFixed(3)}:d=${aOut}[a]`);
   const reel = join(outDir, 'reel.mp4');
-  const vq = draft ? ['-preset', 'veryfast', '-crf', '24'] : ['-preset', 'slow', '-b:v', '18M', '-maxrate', '20M', '-bufsize', '36M'];
+  // Reels: ~18 Mbps (Instagram's upload sweet spot). Masters (plan.encode): constant quality.
+  const vq = draft ? ['-preset', 'veryfast', '-crf', '24']
+    : plan.encode ? ['-preset', 'slow', '-crf', String(plan.encode.crf ?? 16), '-maxrate', plan.encode.maxrate ?? '40M', '-bufsize', plan.encode.bufsize ?? '80M']
+    : ['-preset', 'slow', '-b:v', '18M', '-maxrate', '20M', '-bufsize', '36M'];
   execFileSync(ffmpeg, ['-y', '-loglevel', 'error', ...inputs, '-filter_complex', f.join(';'), '-map', '[v]', '-map', '[a]',
     '-c:v', 'libx264', '-profile:v', 'high', ...vq, '-pix_fmt', 'yuv420p', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
     '-r', String(fps), '-c:a', 'aac', '-b:a', draft ? '192k' : '320k', '-movflags', '+faststart', reel], { stdio: 'inherit' });

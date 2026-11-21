@@ -27,13 +27,33 @@ const shots = [
   { at: B(kVoy + 11), style: 'silk', variant: 'silk', depth: false, palette: PAL },               // Silk Flat near the end
   { at: B(kVoy + 15), style: 'voyage', variant: 'void', depth: false, palette: PAL },             // under the lockup
 ];
-const cardAt = B(k1 - 4);
+// Options (env): ASPECT=9:16 (re-rendered in portrait, not cropped), CUT=1 (the ~30 s cut:
+// 16 bars opening on the first drop, the lockup over its last four), SS (supersampling),
+// CRF (master encode), NAME, OUT (folder under the repo).
+const portrait = process.env.ASPECT === '9:16';
+const cut = process.env.CUT === '1';
+const kDrop = idx(35.1);
+const ws = cut ? kDrop : k0, we = cut ? kDrop + 18 : k1;
+// The cut, compressed: the drop and his line on Silk, Voyage, Ink, Warp, Silk Flat, and
+// Voyage under the lockup (Wisp's quiet moment is the intro, in the full-length versions).
+const useShots = cut ? [
+  { ...shots[1], at: B(kDrop) },
+  { ...shots[2], at: B(kVoy) },
+  { ...shots[3], at: B(kVoy + 4) },
+  { ...shots[4], at: B(kVoy + 6) },
+  { ...shots[5], at: B(kVoy + 8) },
+  { ...shots[6], at: B(kVoy + 10) },
+] : shots;
+const cardAt = B(we - 4);
+const name = process.env.NAME || 'trailer-A2';
 const plan = {
   format: 'trailer', song: song.file, title: 'I Wonder', artist: 'Kanye West', cover: findCover(song),
-  window: { start: B(k0), end: B(k1) }, size: [1920, 1080], fps: 60, quality: 'high', supersample: Number(process.env.SS || 1), preroll: 'full',
-  shots, labels: true, labelPalette: false, nowPlaying: [+(B(k0) + 0.5).toFixed(3), +(cardAt - 7.2).toFixed(3)], text: 'none', mark: false,
-  card: { at: cardAt, line: 'see your music.' }, fadeIn: 0.6, name: process.env.NAME || 'trailer-A2', out: `local-media/trailer/drafts/${process.env.NAME || 'trailer-A2'}`,
+  window: { start: B(ws), end: B(we) }, size: portrait ? [1080, 1920] : [1920, 1080], fps: 60, quality: 'high', supersample: Number(process.env.SS || 1), preroll: 'full',
+  shots: useShots, labels: true, labelPalette: false,
+  nowPlaying: cut ? [+(B(ws) + 0.5).toFixed(3)] : [+(B(ws) + 0.5).toFixed(3), +(cardAt - 7.2).toFixed(3)], text: 'none', mark: false,
+  card: { at: cardAt, line: 'see your music.' }, fadeIn: cut ? 0 : 0.6, name, out: process.env.OUT || `local-media/trailer/drafts/${name}`,
+  ...(process.env.CRF ? { encode: { crf: Number(process.env.CRF), maxrate: '40M', bufsize: '80M' } } : {}),
 };
-const dur = (i) => (shots[i + 1]?.at ?? plan.window.end) - shots[i].at;
-console.log(shots.map((s, i) => `${mmss(s.at)} (+${(s.at - W0).toFixed(1)} s) ${styleLine(s, false)} ${dur(i).toFixed(1)} s`).join('\n'), `\nlockup ${mmss(cardAt)}, end ${mmss(plan.window.end)}`);
+const dur = (i) => (useShots[i + 1]?.at ?? plan.window.end) - useShots[i].at;
+console.log(useShots.map((s, i) => `${mmss(s.at)} (+${(s.at - B(ws)).toFixed(1)} s) ${styleLine(s, false)} ${dur(i).toFixed(1)} s`).join('\n'), `\nlockup ${mmss(cardAt)}, end ${mmss(plan.window.end)}`);
 writeFileSync(join(MEDIA, 'trailer', 'drafts', `${plan.name}.plan.json`), JSON.stringify(plan, null, 1));
