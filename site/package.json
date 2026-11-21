@@ -9,6 +9,7 @@
     "dev": "npm run prepare:demo && astro dev",
     "build": "npm run prepare:demo && npm run release && astro build",
     "preview": "astro preview --port 4321",
+    "test:live": "node scripts/test-live.mjs",
     "check": "astro check"
   },
   "dependencies": {

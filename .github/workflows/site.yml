@@ -71,6 +71,16 @@ jobs:
       - name: WASM analyser
         run: npm run build:wasm
 
+      # /live runs the app's own UI: click every style, look, view, palette and
+      # control there and check the engine switched (software WebGL here), for
+      # the demo, a dropped file and a fake microphone. A failure stops the deploy.
+      - name: /live controls test
+        working-directory: site
+        run: |
+          ../node_modules/.bin/playwright install --with-deps chromium
+          npm run build
+          node scripts/test-live.mjs --channel chromium --slow
+
       - name: Build only (no Vercel secrets yet)
         if: env.VERCEL_TOKEN == ''
         working-directory: site

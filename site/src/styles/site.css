@@ -291,6 +291,11 @@ html:not(.static) .only-static { display: none !important; }
 .ss figcaption { margin-top: 8px; }
 @media (max-width: 1000px) { .dl-grid { grid-template-columns: 1fr; } .dl-grid > div { border-right: 0; border-bottom: var(--line); } }
 
+/* One quiet line under the download block. */
+.story-line { margin-top: clamp(40px, 7vh, 72px); font-size: var(--t-small); color: var(--b62); }
+.story-line a { color: var(--bone); border-bottom: 1px solid var(--b25); padding-bottom: 2px; transition: border-color 140ms var(--ease); }
+.story-line a:hover { border-color: var(--bone); }
+
 /* ── Footer ── */
 .foot { border-top: var(--line); padding: 28px 0 36px; }
 .foot-in { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 18px 32px; align-items: center; }

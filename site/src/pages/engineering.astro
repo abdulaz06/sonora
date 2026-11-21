@@ -14,7 +14,7 @@ const secs = (demo.sections as [string, number, number][]).filter(([n]) => n !==
 const W = 1000;
 const x = (t: number): number => (t / dur) * W;
 const toc = [
-  ['problem', 'the problem'], ['analysis', 'analysis'], ['mapping', 'the mapping layer'], ['events', 'events'], ['crate', 'one crate, two targets'],
+  ['story', 'why i built it'], ['problem', 'the problem'], ['analysis', 'analysis'], ['mapping', 'the mapping layer'], ['events', 'events'], ['crate', 'one crate, two targets'],
   ['rendering', 'rendering'], ['harness', 'the harness'], ['ink', 'the ink investigation'], ['colour', 'colour'], ['site', 'this website'], ['limits', 'limitations'],
 ];
 ---
@@ -51,6 +51,7 @@ const toc = [
     .tbl td { color: var(--b75); }
     .tbl td:first-child { color: var(--bone); white-space: nowrap; }
     .tbl-wrap { overflow-x: auto; }
+    #story { scroll-margin-top: 88px; }
     .pull { border-left: 1px solid var(--bone); padding: 4px 0 4px 20px; margin: 28px 0; font-family: var(--f-display); font-weight: 600; font-size: clamp(20px, 1.7vw, 28px); letter-spacing: -0.02em; line-height: 1.25; color: var(--bone); }
     @media (max-width: 1000px) {
       .eng { grid-template-columns: 1fr; }
@@ -80,9 +81,18 @@ const toc = [
     <div class="wrap">
       <div class="eng">
         <nav class="toc micro" aria-label="On this page">
-          {toc.map(([id, label], i) => <a href={`#${id}`}>{String(i + 1).padStart(2, '0')} · {label}</a>)}
+          {toc.map(([id, label], i) => <a href={`#${id}`}>{String(i).padStart(2, '0')} · {label}</a>)}
         </nav>
         <article>
+          <section id="story">
+            <p class="label">00 · why i built it</p>
+            <h2 class="h2">why i built it.</h2>
+            <p>I’ve always loved music. When I’m on my own, something is always playing: on aux in the car, through my Sony WH-CH720Ns, or through the Edifier MR3s on my desk. And it’s always at full volume (my family and friends will vouch for that), because I want to catch every small detail in a song, exactly the way the artist made it. I don’t play an instrument, I can’t really sing, and I have zero musical training. I just love listening.</p>
+            <p>In April 2026 I was at my desk with music on, as usual, and noticed my second screen sitting there doing nothing. My laptop was plugged into my monitor, all the work happened on the big one, and the small one barely got used. What if it showed visuals for whatever I was listening to?</p>
+            <p>I didn’t even know what that was called. ChatGPT gave me the words: a live, audio-reactive music visualizer. So I went looking for a free one that looked good and just worked with whatever was playing. After days of searching, I came up empty. So I looked up how hard it would be to build one myself. That’s where it started.</p>
+            <p>Seven months later, it’s called sonora: a free Windows app that listens to whatever’s playing on your PC (Spotify, YouTube, a DJ set, anything) and turns it into live visuals that move with every beat.</p>
+          </section>
+
           <section id="problem">
             <p class="label">01 · the problem</p>
             <h2 class="h2">raw fft looks dead.</h2>
