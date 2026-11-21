@@ -247,9 +247,12 @@ async function main(): Promise<void> {
     // Dev checks without devtools: the link and preview cost on the dev console.
     window.setInterval(() => {
       const t = host.tap?.stats;
-      void invoke('dev_log', { msg: `linked=${host.linked()} tap=${host.tap?.isActive()} captures=${t?.captures} sent=${t?.sent} dropped=${t?.dropped} hookMs=${t?.hookMs.toFixed(3)} frameMs=${controller.renderer.stats().frameMs.toFixed(2)} fps=${controller.renderer.stats().fps.toFixed(0)}` }).catch(() => undefined);
+      void invoke('dev_log', { msg: `screen=${shell.screen()} vis=${document.visibilityState} fs=${platform.isFullscreen()} linked=${host.linked()} tap=${host.tap?.isActive()} captures=${t?.captures} sent=${t?.sent} dropped=${t?.dropped} hookMs=${t?.hookMs.toFixed(3)} frameMs=${controller.renderer.stats().frameMs.toFixed(2)} fps=${controller.renderer.stats().fps.toFixed(0)}` }).catch(() => undefined);
     }, 3000);
-    if (import.meta.env.VITE_SONORA_OPEN_CONTROLLER) window.setTimeout(() => platform.openController?.(), 4000);
+    if (import.meta.env.VITE_SONORA_OPEN_CONTROLLER) {
+      // Dev check: skip the intro (dev builds start from their own fresh settings), show the visual, open the controller.
+      window.setTimeout(() => { if (shell.screen() === 'intro') { settings.onboarded = true; persist(); } shell.goMenu(); shell.goVisual(); platform.openController?.(); }, 4000);
+    }
   }
 
   // ── Updates: a quiet notice with one-click install ──

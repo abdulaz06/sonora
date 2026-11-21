@@ -83,7 +83,7 @@ export interface HarnessApi {
   driftCrossing(index: number, phase: number): boolean;
   /** Controller preview tap on this page's renderer (cost measurements): on/off, and
    * capture every n-th frame (0 = the real rate, PREVIEW_FPS by time). */
-  previewTap(o: { on: boolean; every?: number }): PreviewStats | null;
+  previewTap(o: { on: boolean; every?: number; mode?: 'bitmap' | 'pbo' }): PreviewStats | null;
   /** Album colours: extract a cover (data: URL) exactly as the app does. */
   albumExtract(src: string): Promise<{ kind: string; hues: unknown; resolved: ResolvedPalette | null; colours: { lch: number[]; share: number; neutral: boolean }[] }>;
 }
@@ -435,6 +435,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       tap ??= new PreviewTap(gl);
       const t = tap;
       t.forceEvery = o.every ?? 0;
+      if (o.mode) t.mode = o.mode;
       t.setActive(o.on);
       renderer.setFrameHook(o.on ? (_g, now) => t.onFrame(now) : null);
       return { ...t.stats };

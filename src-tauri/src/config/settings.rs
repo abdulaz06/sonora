@@ -11,7 +11,9 @@ use std::path::PathBuf;
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
 
-const SETTINGS_FILENAME: &str = "settings.json";
+/// Development builds (`tauri dev`) keep their own file, so trying a new
+/// version never migrates or overwrites the settings of the installed app.
+const SETTINGS_FILENAME: &str = if cfg!(debug_assertions) { "settings.dev.json" } else { "settings.json" };
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app

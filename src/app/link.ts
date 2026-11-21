@@ -83,6 +83,8 @@ export interface PreviewMsg {
   /** Capture time, ms since the epoch (performance.timeOrigin + now), for latency. */
   at: number;
   seq: number;
+  /** Rows are bottom-up (a readPixels capture): draw flipped. */
+  flip: boolean;
 }
 
 export interface Link {

@@ -83,7 +83,7 @@ export async function bootController(desktop: Desktop = {}): Promise<void> {
       const W = Math.max(1, Math.round(r.width * dpr)), H = Math.max(1, Math.round(r.height * dpr));
       if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; }
       // readPixels rows are bottom-up: flip while drawing.
-      g.setTransform(1, 0, 0, -1, 0, H);
+      if (e.data.flip) g.setTransform(1, 0, 0, -1, 0, H);
       g.imageSmoothingQuality = 'high';
       g.drawImage(bmp, 0, 0, W, H);
       g.setTransform(1, 0, 0, 1, 0, 0);
