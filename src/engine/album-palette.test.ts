@@ -84,6 +84,7 @@ describe('album palette: building', () => {
   it('with only a primary it is exactly the custom-hue palette (yellows aside: gold, not lime)', () => {
     for (let h = 0; h < 360; h += 7.5) {
       if (h > 65 && h < 140) continue;   // the olive band splits at 118° for covers (102.5° for custom)
+      if (h > 162 && h < 245) continue;  // a cyan pick kept as the secondary is light cyan for covers
       const a = paletteFromCover({ primary: h }), b = paletteFromHue(h);
       // (The floor lifts for gold to teal primaries: Ink Glow Depth flicker.)
       expect({ ...a, name: '', bg: null }).toEqual({ ...b, name: '', bg: null });

@@ -418,9 +418,10 @@ export function paletteFromCover(c: CoverHues, name = 'Album'): Palette {
   const hh = warm ? h + Math.max(-15, Math.min(15, angDiff(80, h))) : h + Math.max(-15, Math.min(15, angDiff(195, h)));
   const primary = vivid(0.6, h, 0.22, 1);
   const secHue = secFromCover || sec === h0 ? sec : bandHue(sec, true);
-  // A cover's cyan secondary is kept as a light cyan, like a cyan accent (a mid-light
-  // one was dull: Warp's streaks fell under its chroma floor).
-  const cyanSec = secFromCover && secHue > BANDS[1][0] && secHue < BANDS[1][1];
+  // A cyan secondary (the cover's, or its cyan primary kept when that moved to azure or
+  // teal) is a light cyan, like a cyan accent (a mid-light one was dull: Warp's streaks
+  // fell under its chroma floor).
+  const cyanSec = (secFromCover || sec === h0) && secHue > BANDS[1][0] && secHue < BANDS[1][1];
   const secondary: OKLCH = cyanSec ? [COVER_CYAN_ACCENT_L - 0.05, Math.min(COVER_CYAN_ACCENT_C + 0.015, maxChroma(COVER_CYAN_ACCENT_L - 0.05, secHue) * 0.95), secHue] : vivid(0.55, secHue, 0.2, 0.9);
   const accent: OKLCH = cyanAccent
     ? [COVER_CYAN_ACCENT_L, Math.min(COVER_CYAN_ACCENT_C, maxChroma(COVER_CYAN_ACCENT_L, acc) * 0.95), acc]
