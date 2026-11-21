@@ -93,10 +93,10 @@ const COVER_OLIVE_SPLIT = 118;
  * cyan (Ocean's accent: L 0.77, C 0.12 passes every gate) instead of turning azure. */
 const COVER_CYAN_ACCENT_L = 0.77;
 const COVER_CYAN_ACCENT_C = 0.125;
-/** Album palettes with a gold, lime, green or teal primary sit on a lighter,
- * slightly tinted floor, as Aurora and Acid do (D67): against the darkest
- * floor Ink Glow Depth's hits swung 2.58–2.67/s (gate 2.5) with those bright
- * hues. Weight 1 from COVER_FLOOR_HUES[1] to [2], easing in and out over 20°. */
+/** Album palettes with an orange, gold, lime, green or teal primary sit on a
+ * lighter, slightly tinted floor, as Aurora and Acid do (D67): against the
+ * darkest floor Ink Glow Depth's hits swung 2.58–2.67/s (gate 2.5) with those
+ * bright hues. Weight 1 from COVER_FLOOR_HUES[1] to [2], easing in and out over 20°. */
 const COVER_FLOOR_HUES = [40, 55, 170, 190];
 const COVER_FLOOR_L = 0.02;
 const COVER_FLOOR_C = 0.008;
