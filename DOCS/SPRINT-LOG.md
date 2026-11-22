@@ -5,28 +5,34 @@
 > New styles stay off the website until the release (hidden on the site build; the app and the dev page show them).
 
 ## Summary
-(written at the review stop)
+**Review stop.** Open `verify/review-1.2/index.html` (every look: arc contact sheet, 24 s clip with audio, 9:16 still, gate rows; sizes; ASSETS.md).
+
+- Built: Stage (Club / Arena / Cathedral), Cymatics (Stone / Sand / Liquid), Glass (Bubbles / Fins / Chrome), Cover, Echo (Glow / Trace), Memory (Forest / Coast / Desert), Silk Helix (Flat + Depth), Filter: Glyph / Reeded glass (Settings › Filter, (i) card, G). Hidden on the deployed site until `RELEASED_12` (D91).
+- Gates: sync ≥ 90% on every new look (regional where the kick is local by design); flicker PASS everywhere; motion background step PASS everywhere (fine share 65–85%, like the shipped particle / raymarch family, D93); dt sweep PASS; colour: 7 of 9 presets clean everywhere, album colours 10/10, custom hue 9/12; per-palette flicker: all 162 pass (after trimming Echo Glow and Chrome exposure).
+- Cost at 1080p Medium 0.97–3.90 ms (Cymatics heaviest; High 7.0 ms); filters +0.03–0.23 ms; compile ≤ 0.84 s (Voyage 2.5 s). Installer +28.5 MB raw of 35 (Memory 23.2).
+- Didn't pass: Glyph over Cover paper (43% of kicks); Silk + filters one-frame step (Silk's own D68 inversion); colour near misses (Solar Helix Flat olive 6%, Aurora Cover dark chroma 0.093, hue 90° Helix, hue 180–210° Cover); Memory reads soft (CC0 photoscans: no bundle-safe splat scans exist) and its drop on house-124 lands in the walk's loop fade; Memory / Cover / Echo Low isn't lighter (already ~1–1.8 ms, not GPU-bound). Export / Recording with the new styles not exercised by a script.
+- Next: wait for "Ship it" (tweaks, release 1.2.0 after 1.1.0, flip `RELEASED_12`, site sections, README table, Lighthouse, test:live).
 
 ## Progress (resume here)
 - Built and pushed: filters (Glyph, Reeded glass), Silk Helix, Stage, Cymatics, Glass, Cover, Echo, Memory, catalog / Set Mode / settings wiring. Release gate: `src/app/release.ts` (`RELEASED_12` false: the deployed site hides 1.2 styles, looks and the Filter section).
 - Gate runs live in `verify/gates-1.2/*.log` (`scripts/gates-12.sh filters|motion|dt|syncflicker|compile`, `scripts/cost.mjs`, `scripts/compile-time.mjs`); `verify --sync` with `SYNC_DEBUG=1` prints every kick.
 - The motion gate's background step (≤ 0.02 a frame) found whole-background kick pulses in Stage (bass haze, room strobe, heads through the lens), Glass (studio lift incl. backdrop), Memory (fog clearing + 62% of splats glowing) and Cover paper (shadow skirt over the page), and Glass Fins' camera flying past the ribbon's end; all fixed (see the decisions). Glyph got a hit-frame kick response (Glass 83 → 100%, Memory 78 → 100%).
-- Still to do before the review: final gate batches on the fixed code (syncflicker, motion for the fixed styles, dt, filters, compile), frame cost on an idle GPU, colour gates (palette matrix `new12`, calibration of the new combos, custom hue, album colours, per-palette flicker), media encode + sizes, decisions D91+, re-render the review items whose styles changed, the summary.
 - Helpers: `scripts/luma-steps.mjs <style> <look>` (largest flicker steps, `CLIP=1` most blown-out frame); `scripts/snapshots.mjs` logs page errors (`SNAP_OUT`, `SNAP_COVER`, `SNAP_LIGHT`).
 
 ## Checklist
 - [x] 0. Read the docs, references and engine; worktree; harness scripts honour `SONORA_HARNESS_PORT` (parallel runs)
 - [x] F1. Filters: Glyph (atlas from bundled Plex Mono, per-cell hysteresis, edge glyphs) and Reeded glass (vertical / angled / radial); renderer hook after the composite; settings, controller, G key, (i) card; harness `--filter` / `SONORA_FILTER`
-- [~] F2. Filter gates on every style (sync, flicker, motion, colour), cost ≤ 1 ms at 1080p Medium, 9:16 legibility: first pass done (Glyph kick response added); final batch pending
-- [~] H. Silk Helix look (Flat + Depth): sync + flicker + motion pass; cost measured; dt / colour pending
-- [~] S. Stage (Club / Arena / Cathedral): sync + flicker + background step pass after the fixes; final batch / dt / colour pending
-- [~] C. Cymatics (Stone / Sand / Liquid): sync + flicker + motion pass; dt / colour pending
-- [~] G. Glass (Bubbles / Fins / Chrome): sync + background step pass after the fixes; final batch / colour pending
-- [~] V. Cover (album art; generated fallback; Set Mode only with a cover): sync (regional 91%) + background step pass; colour pending
-- [~] M. Memory (splat scenes from CC0 photoscans, ≤ 8 MB each, on demand): regional sync 91–100% + background step pass after the ring; colour pending
-- [~] E. Echo (CMU mocap, retimed; time echoes): sync + flicker + motion pass; colour pending
-- [~] P. Catalog words, (i) cards, Set Mode tags done; media render running; ASSETS.md done (Echo, font, Memory); installer size per style pending encode
-- [ ] R. Review: `verify/review-1.2/index.html` (contact sheets, clips, 9:16 stills, gate tables, sizes, what didn't pass); summary; stop
+- [x] F2. Filter gates on every style's default look (sync, flicker, colour via the styles), cost ≤ 1 ms (+0.03–0.23 ms), 9:16 stills; Glyph kick lift as a per-style opt-in; Glyph × Cover paper 43% (reported)
+- [x] H. Silk Helix look (Flat + Depth): sync, flicker, motion, dt, colour (Solar olive near miss), cost, media
+- [x] S. Stage (Club / Arena / Cathedral): sync, flicker, background step (rebuilt kick light), dt, colour, cost, media
+- [x] C. Cymatics (Stone / Sand / Liquid): sync, flicker, motion, dt, colour (palette in the key light), cost, media
+- [x] G. Glass (Bubbles / Fins / Chrome): sync, flicker, background step, Fins camera fix, dt, colour, cost, media
+- [x] V. Cover (album art; generated fallback; Set Mode only with a cover): sync (paper regional 96%), flicker, background step, dt, colour (Aurora / cyan near misses), cost, media
+- [x] M. Memory (splat scenes from CC0 photoscans, ≤ 8 MB each, on demand): regional sync 100% (kick light ring), flicker, background step, dt, colour (light mode), cost, media
+- [x] E. Echo (CMU mocap, retimed; time echoes): sync, flicker, motion, dt, colour, cost, media
+- [x] P. Catalog words, (i) cards, Set Mode tags, media (thumbnails, loops, filter pictures, palette thumbnails), ASSETS.md, installer size per style (D98)
+- [x] R. Review: `verify/review-1.2/index.html` (contact sheets, clips, 9:16 stills, gate tables, sizes, what didn't pass); summary; stop
+- [ ] Ship: on "Ship it" — tweaks, release 1.2.0, site, README, Lighthouse, test:live
 
 # 1.1 — export, recording, text in exports, AAA Voyage worlds, faster /live
 
