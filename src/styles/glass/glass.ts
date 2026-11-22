@@ -44,8 +44,14 @@ const ORBIT = 0.05;
 const KICK_RIPPLE = 1;
 const KICK_FLARE = 0.7;
 const KICK_TAU = 0.16;
-/** Kick: the whole studio light lifts by this share on the hit frame (fixed headroom). */
-const KICK_STUDIO = 0.38;
+/** Kick: the studio light seen in and through the glass lifts by this share on the hit frame
+ * (fixed headroom); the backdrop seen directly never does (motion gate's background step). */
+const KICK_STUDIO: Record<Look, number> = { bubbles: 0.38, fins: 0.62, chrome: 0.14 };
+/** Fins: each kick turns the slats a step (rad), most of it within this time (s): the light through them shifts on the hit. */
+const FIN_TURN = 0.3;
+const FIN_TURN_TAU = 0.05;
+/** Fins: the camera's swing either side of the ribbon's face (rad). */
+const FIN_SWING = 0.7;
 /** Drop: reform envelope decay (s). */
 const REFORM_TAU = 1.2;
 
@@ -72,6 +78,8 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
   // ── State ──
   let time = 0;
   let spin = 0;
+  let finTurn = 0;
+  let finTurnNow = 0;
   let orbit = rng() * Math.PI * 2;
   let layout = rng() * 100;
   let kickArmed = true;
@@ -108,6 +116,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       orbit += dt * ORBIT * (1 + ctx.intensitySmoothed);
       waveT += dt * (1.2 + 3.5 * ctx.intensitySmoothed);
       reform *= Math.exp(-dt / REFORM_TAU);
+      finTurnNow += (finTurn - finTurnNow) * (1 - Math.exp(-dt / FIN_TURN_TAU));
       rippleT += dt;
       kick *= Math.exp(-dt / KICK_TAU);
       // Frame-accurate: the bass envelope flares the key light on the hit frame.
@@ -117,6 +126,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       if (kickArmed && ctx.bassHits > 0.55 && fade > 0.1) {
         kickArmed = false;
         rippleT = 0;
+        if (look === 'fins') finTurn += FIN_TURN;
         const b = ballPos(Math.floor(rng() * countNow), time);
         rippleC = look === 'bubbles' ? [b[0], b[1], b[2]] : [(rng() - 0.5) * 0.8, 0, (rng() - 0.5) * 0.8];
       }
@@ -136,7 +146,9 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       // Camera: an orbit around the forms, the shared camera's surge and roll.
       const dist = (look === 'chrome' ? 2.2 : look === 'fins' ? 2.2 : 2.1) * (1 - cam.lurchAmount * 0.12);
       const elev = look === 'chrome' ? 0.85 + 0.12 * Math.sin(time * 0.05) : 0.18 + 0.12 * Math.sin(time * 0.07);
-      const az = orbit + simplex2(time * 0.03, 3) * 0.4;
+      // Fins: the ribbon lies along x, so the camera swings across its side instead of orbiting
+      // (a full orbit flew along the ribbon's axis, past its end: an empty frame).
+      const az = look === 'fins' ? Math.PI / 2 + FIN_SWING * Math.sin(orbit * 0.8) + simplex2(time * 0.03, 3) * 0.2 : orbit + simplex2(time * 0.03, 3) * 0.4;
       const pos: [number, number, number] = [Math.cos(az) * Math.cos(elev) * dist, Math.sin(elev) * dist + (look === 'chrome' ? 0.3 : 0), Math.sin(az) * Math.cos(elev) * dist];
       const tgt: [number, number, number] = [0, look === 'chrome' ? 0.2 : 0, 0];
       const f = norm3([tgt[0] - pos[0], tgt[1] - pos[1], tgt[2] - pos[2]]);
@@ -153,7 +165,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
 
       // Studio colours from the palette.
       // Chrome is brighter overall (mirrors everywhere): a smaller lift keeps each hit's step in bounds.
-      const studio = 1 + KICK_STUDIO * kick * (look === 'chrome' ? 0.5 : 1);
+      const studio = 1 + KICK_STUDIO[look] * kick;
       const lo = mix3(pal.bg, pal.shade, 0.5).map((x) => x * 1.4 * studio) as RGB;
       const mid = mul3(pal.secondary, 0.7 * studio) as RGB;
       const hi = mul3(mix3(pal.highlight, pal.primary, 0.35), 0.95 * studio) as RGB;
@@ -168,10 +180,10 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       gl.useProgram(p.prog);
       setUniforms(gl, p, {
         u_res: [w, h], u_time: time, u_cam_pos: pos, u_cam_fwd: f, u_cam_right: r, u_cam_up: u, u_tan_half: Math.tan(fov / 2),
-        u_steps: STEPS[q], u_env_lo: lo, u_env_mid: mid, u_env_hi: hi, u_key: key, u_rim: rim, u_sparkle: sparkle,
+        u_steps: STEPS[q], u_env_lo: lo, u_env_mid: mid, u_env_hi: hi, u_key: key, u_rim: rim, u_sparkle: sparkle, u_studio: studio,
         u_balls: balls, u_ball_count: n, u_blend_k: BLEND_K[0] + (BLEND_K[1] - BLEND_K[0]) * clamp01(ctx.bassPresence),
         u_ripple: [rippleC[0], rippleC[1], rippleC[2], KICK_RIPPLE * (rippleT < 1.5 ? 1 : 0)], u_ripple_t: rippleT,
-        u_spin: spin, u_twist: 0.1 + 0.16 * es.buildProgress + 0.05 * glowK, u_count: look === 'fins' ? 10 + Math.round(10 * glowK) : 8 + 6 * glowK,
+        u_spin: spin + finTurnNow, u_twist: 0.1 + 0.16 * es.buildProgress + 0.05 * glowK, u_count: look === 'fins' ? 10 + Math.round(10 * glowK) : 8 + 6 * glowK,
         u_tint: tint, u_wave_t: waveT, u_wave_amp: 0.4 + 0.8 * clamp01(ctx.bassPresence), u_reform: reform,
       });
       drawQuad(gl, quadVAO);

@@ -22,6 +22,7 @@ uniform vec3 u_env_hi;
 uniform vec3 u_key;          // softbox colour × intensity
 uniform vec3 u_rim;          // rim light colour × intensity
 uniform float u_sparkle;     // highs: glints flare
+uniform float u_studio;      // kick lift of the studio light (seen through and in the glass only)
 // forms
 uniform vec4 u_balls[10];
 uniform int u_ball_count;
@@ -135,6 +136,8 @@ void main() {
   float y = rd.y;
   vec3 bg = mix(u_env_lo, u_env_mid, smoothstep(-0.6, 0.15, y));
   bg = mix(bg, u_env_hi, smoothstep(0.15, 0.95, y)) * 0.55 + u_env_lo * 0.25;
+  // The backdrop seen directly never pulses: kicks light the glass (refraction, reflections), not the wall.
+  bg /= u_studio;
   bg += u_rim * 0.05 * exp(-pow(length(ndc * vec2(aspect * 0.5, 1.0)) * 1.2, 2.0));
   float t = march(ro, rd, 12.0, 1.0);
   vec3 col = bg;
