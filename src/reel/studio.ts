@@ -11,7 +11,8 @@
 import '../ui/ds/ds.css';
 import '../ui/screens/screens.css';
 import './studio.css';
-import { buildPlan, COMBOS, LABEL_TIMING, PALETTE_NAMES, paletteName, snapToBar, styleLine, TOAST_TIMING, type Analysis, type Plan, type StudioState } from '../../scripts/reel/plan-lib.mjs';
+import { buildPlan, COMBOS, LABEL_TIMING, PALETTE_NAMES, paletteName, snapToBar, styleLine, TOAST_TIMING, type Analysis, type Plan, type StudioState } from '../export/plan-lib.mjs';
+import { drawStrip as paintStrip, stripPx, stripTime } from '../export/strip';
 import { paletteFromArt } from '../app/album-colours';
 import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
@@ -94,76 +95,30 @@ async function openSong(slug: string): Promise<void> {
   renderAll();
 }
 
-// ── The strip ──
+// ── The strip (shared with the app's Export screen) ──
 const strip = $<HTMLCanvasElement>('#strip');
-const sx = (t: number): number => (t / (analysis?.duration ?? 1)) * strip.width;
-const tx = (x: number): number => (x / strip.width) * (analysis?.duration ?? 1);
 let playhead = -1;
 function drawStrip(): void {
   if (!analysis) return;
-  const a = analysis;
-  const dpr = window.devicePixelRatio || 1;
-  const r = strip.getBoundingClientRect();
-  strip.width = Math.round(r.width * dpr); strip.height = Math.round(r.height * dpr);
-  const g = strip.getContext('2d')!;
-  const W = strip.width, H = strip.height, mid = H * 0.62;
-  g.clearRect(0, 0, W, H);
-  // Window
-  g.fillStyle = 'rgba(236,231,223,0.08)';
-  g.fillRect(sx(state.window.start), 0, sx(state.window.end) - sx(state.window.start), H);
-  // Bars (every 4th stronger)
-  a.bars.forEach((b, i) => { g.fillStyle = i % 4 === 0 ? 'rgba(236,231,223,0.16)' : 'rgba(236,231,223,0.06)'; g.fillRect(Math.round(sx(b)), 0, 1, H); });
-  // Waveform
-  g.fillStyle = 'rgba(236,231,223,0.28)';
-  const n = a.peaks.length;
-  for (let x = 0; x < W; x++) {
-    const i0 = Math.floor((x / W) * n), i1 = Math.max(i0 + 1, Math.floor(((x + 1) / W) * n));
-    let m = 0; for (let i = i0; i < i1; i++) m = Math.max(m, a.peaks[i]);
-    const hgt = m * H * 0.32;
-    g.fillRect(x, mid - hgt, 1, hgt * 2);
-  }
-  // Intensity
-  g.strokeStyle = 'rgba(236,231,223,0.85)'; g.lineWidth = 1.5 * dpr; g.beginPath();
-  const ci = a.curve.intensity;
-  for (let x = 0; x < W; x += 2) { const v = ci[Math.min(ci.length - 1, Math.floor((x / W) * ci.length))]; const y = H * 0.36 - v * H * 0.3; if (x) g.lineTo(x, y); else g.moveTo(x, y); }
-  g.stroke();
-  // Events
-  g.font = `${10 * dpr}px IBM Plex Mono, monospace`;
-  for (const e of a.events) {
-    const x = sx(e.t);
-    if (e.type === 'bigHit') { g.fillStyle = 'rgba(236,231,223,0.5)'; g.fillRect(x - dpr, H - 6 * dpr, 2 * dpr, 4 * dpr); continue; }
-    g.fillStyle = '#ECE7DF';
-    if (e.type === 'drop') { g.beginPath(); g.moveTo(x, H - 2 * dpr); g.lineTo(x - 6 * dpr, H - 14 * dpr); g.lineTo(x + 6 * dpr, H - 14 * dpr); g.fill(); g.fillRect(x, 0, dpr, H - 14 * dpr); }
-    else { g.fillRect(x, H - 14 * dpr, dpr, 12 * dpr); }
-    g.fillText(e.type === 'breakdown' ? 'break' : e.type, x + 4 * dpr, 12 * dpr);
-  }
-  // Switch bar (beat switch)
-  if (state.format === 'beatswitch' && state.switchAt !== undefined) { g.fillStyle = '#ECE7DF'; g.fillRect(sx(state.switchAt) - dpr, 0, 2 * dpr, H); }
-  // Window edges + playhead
-  g.fillStyle = '#ECE7DF';
-  g.fillRect(sx(state.window.start), 0, dpr, H); g.fillRect(sx(state.window.end) - dpr, 0, dpr, H);
-  if (playhead >= 0) { g.fillStyle = 'rgba(236,231,223,0.9)'; g.fillRect(sx(playhead), 0, dpr, H); }
+  paintStrip(strip, analysis, { window: state.window, playhead, marker: state.format === 'beatswitch' ? state.switchAt : undefined });
   $('#win-readout').textContent = `${fmt(state.window.start)} → ${fmt(state.window.end)} · ${(state.window.end - state.window.start).toFixed(1)} s · ${analysis.bars.filter((b) => b >= state.window.start && b < state.window.end).length} bars`;
 }
 let drag: { x0: number } | null = null;
 strip.addEventListener('pointerdown', (e) => {
   if (!analysis) return;
-  const r = strip.getBoundingClientRect();
-  const x = (e.clientX - r.left) * (strip.width / r.width);
-  const t = tx(x);
+  const t = stripTime(strip, analysis, e.clientX);
   if (pickSwitch || (state.format === 'beatswitch' && e.altKey)) { state.switchAt = snapToBar(t, analysis.bars); pickSwitch = false; renderAll(); return; }
   // Near a drop: frame the window around it (a quarter in), snapped to bars.
-  const drop = analysis.events.find((ev) => ev.type === 'drop' && Math.abs(sx(ev.t) - x) < 10 * (window.devicePixelRatio || 1));
+  const drop = analysis.events.find((ev) => ev.type === 'drop' && stripPx(strip, analysis!, ev.t - t) < 10);
   if (drop) { setWindow(drop.t - length * 0.3, length); return; }
-  drag = { x0: x };
+  drag = { x0: t };
   strip.setPointerCapture(e.pointerId);
 });
 strip.addEventListener('pointermove', (e) => {
   if (!drag || !analysis) return;
-  const r = strip.getBoundingClientRect();
-  const x = (e.clientX - r.left) * (strip.width / r.width);
+  const x = stripTime(strip, analysis, e.clientX);
   const a = Math.min(drag.x0, x), b = Math.max(drag.x0, x);
-  state.window = { start: snapToBar(tx(a), analysis.bars), end: snapToBar(tx(b), analysis.bars) };
+  state.window = { start: snapToBar(a, analysis.bars), end: snapToBar(b, analysis.bars) };
   drawStrip();
 });
 strip.addEventListener('pointerup', () => {
