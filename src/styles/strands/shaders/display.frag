@@ -58,7 +58,12 @@ void main() {
     col = u_bg * 0.6;
     col += u_c0 * c * 1.1 * e;
     col += u_c3 * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 0.9 * e;
+#ifdef HELIX
+    // Helix glints burn whiter than the threads.
+    col += mix(u_c3, vec3(1.0), 0.4) * dust * 0.6 * e;
+#else
     col += mix(u_c0, u_c3, 0.6) * dust * 0.9 * e;
+#endif
   }
 #elif VARIANT == 2
   // Wisp: coloured smoke trails, bright darting flames.

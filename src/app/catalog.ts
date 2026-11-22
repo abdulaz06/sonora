@@ -64,7 +64,10 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
     line: 'Millions of points of light pulled into flowing threads.',
     more: 'Threads gather and twist with the bass and flare on every hit; builds tie them into a knot that bursts on the drop.',
     suits: 'house, techno, clean electronic',
-    looks: [],
+    looks: SHOW_12 ? [
+      { id: 'silk', label: 'Silk', line: 'Threads flowing on currents.', media: 'silk' },
+      { id: 'helix', label: 'Helix', line: 'Threads of light twisting into a double helix; drops unwind it.', media: 'silk-helix' },
+    ] : [],
     views: { depth: 'The threads float as sheets above a ground you glide over.', flat: 'Threads flowing across a flat black canvas.' },
   },
   wisp: {
@@ -115,7 +118,9 @@ export function mediaNameFor(style: StyleId, look: string, depth: boolean): stri
   const info = STYLE_INFO[style];
   // The style heroes are Flat Wisp and Flat Silk (with loops).
   if (style === 'wisp') return depth ? `wisp-${look}` : 'wisp';
+  if (style === 'silk' && look === 'helix') return depth ? 'silk-helix-depth' : 'silk-helix';
   if (style === 'silk' && !depth) return 'silk';
+  if (style === 'silk') return 'silk-view-depth';
   if (info.looks.length > 0 && info.looks.some((l) => l.id === look)) {
     if (style === 'ink' && !depth) return 'ink-view-flat';
     return `${style}-${look}`;
@@ -145,6 +150,7 @@ export const PIECES: Piece[] = [
   { id: 'ink:marble', style: 'ink', look: 'marble', label: 'Ink · Marble', views: ['depth', 'flat'], energy: 0.35, media: 'ink-marble' },
   { id: 'ink:sumi', style: 'ink', look: 'sumi', label: 'Ink · Sumi', views: ['depth', 'flat'], energy: 0.2, media: 'ink-sumi' },
   { id: 'silk', style: 'silk', look: 'silk', label: 'Silk', views: ['flat', 'depth'], energy: 0.75, media: 'silk' },
+  ...(SHOW_12 ? [{ id: 'silk:helix', style: 'silk' as StyleId, look: 'helix', label: 'Silk · Helix', views: ['flat', 'depth'] as ('flat' | 'depth')[], energy: 0.65, media: 'silk-helix' }] : []),
   { id: 'wisp:flat', style: 'wisp', look: 'ground', label: 'Wisp · Flat', views: ['flat'], energy: 0.35, media: 'wisp-view-flat' },
   { id: 'wisp:ground', style: 'wisp', look: 'ground', label: 'Wisp · Ground', views: ['depth'], energy: 0.25, media: 'wisp-ground' },
   { id: 'wisp:tunnel', style: 'wisp', look: 'tunnel', label: 'Wisp · Tunnel', views: ['depth'], energy: 0.7, media: 'wisp-tunnel' },

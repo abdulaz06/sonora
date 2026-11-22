@@ -43,7 +43,10 @@ for c in $combos; do
     done
   fi
   if [[ " $only " == *" cost "* ]]; then
-    node scripts/verify.mjs --style $style --variant $look $vf --palette $pal --track house-124 --out "$seqroot/cost/$style-$look-$view" 2>&1 | grep -E "frame cost|fps:" | sed "s/^/COST $tag /" | tee -a "$log"
-    rm -rf "$seqroot/cost/$style-$look-$view"
+    # --out is relative to the repo (verify joins it onto the root).
+    for q in ${QUALITIES:-medium}; do
+      node scripts/verify.mjs --style $style --variant $look $vf --palette $pal --quality $q --track house-124 --out "verify/tmp-cost/$style-$look-$view-$q" 2>&1 | grep -E "frame cost|fps:" | sed "s/^/COST $tag $q /" | tee -a "$log"
+      rm -rf "verify/tmp-cost/$style-$look-$view-$q"
+    done
   fi
 done

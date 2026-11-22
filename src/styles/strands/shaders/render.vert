@@ -91,7 +91,20 @@ void main() {
   v_seed = seed;
   v_uv = vec2(0.0);
 
-#if VARIANT == 0
+#if VARIANT == 0 && defined(HELIX)
+  // Silk Helix: r = thread density (A.w = strand weight, A.z = front/back or height), g = glints.
+#ifdef DEPTH
+  w *= project(worldAt(A.xy, A.z), kind > 0.5 ? 1.2 : u_point);
+  float shade = A.w;
+#else
+  gl_Position = vec4(toClip(A.xy), 0.0, 1.0);
+  gl_PointSize = kind > 0.5 ? 1.5 : u_point;
+  float shade = A.w * A.z;
+#endif
+  v_col = kind > 0.5
+    ? vec4(0.0, w * A.w * (0.35 + 1.2 * u_sparkle) * (0.3 + 0.7 * pow(fract(seed * 31.0), 2.0)) * 4.0, 0.0, 0.0)
+    : vec4(w * u_gain * shade * 1.6, 0.0, 0.0, 0.0);
+#elif VARIANT == 0
   // Silk: r = ribbon density, g = dust.
 #ifdef DEPTH
   // Ribbons float as thin sheets whose height rolls smoothly with position, so

@@ -133,6 +133,37 @@ const TUNNEL_GAIN = 0.05;
 const TUNNEL_WALL_GAIN = 4;
 const TUNNEL_KICK = [0.5, 0.3];
 
+/** Silk Helix (Flat, in view heights): half the axis length, strand radius
+ * (quiet → loud), full turns across one view height, sway of the axis
+ * (view widths) and its tilt wander (rad). */
+const HX_LEN = 0.62;
+const HX_RADIUS = [0.085, 0.135];
+const HX_TURNS = 1.6;
+const HX_SWAY = 0.2;
+/** Kick breath: envelope decay (s). */
+const HX_KICK_TAU = 0.22;
+const HX_TILT = 0.28;
+/** Silk Helix Depth: half the height (world units), radius (sim units), turns over the height. */
+const HX_DEPTH_LEN = 0.75;
+const HX_DEPTH_RADIUS = [0.06, 0.09];
+const HX_DEPTH_TURNS = 2.0;
+/** Depth: the column stands this far ahead of the camera (world units), following it with a short lag (s). */
+const HX_DEPTH_AHEAD = 1.9;
+const HX_DEPTH_LAG = 0.8;
+/** Rotation speed (rad/s): base, + intensity (motion follower), + build; the drop spins it up. */
+const HX_SPIN = [0.35, 1.7, 0.9, 2.4];
+/** Builds tighten the twist by this share at full build progress. */
+const HX_BUILD_TWIST = 0.6;
+/** Drop unwind decay (s); third strand fade (s); plucks: threshold, cooldown (s), life (s). */
+const HX_BURST_TAU = 0.32;
+/** Accumulation decay per frame at 60 fps (shorter trails than Silk: crisp threads while it spins). */
+const HX_DECAY = 0.72;
+const HX_THIRD_TAU = 0.7;
+const HX_PLUCK = [0.5, 0.16, 1.4];
+/** Thread gain relative to Silk (the threads crowd onto the strands). */
+const HX_GAIN = 0.32;
+
+interface Pluck { s: number; age: number; str: number }
 interface Shock { x: number; y: number; r: number; s: number; age: number }
 interface Agent { x: number; y: number; heading: number; speed: number; turn: number; glow: number }
 interface Ring { x: number; y: number; age: number; s: number; h: number }
@@ -175,8 +206,26 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     return pd;
   };
   let wasDepth: boolean | null = null;
-  // Wisp looks (Depth only): 'ground' or 'tunnel'.
+  // Silk Helix programs (Flat / Depth), built on first use.
+  const ph: Partial<Record<'flat' | 'depth', { update: Program; render: Program; display: Program }>> = {};
+  const helixPrograms = (depth: boolean): { update: Program; render: Program; display: Program } => {
+    const key = depth ? 'depth' : 'flat';
+    const d = `${def}\n#define HELIX 1${depth ? '\n#define DEPTH 1' : ''}`;
+    ph[key] ??= {
+      update: makeProgram(gl, fullscreenVert, inc(updateFrag), d),
+      render: makeProgram(gl, inc(renderVert), inc(renderFrag), d),
+      display: makeProgram(gl, fullscreenVert, inc(displayFrag), d),
+    };
+    return ph[key]!;
+  };
+  // Wisp looks (Depth only): 'ground' or 'tunnel'. Silk: 'silk' or 'helix'.
   let variant = kind === 'wisp' ? 'ground' : kind;
+  const helixOn = (): boolean => kind === 'silk' && variant === 'helix';
+  // Silk Helix state.
+  let hxPhase = rng() * 6.28, hxThird = 0, hxBurst = 0, hxBurstT = 99, hxPluckCd = 0;
+  const plucks: Pluck[] = [];
+  let hxOrigin: [number, number] | null = null;
+  let hxHc = 0.2, hxKick = 0;
   const tunnel = kind === 'wisp' ? new Tunnel(deps.seed) : null;
   let tunnelProg: Program | null = null;
   let histTex: WebGLTexture | null = null;
@@ -332,7 +381,10 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     id: kind,
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
-      if (kind === 'silk') {
+      if (kind === 'silk' && helixOn()) {
+        // Helix: the drop unwinds it into a burst (it re-forms as the burst eases).
+        if (e.type === 'drop') hxBurstT = 0;
+      } else if (kind === 'silk') {
         if (e.type === 'drop') { cut(ctx, CUT_BEATS_DROP); burst = 1; formT = 0; formRot = rng() * Math.PI; }
         else if (e.type === 'bigHit' && rng() < CUT_HIT_CHANCE) cut(ctx, CUT_BEATS_HIT);
       } else if (kind === 'warp' && e.type === 'drop') {
@@ -356,8 +408,28 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       sparkle = Math.max(sparkle * Math.exp(-dt / 0.15), ctx.highHits);
       bassCooldown -= dt;
 
+      // Silk Helix: twist speed rides intensity, builds tighten, kicks pluck the strands.
+      if (helixOn()) {
+        const es = ctx.eventState;
+        // Unwind envelope: rises over ~0.3 s from the drop, then eases back (threads streak outward and return).
+        hxBurstT += dt;
+        hxBurst = hxBurstT < 4 ? (hxBurstT / HX_BURST_TAU) * Math.exp(1 - hxBurstT / HX_BURST_TAU) : 0;
+        hxPhase += dt * (HX_SPIN[0] + HX_SPIN[1] * ctx.intensitySmoothed + HX_SPIN[2] * build + HX_SPIN[3] * hxBurst) * (0.35 + 0.65 * fade);
+        const third = es.section === 'drop' && es.sinceDrop < 20 ? 1 : 0;
+        hxThird += (third - hxThird) * (1 - Math.exp(-dt / HX_THIRD_TAU));
+        hxKick = Math.max(hxKick * Math.exp(-dt / HX_KICK_TAU), ctx.bassHits * fade);
+        hxPluckCd -= dt;
+        if (ctx.bassHits > HX_PLUCK[0] && hxPluckCd <= 0 && fade > 0.1) {
+          plucks.push({ s: (rng() - 0.5) * 1.2, age: 0, str: ctx.bassHits });
+          if (plucks.length > 4) plucks.shift();
+          hxPluckCd = HX_PLUCK[1];
+        }
+        for (const q of plucks) q.age += dt;
+        while (plucks.length && plucks[0].age > HX_PLUCK[2]) plucks.shift();
+      }
+
       // Silk shockwaves on bass hits.
-      if (kind === 'silk' && ctx.bassHits > 0.55 && bassCooldown <= 0 && fade > 0.1) {
+      if (kind === 'silk' && !helixOn() && ctx.bassHits > 0.55 && bassCooldown <= 0 && fade > 0.1) {
         const q = toSim(ctx, (rng() - 0.5) * 1.4, (rng() - 0.5) * 1.2);
         shocks.push({ x: q[0], y: q[1], r: 0.02, s: 0.6 * ctx.bassHits, age: 0 });
         if (shocks.length > 4) shocks.shift();
@@ -470,7 +542,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         return;
       }
       if (wasTunnel) { wasTunnel = false; needsInit = true; }
-      const prog = depth ? { ...p, ...depthPrograms() } : p;
+      const helix = helixOn();
+      const prog = helix ? helixPrograms(depth) : depth ? { ...p, ...depthPrograms() } : p;
       // The simulated region: the 2D view in Flat, the ground ahead in Depth.
       const view = depth ? DEPTH_VIEW : cam.viewHeight;
       const vw: View = depth ? { center: depthCenter(ctx, kind), rot: 0 } : viewOf(ctx, kind);
@@ -518,6 +591,48 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         u_time: time, u_center: vw.center, u_view: view, u_aspect: aspect,
         u_rot: vw.rot, u_field_t: fieldT, u_active: active,
       };
+      // Silk Helix: the axis (Flat: around the view centre, swaying and tilting;
+      // Depth: standing on the ground ahead, following the camera with a lag).
+      let helixU: Record<string, UniformValue> = {};
+      if (helix) {
+        const vh = cam.viewHeight;
+        const glowK = clamp01(ctx.intensityGlow);
+        const build = ctx.eventState.buildProgress;
+        const len = depth ? HX_DEPTH_LEN : HX_LEN * vh;
+        const pl: number[] = [];
+        for (let i = 0; i < 4; i++) { const q = plucks[i]; pl.push(q ? q.s * len : 0, q ? q.age : 9, q ? q.str : 0, 0); }
+        if (depth) {
+          const fl = Math.hypot(cam.forward[0], cam.forward[2]) || 1;
+          const c: [number, number] = [(cam.position[0] + cam.forward[0] / fl * HX_DEPTH_AHEAD) / DEPTH_SCALE.silk,
+            (cam.position[2] + cam.forward[2] / fl * HX_DEPTH_AHEAD) / DEPTH_SCALE.silk];
+          if (!hxOrigin) hxOrigin = [c[0], c[1]];
+          const k = 1 - Math.exp(-ctx.dt / HX_DEPTH_LAG);
+          hxOrigin = [hxOrigin[0] + (c[0] - hxOrigin[0]) * k, hxOrigin[1] + (c[1] - hxOrigin[1]) * k];
+          const R = HX_DEPTH_RADIUS[0] + (HX_DEPTH_RADIUS[1] - HX_DEPTH_RADIUS[0]) * glowK;
+          hxHc += (cam.position[1] + Math.tan(cam.pitch) * HX_DEPTH_AHEAD - hxHc) * k;
+          helixU = {
+            u_hx_hc: hxHc,
+            u_hx_origin: hxOrigin, u_hx_dir: [0, 1], u_hx_radius: R,
+            u_hx_twist: (HX_DEPTH_TURNS * 2 * Math.PI) / (2 * HX_DEPTH_LEN) * (1 + HX_BUILD_TWIST * build),
+            u_hx_depth: 1,
+          };
+        } else {
+          hxOrigin = null;
+          const sway = simplex2(time * 0.047, 7) * HX_SWAY * vh * aspect;
+          const tilt = simplex2(time * 0.023, 9) * HX_TILT + cam.rotation * 0.4;
+          const cx = cam.center[0] + Math.cos(cam.rotation) * sway, cy = cam.center[1] + Math.sin(cam.rotation) * sway;
+          const R = (HX_RADIUS[0] + (HX_RADIUS[1] - HX_RADIUS[0]) * glowK) * vh;
+          helixU = {
+            u_hx_origin: [cx, cy], u_hx_dir: [-Math.sin(tilt), Math.cos(tilt)], u_hx_radius: R,
+            u_hx_twist: (HX_TURNS * 2 * Math.PI) / vh * (1 + HX_BUILD_TWIST * build),
+            u_hx_depth: 0,
+          };
+        }
+        helixU = {
+          ...helixU, u_hx_len: len, u_hx_phase: hxPhase, u_hx_kick: hxKick, u_hx_third: hxThird, u_hx_burst: hxBurst,
+          u_hx_flow: len * (0.06 + 0.2 * speedEnv), u_hx_pluck: pl, u_hx_pluck_count: 4,
+        };
+      }
 
       // ── 1. Update particles ──
       gl.disable(gl.BLEND);
@@ -525,7 +640,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       gl.viewport(0, 0, side, rows);
       gl.useProgram(prog.update.prog);
       setUniforms(gl, prog.update, {
-        ...common,
+        ...common, ...helixU,
         u_stateA: state.read.tex[0], u_stateB: state.read.tex[1],
         u_dt: Math.min(ctx.dt, 1 / 30), u_init: needsInit ? 1 : 0, u_intensity: ctx.intensitySmoothed,
         u_fade: ctx.fadeInOut, u_speed: kind === 'warp' ? warpSpeed : 0.5 + speedEnv * 1.3,
@@ -543,7 +658,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       bindTarget(gl, accum!);
       gl.enable(gl.BLEND);
       gl.useProgram(fill.prog);
-      const decay = Math.pow(depth && kind === 'wisp' ? WISP_DEPTH_DECAY : cfg.decay, ctx.dt * 60);
+      const decay = Math.pow(depth && kind === 'wisp' ? WISP_DEPTH_DECAY : helix ? HX_DECAY : cfg.decay, ctx.dt * 60);
       gl.blendFunc(gl.ZERO, gl.CONSTANT_ALPHA);
       gl.blendColor(0, 0, 0, decay);
       setUniforms(gl, fill, { u_color: [0, 0, 0, 0] });
@@ -571,7 +686,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         ...depthU,
         ...common,
         u_stateA: state.read.tex[0], u_stateB: state.read.tex[1], u_side: side,
-        u_point: cfg.point * Math.max(1, ctx.height / 1080), u_gain: cfg.gain * (kind === 'silk' ? 0.6 + 0.8 * ctx.fadeInOut
+        u_point: cfg.point * Math.max(1, ctx.height / 1080), u_gain: cfg.gain * (helix ? HX_GAIN : 1) * (kind === 'silk' ? 0.6 + 0.8 * ctx.fadeInOut
           // Warp: longer streaks at speed cover more screen; keep brightness even.
           : kind === 'warp' ? Math.min(1.5, Math.max(0.4, Math.sqrt(7 / Math.max(warpSpeed, 0.1)))) : 1),
         u_sparkle: sparkle, u_res: [ctx.width, ctx.height],
@@ -648,6 +763,11 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
 
     setVariant(id: string): void {
       if (kind === 'wisp') variant = id === 'tunnel' ? 'tunnel' : 'ground';
+      else if (kind === 'silk') {
+        const v = id === 'helix' ? 'helix' : 'silk';
+        if (v !== variant) needsInit = true;
+        variant = v;
+      }
     },
 
     getVariant(): string {
@@ -661,6 +781,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       gl.deleteProgram(p.render.prog);
       gl.deleteProgram(p.display.prog);
       if (pd) { gl.deleteProgram(pd.render.prog); gl.deleteProgram(pd.display.prog); }
+      for (const x of Object.values(ph)) { gl.deleteProgram(x.update.prog); gl.deleteProgram(x.render.prog); gl.deleteProgram(x.display.prog); }
       if (tunnelProg) gl.deleteProgram(tunnelProg.prog);
       if (histTex) gl.deleteTexture(histTex);
       gl.deleteProgram(fill.prog);

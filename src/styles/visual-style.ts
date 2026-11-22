@@ -25,6 +25,7 @@ import type { EventState, SonoraEvent } from '../engine/events';
 import type { FlashGuard } from '../engine/flash-guard';
 import type { GenerativeState } from '../engine/generative';
 import type { QualityParams } from '../engine/quality';
+import { SHOW_12 } from '../app/release';
 
 export type StyleId = 'ink' | 'silk' | 'wisp' | 'warp' | 'voyage' | 'aura' | 'halo';
 export type StyleCategory = 'art' | 'classic';
@@ -47,7 +48,7 @@ export const STYLE_VARIANTS: Record<StyleId, VariantOption[]> = {
     { id: 'marble', label: 'Marble' },
     { id: 'sumi', label: 'Sumi', defaultLight: true },
   ],
-  silk: [{ id: 'silk', label: 'Silk' }],
+  silk: [{ id: 'silk', label: 'Silk' }, ...(SHOW_12 ? [{ id: 'helix', label: 'Helix' }] : [])],
   // Wisp's looks apply to its Depth view only (Flat is one look).
   wisp: [
     { id: 'ground', label: 'Ground', lightCapable: false },

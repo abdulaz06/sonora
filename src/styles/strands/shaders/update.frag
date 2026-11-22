@@ -36,6 +36,23 @@ uniform float u_ember_kick;    // Wisp Depth Ground: beat envelope that stirs th
 uniform float u_gather;
 uniform float u_burst;
 uniform float u_form;
+#ifdef HELIX
+// Silk Helix: threads ride twisted strands around an axis; glints orbit it.
+uniform vec2 u_hx_origin;      // axis centre (Flat: world) / foot on the ground (Depth: sim units)
+uniform vec2 u_hx_dir;         // Flat: axis direction (unit)
+uniform float u_hx_len;        // half the axis length (world / height units)
+uniform float u_hx_radius;
+uniform float u_hx_twist;      // radians per unit along the axis
+uniform float u_hx_phase;      // rotation phase (twist speed rides intensity)
+uniform float u_hx_third;      // 0..1: third strand (drops)
+uniform float u_hx_burst;      // drop: the helix unwinds outward, then re-forms
+uniform float u_hx_flow;       // threads travel along their strand (units/s)
+uniform vec4 u_hx_pluck[4];    // kick plucks: axis position, age, strength
+uniform int u_hx_pluck_count;
+uniform float u_hx_depth;      // 1 in the Depth view
+uniform float u_hx_hc;
+uniform float u_hx_kick;       // bass-hit envelope         // Depth: height of the column's centre (on the camera's line of sight)
+#endif
 layout(location = 0) out vec4 outA;
 layout(location = 1) out vec4 outB;
 //#include noise
@@ -50,6 +67,73 @@ void main() {
   vec2 half_ = vec2(u_view * 0.5 * u_aspect, u_view * 0.5);
 
   bool respawn = u_init > 0.5 || age > life;
+
+#ifdef HELIX
+  // Positions are a function of the particle's seed, its age and the shared
+  // helix state, so threads stay exactly on their strands (no drift).
+  if (respawn) {
+    seed = rand4(uvec2(id), 5u).x;
+    age = u_init > 0.5 ? -r.w * 2.0 : 0.0;
+    life = 2.5 + r.y * 4.5;
+    kind = fract(seed * 977.0) < 0.008 ? 1.0 : 0.0;
+  }
+  {
+    const float PI = 3.14159265;
+    float h1 = fract(seed * 13.17), h2 = fract(seed * 71.31), h3 = fract(seed * 5.77), h4 = fract(seed * 191.3);
+    float a = max(age, 0.0);
+    float L = u_hx_len;
+    vec2 perp = vec2(-u_hx_dir.y, u_hx_dir.x);
+    float s, phi, R, wgt = 1.0;
+    if (kind < 0.5) {
+      float k = floor(h1 * 3.0);
+      // Each strand is a ribbon of hair-thin threads (quantised lanes).
+      float lane = (floor(h2 * 14.0) + 0.5) / 14.0 - 0.5;
+      s = mod(h3 * 2.0 * L + a * u_hx_flow * (0.6 + 0.8 * h4), 2.0 * L) - L;
+      float off = k < 0.5 ? 0.0 : k < 1.5 ? mix(PI, 2.0 * PI / 3.0, u_hx_third) : mix(PI, 4.0 * PI / 3.0, u_hx_third);
+      if (k > 1.5) wgt = u_hx_third;
+      phi = u_hx_phase + s * u_hx_twist * (1.0 - 0.8 * u_hx_burst) + off + lane * 0.38;
+      R = u_hx_radius * (1.0 + lane * 0.22);
+      // Hourglass: the strands pinch where they cross near the middle.
+      float pinch = sin(u_hx_phase * 0.13) * 0.25 * L;
+      R *= 0.42 + 0.68 * smoothstep(0.0, 0.85 * L, abs(s - pinch));
+      for (int i = 0; i < 4; i++) {
+        if (i >= u_hx_pluck_count) break;
+        vec4 pl = u_hx_pluck[i];
+        float d = abs(s - pl.x);
+        float front = pl.y * 1.8 * L;
+        R *= 1.0 + pl.z * 0.55 * exp(-pow((d - front) / (0.1 * L), 2.0)) * exp(-pl.y / 0.55);
+      }
+    } else {
+      // Glints: short dashes circling the axis.
+      s = (h3 * 2.0 - 1.0) * L * 0.9;
+      // Thick near the strands, thinning outward (no visible edge).
+      R = u_hx_radius * (1.05 + (u_hx_depth > 0.5 ? 0.9 : 1.4) * h1 * h1);
+      phi = h2 * 6.2832 + a * (0.7 + 1.3 * h4) * (h1 < 0.5 ? 1.0 : -1.0) + u_hx_phase * 0.6;
+    }
+    // Kicks breathe the whole helix out a little (large, frame-accurate motion).
+    R *= 1.0 + u_hx_kick * 0.16;
+    // Drop: every thread flies out by its own amount, then eases back.
+    R *= 1.0 + u_hx_burst * (0.5 + 1.7 * h4);
+    // Ends of the axis fade (no hard cut where the strands leave the frame).
+    wgt *= smoothstep(L, L * 0.75, abs(s));
+    if (u_hx_depth > 0.5) {
+      A.xy = u_hx_origin + R * vec2(sin(phi), cos(phi));
+      A.z = s + u_hx_hc;
+      A.w = wgt;
+    } else {
+      float across = R * sin(phi);
+      // Glints draw circles in the picture (seen a little from above).
+      float along = kind > 0.5 ? R * 0.42 * cos(phi) : 0.0;
+      A.xy = u_hx_origin + u_hx_dir * (s + along) + perp * across;
+      // Front threads brighter than the ones behind the axis.
+      A.z = 0.45 + 0.55 * (0.5 + 0.5 * cos(phi));
+      A.w = wgt;
+    }
+    outA = A;
+    outB = vec4(age + dt, life, seed, kind);
+    return;
+  }
+#endif
 
 #if VARIANT == 4
   // ── Warp: particles in a tunnel rushing toward the camera (z → 0) ──
