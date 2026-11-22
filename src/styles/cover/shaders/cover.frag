@@ -93,7 +93,10 @@ void main() {
   vec2 dq = abs(hq) - vec2(u_size);
   float d = length(max(dq, 0.0)) + min(max(dq.x, dq.y), 0.0);
   // The halo answers each kick on the hit frame (local: the page itself never pulses).
-  float halo = exp(-max(d, 0.0) / (0.06 + 0.07 * u_kick)) * (0.45 + 0.45 * u_kick);
+  // On paper the shadow stays tight (its skirt greyed the whole page on every kick).
+  float halo = u_light > 0.5
+    ? exp(-max(d, 0.0) / (0.045 + 0.025 * u_kick)) * (0.45 + 0.5 * u_kick) * smoothstep(0.2, 0.04, d)
+    : exp(-max(d, 0.0) / (0.06 + 0.07 * u_kick)) * (0.45 + 0.45 * u_kick);
   col = u_light > 0.5 ? mix(col, u_halo, halo * 0.6) : col + u_halo * halo * 0.5;
   // Swept copies (premultiplied).
   vec4 fb = texture(u_fb, uv);
