@@ -39,6 +39,13 @@
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Local-only media (songs, exports, recordings, masters): `local-media/` (git-ignored). Render scratch outside OneDrive.
 
+## Shipped (after "Ship 1.1 without 1.2")
+- **Release:** [v1.1.0](https://github.com/abdulaz06/sonora/releases/tag/v1.1.0), published 2026-11-22 22:33 UTC by the release workflow from branch `release-1.1` (tag `v1.1.0` on `28adf78`): 1.0.2 plus the 1.1 commits only (cherry-picked: no filters, Silk Helix, Stage or other 1.2 work), with the owner's LICENSE notice update and the harness-port chore. Assets: `sonora_1.1.0_x64-setup.exe` (28.3 MB), `sonora_1.1.0_x64_en-US.msi` (29.6 MB), each with its `.sig`, and `latest.json` (version 1.1.0; signatures equal the `.sig` files; key id EB16D8600B108A21 = the app's updater pubkey). Notes: `DOCS/release-notes/v1.1.0.md`.
+- **Release branch checks:** `tsc`, clippy clean; `npm test` 52 passed; every non-Voyage style pixel-identical to 1.0.2 (Ink Glow Depth / Flat, Marble Depth, Sumi Flat, Silk Flat / Depth, Wisp Flat / Ground / Tunnel, Warp: 120 / 120 frames, `verify/gates-1.1/identical-release.log`).
+- **Website:** production deployed from `release-1.1` (`site` workflow, `workflow_dispatch`): Download buttons "v1.1.0 · 28.3 MB · Windows 10 / 11", `/download` → the 1.1.0 installer (302); new **make videos** section (a 16:9 Voyage City and a 9:16 styles tour, rendered by Export from the demo track, corner mark visible; ~2 MB each, loaded and played only on screen); README "What's new in 1.1". Lighthouse on production: landing 100 / 100 (desktop / mobile), /live 99 / 100. `test:live` 321 / 321 (local) and passed in the deploy.
+- **`main`:** `release-1.1` merged back (`-s ours`: main already held the 1.1 commits), then the version bump to 1.1.0 and the notes.
+- **For the 1.2 session:** the site has failed to build from `main` since the 1.2 styles joined `ART_STYLES` (`site/src/pages/index.astro` maps `ART_STYLES` to `SCENES[id].options`, undefined for the new styles), so production deploys from `main` (pushes, releases, the daily refresh) fail and the live site stays the 1.1 build until that's fixed.
+
 ## Summary (review stop: waiting for Abdul)
 
 Review page: `verify/review-1.1/index.html` (every file below, with paths).
