@@ -80,6 +80,7 @@ pub fn start_capture_on(
 
     let sample_rate = config.sample_rate().0;
     let channels = config.channels() as usize;
+    crate::out::record::RATE.store(sample_rate, Ordering::Relaxed);
     let stream_config: cpal::StreamConfig = config.config();
 
     let stream = device
@@ -92,6 +93,9 @@ pub fn start_capture_on(
                     let mono: f32 = chunk.iter().sum::<f32>() / channels as f32;
                     buf.write_one(mono);
                 }
+                // The capture clock (and the recording, when armed) under the same lock,
+                // so a frame's clock always matches the samples it analysed.
+                crate::out::record::on_capture(data, channels);
             },
             move |err| {
                 eprintln!("Audio stream error: {err}");

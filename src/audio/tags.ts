@@ -2,7 +2,8 @@
  * Title, artist, album and the embedded cover from an audio file, for the web
  * page's now playing and album colours: MP3 (ID3v2 APIC / PIC and text
  * frames), M4A / MP4 (iTunes `covr`, ©nam, ©ART, ©alb) and FLAC (PICTURE and
- * VORBIS_COMMENT blocks). Everything is read in the browser; nothing is sent.
+ * VORBIS_COMMENT blocks), Ogg Vorbis / Opus (comment header, with
+ * METADATA_BLOCK_PICTURE). Everything is read on the device; nothing is sent.
  */
 
 export interface FileTags {
@@ -21,6 +22,7 @@ export function readTags(buf: ArrayBuffer): FileTags {
     if (b.length > 10 && str(b, 0, 3) === 'ID3') return readId3(b);
     if (b.length > 4 && str(b, 0, 4) === 'fLaC') return readFlac(b);
     if (b.length > 12 && str(b, 4, 4) === 'ftyp') return readMp4(b);
+    if (b.length > 27 && str(b, 0, 4) === 'OggS') return readOgg(b);
   } catch { /* a broken tag never stops playback */ }
   return {};
 }
@@ -120,15 +122,60 @@ function readFlac(b: Uint8Array): FileTags {
         if (k === 'TITLE') out.title = v; else if (k === 'ARTIST') out.artist = v; else if (k === 'ALBUM') out.album = v;
       }
     } else if (type === 6 && len < MAX_PICTURE) {
-      const pt = u32(d, 0);
-      let p = 4;
-      const ml = u32(d, p); p += 4;
-      const mime = str(d, p, ml); p += ml;
-      const dl = u32(d, p); p += 4 + dl + 16;
-      const n = u32(d, p); p += 4;
-      if (!out.picture || (pt === 3 && picType !== 3)) { out.picture = { mime, data: d.subarray(p, p + n) }; picType = pt; }
+      const pic = flacPicture(d);
+      if (!out.picture || (pic.type === 3 && picType !== 3)) { out.picture = { mime: pic.mime, data: pic.data }; picType = pic.type; }
     }
     if (last) break;
+  }
+  return out;
+}
+
+/** A FLAC PICTURE block (also Ogg's METADATA_BLOCK_PICTURE). */
+function flacPicture(d: Uint8Array): { type: number; mime: string; data: Uint8Array } {
+  const type = u32(d, 0);
+  let p = 4;
+  const ml = u32(d, p); p += 4;
+  const mime = str(d, p, ml); p += ml;
+  const dl = u32(d, p); p += 4 + dl + 16;
+  const n = u32(d, p); p += 4;
+  return { type, mime, data: d.subarray(p, p + n) };
+}
+
+/** Ogg: the second packet is the comment header ('vorbis' or 'OpusTags'). */
+function readOgg(b: Uint8Array): FileTags {
+  const out: FileTags = {};
+  // Reassemble the first packets from the pages' lacing.
+  const packets: Uint8Array[] = [];
+  let cur: number[] = [];
+  let o = 0;
+  while (o + 27 <= b.length && packets.length < 2 && str(b, o, 4) === 'OggS') {
+    const segs = b[o + 26];
+    let p = o + 27 + segs;
+    for (let i = 0; i < segs; i++) {
+      const l = b[o + 27 + i];
+      for (let k = 0; k < l; k++) cur.push(b[p + k]);
+      p += l;
+      if (l < 255) { packets.push(Uint8Array.from(cur)); cur = []; if (packets.length >= 2) break; }
+      if (cur.length > MAX_PICTURE * 1.4) return out;
+    }
+    o = p;
+  }
+  const c = packets[1];
+  if (!c) return out;
+  const start = str(c, 0, 8) === 'OpusTags' ? 8 : str(c, 1, 6) === 'vorbis' ? 7 : -1;
+  if (start < 0) return out;
+  const le = (x: number): number => (c[x] | (c[x + 1] << 8) | (c[x + 2] << 16) | (c[x + 3] << 24)) >>> 0;
+  let p = start + 4 + le(start);
+  const n = le(p); p += 4;
+  for (let i = 0; i < n && p + 4 <= c.length; i++) {
+    const l = le(p); p += 4;
+    const kv = new TextDecoder().decode(c.subarray(p, p + l)); p += l;
+    const eq = kv.indexOf('=');
+    const k = kv.slice(0, eq).toUpperCase(), v = kv.slice(eq + 1).trim();
+    if (k === 'TITLE') out.title = v; else if (k === 'ARTIST') out.artist = v; else if (k === 'ALBUM') out.album = v;
+    else if (k === 'METADATA_BLOCK_PICTURE' && !out.picture) {
+      try { const bin = Uint8Array.from(atob(v), (ch) => ch.charCodeAt(0)); const pic = flacPicture(bin); out.picture = { mime: pic.mime, data: pic.data }; } catch { /* broken picture */ }
+    }
   }
   return out;
 }

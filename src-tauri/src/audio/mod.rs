@@ -29,6 +29,15 @@ const WATCHDOG_MS: u128 = 3000;
 /// instead of freezing on the last frame.
 const SILENCE_FILL_MS: u128 = 120;
 
+/// An analysis frame with the capture clock at the end of its window (sample
+/// frames since start; recordings time the picture by it).
+#[derive(serde::Serialize)]
+struct Stamped<'a, F: serde::Serialize> {
+    #[serde(flatten)]
+    frame: &'a F,
+    clock: u64,
+}
+
 /// Start the audio capture and processing pipeline.
 pub fn start(app_handle: tauri::AppHandle, device_state: Arc<DeviceState>) {
     std::thread::spawn(move || {
@@ -113,16 +122,24 @@ fn run_pipeline(
             && now.duration_since(last_fill).as_millis() >= 16
         {
             // Nothing arriving: analyse silence at the normal hop rate.
-            buffer.lock().write_slice(&silence[..hop.min(silence.len())]);
+            {
+                let mut b = buffer.lock();
+                b.write_slice(&silence[..hop.min(silence.len())]);
+                crate::out::record::on_silence(hop.min(silence.len()));
+            }
             last_fill = now;
             new_count = hop;
         }
         if new_count < hop {
             continue;
         }
-        buffer.lock().read_latest(analysis.window_mut());
+        let clock = {
+            let mut b = buffer.lock();
+            b.read_latest(analysis.window_mut());
+            crate::out::record::CLOCK.load(Ordering::Relaxed)
+        };
         let frame = analysis.analyze();
-        let _ = app_handle.emit("audio-frame", &frame);
+        let _ = app_handle.emit("audio-frame", &Stamped { frame: &frame, clock });
     }
 }
 

@@ -372,6 +372,10 @@ async function desktopPlatform(settings: PersistedSettings, persist: () => void)
       } catch (err) { console.warn('Could not move the output:', err); }
     },
     outputMonitor: async () => { try { return (await currentMonitor())?.name ?? ''; } catch { return ''; } },
+    async videoIo() {
+      const d = await import('./export/desktop-io');
+      return { sink: (name) => d.desktopSink(name), aac: (sr, ch, kbps) => d.openAac(sr, ch, kbps), reveal: (path) => { void d.revealFile(path); } };
+    },
   };
 }
 

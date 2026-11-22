@@ -163,6 +163,8 @@ export const SHORTCUTS: [string[], string][] = [
   [['1–9'], 'Palettes'],
   [['A'], 'Album colours on / off'],
   [['R'], 'Controller on a second screen (desktop)'],
+  [['E'], 'Export a video from a song (desktop)'],
+  [['F9'], 'Record the visual with the sound (desktop)'],
   [['D'], 'Audio signals (advanced)'],
   [['P'], 'Show / hide FPS'],
 ];

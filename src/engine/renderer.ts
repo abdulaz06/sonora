@@ -118,6 +118,8 @@ export interface RendererOptions {
   preserveDrawingBuffer?: boolean;
   /** Cap on devicePixelRatio for the backing store (website canvases; default: none). */
   maxPixelRatio?: number;
+  /** Keep the canvas at the size it was given (exports render off-screen at a fixed size). */
+  fixedSize?: boolean;
 }
 
 export interface Renderer {
@@ -209,7 +211,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
 
   // ── Post pipelines ──
   const maxPixelRatio = options.maxPixelRatio ?? Infinity;
-  sizeCanvas(canvas, maxPixelRatio);
+  if (!options.fixedSize) sizeCanvas(canvas, maxPixelRatio);
   const legacyPost = new PostProcessPipeline(
     gl,
     buildProgram(gl, fullscreenVertSrc, postBloomFragSrc),
@@ -295,7 +297,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     const dt = Math.min(Math.max(rawDt, 0), MAX_DT);
     time += dt;
     blackLevel = blackout ? Math.max(0, blackLevel - dt / BLACKOUT_FADE_S) : Math.min(1, blackLevel + dt / BLACKOUT_FADE_S);
-    sizeCanvas(canvas, maxPixelRatio);
+    if (!options.fixedSize) sizeCanvas(canvas, maxPixelRatio);
 
     // Crossfade between styles
     const fadeRate = 2 / STYLE_FADE_SECONDS;
