@@ -3,6 +3,14 @@
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Local-only media (songs, exports, recordings, masters): `local-media/` (git-ignored). Render scratch outside OneDrive.
 
+## Progress (resume here)
+- **Done:** A1–A3, B1–B2, E1 (pushed). Export screen works in the app; recording works (HUD, F9, tray, controller, settings).
+- **Measured:** export 1080p60 Ink Glow Depth 51 fps incl. warm-up (0.85× real time), Voyage Void 30 fps; exports deterministic (frame hashes equal over 3–5 runs); export A/V sync 39/39 clicks within a frame (−16.5…0 ms); recording sync 30/30 within a frame (−16.9…+16.5 ms); recording pacing at 180 Hz: 0 held frames, worst 5.8 ms, capture 0.19 ms/frame; /live Lighthouse desktop 47 → 95, mobile 100; `test:live` 321/321.
+- **Voyage before** (D1): `verify/voyage-1.1/before/` stills (palettes 0,2,3,6,7 × t 20/62/92), clips at 89 s, `cost.json` (1080p ms, City low/med/high ≈ 1.4–1.9 / 2.8–3.6 / 9.2–12.8; Ocean ≈ 1.7–2.0 / 3.7–4.2 / 10.5–13.1).
+- **D2 in progress:** sources downloaded to `local-media/textures-src/` (git-ignored): Poly Haven CC0 aerial_grass_rock (+nor), aerial_mud_1, aerial_rocks_02 (+nor), snow_field_aerial, aerial_beach_01, aerial_asphalt_01 (2k jpg, dl.polyhaven.org); ambientCG CC0 Ground037 1K; USGS NAIP (public domain, imagery.nationalmap.gov USGSNAIPImagery exportImage, bboxes in `naip/sources.txt`): farm-lancaster, farm-east, farm-amish, forest-vermont, town-phila (shore retry pending). Tooling chosen: `ktx2-encoder` (MIT, Basis encoder wasm, Apache-2.0) for KTX2 at build time; Basis transcoder (three.js `examples/jsm/libs/basis`, Apache-2.0, 527 KB wasm) at runtime in a worker. Not using the third-party `basisu.exe`.
+- **Next:** texture build script + `ASSETS.md`; KTX2 loader (worker transcode → BC7/S3TC, mips, anisotropy; loads only when City/Ocean shows, not in the site prewarm worker; harness `configure` awaits it); backdrop rewrite (NAIP-driven farmland regions with canopy heights from imagery, forest canopy, heightfield soft shadows + AO, GGX, scattering haze, palette in sun/sky/haze/lights; Gerstner water with Fresnel, SSS, fold/shore foam, depth colour, glints); budgets; palette metric recalibration for City/Ocean; after-captures; `npm run media`. Then A4 album-art/outro/cinematic export checks, A6 installer size, C2, full gates, review page.
+- Dev app for checks: `bash scripts/app/dev.sh` (own WebView2 profile, CDP :9333; `SONORA_FAKE_CAPTURE=<wav>` for silent sync checks). Checks: `scripts/app/export-check.mjs [--sync|--twice]`, `scripts/app/rec-check.mjs`, `scripts/app/export-ui.mjs <song>`.
+
 ## Checklist
 - [ ] 0. Baseline: gates and numbers before 1.1 (cost, sync, flicker, motion, Lighthouse /live + landing, installer size); Voyage before stills and clips
 - [x] A1. Shared modules: analysis, window picking, bar snapping, cut plans, strip, overlays → `src/export/`; studio uses them and still works
@@ -16,7 +24,7 @@
 - [ ] B3. A/V sync check with a click track in the harness (≤ 1 frame); pacing with recording on (no held frames), cost logged
 - [ ] C1. Title card (reel / cinematic), text overlays (timing, bar snap, position, size, style), now-playing card; fonts (brand + OFL, licences)
 - [ ] C2. Safe zones respected; preview = render
-- [ ] D1. Voyage before: stills (palettes × lights), wide-shot clips, frame times per preset
+- [x] D1. Voyage before: stills (palettes × lights), wide-shot clips, frame times per preset
 - [ ] D2. Assets (CC0 / public domain) → KTX2/Basis, `ASSETS.md`, lazy loading on the site
 - [ ] D3. City: irregular farmland, forests, roads, hedgerows, farm buildings; buildings, streets, parks, windows
 - [ ] D4. Lighting: GGX, heightfield soft shadows, AO, atmospheric scattering; palette lives in the light
