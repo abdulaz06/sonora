@@ -371,7 +371,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       drawQuad(gl, quadVAO);
       const post = ctx.post;
       if (light) { post.tonemap = 'none'; post.bloom = 0; post.vignette = 0.12; }
-      else { post.bloom = 0.7; post.bloomThreshold = 0.8; post.vignette = 0.35; post.exposure = 0.82; }
+      else { post.bloom = 0.7; post.bloomThreshold = 0.8; post.vignette = 0.35; post.exposure = 0.76; }
     },
 
     setQuality(q: QualityParams): void { quality = q; },

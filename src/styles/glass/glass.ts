@@ -206,7 +206,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       const post = ctx.post;
       post.bloom = 0.5;
       post.bloomThreshold = 1.0;
-      post.exposure = look === 'chrome' ? 0.66 : 1;
+      post.exposure = look === 'chrome' ? 0.62 : 1;
       post.vignette = 0.3;
     },
 
