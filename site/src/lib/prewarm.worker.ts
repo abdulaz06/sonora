@@ -23,7 +23,7 @@ self.onmessage = async (e: MessageEvent<Job>) => {
     const off = new OffscreenCanvas(width, height) as OffscreenCanvas & { clientWidth: number; clientHeight: number };
     off.clientWidth = width;
     off.clientHeight = height;
-    const r = initRenderer(off as unknown as HTMLCanvasElement, { autoStart: false, seed: 1234, maxPixelRatio: 1 });
+    const r = initRenderer(off as unknown as HTMLCanvasElement, { autoStart: false, seed: 1234, maxPixelRatio: 1, loadAssets: false });
     const gl = off.getContext('webgl2') as WebGL2RenderingContext;
     const px = new Uint8Array(4);
     for (const s of scenes) {

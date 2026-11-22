@@ -141,7 +141,7 @@ export function setUniforms(
     if (loc === undefined || loc === null) continue;
     if (v instanceof WebGLTexture) {
       gl.activeTexture(gl.TEXTURE0 + unit);
-      gl.bindTexture(gl.TEXTURE_2D, v);
+      gl.bindTexture(p.types[k] === gl.SAMPLER_2D_ARRAY ? gl.TEXTURE_2D_ARRAY : gl.TEXTURE_2D, v);
       gl.uniform1i(loc, unit);
       unit++;
     } else if (typeof v === 'boolean' || typeof v === 'number') {

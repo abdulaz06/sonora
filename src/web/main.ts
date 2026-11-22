@@ -56,7 +56,7 @@ export interface HarnessApi {
   analyseOnly(seconds: number): number;
   /** Canvas as a data URL (PNG by default; 'image/jpeg' for videos). */
   snapshot(type?: string, quality?: number): string;
-  configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string; responsiveness?: number; debug?: Partial<DebugFlags> }): void;
+  configure(opts: { style?: StyleId; variant?: string; depth?: boolean; light?: LightMode; quality?: QualityPreset; palette?: number; drift?: boolean; camera?: string; responsiveness?: number; debug?: Partial<DebugFlags> }): Promise<void>;
   /** Fire a trackChange with a title (as a media session would). */
   seedText(title: string): void;
   time(): number;
@@ -357,6 +357,8 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       if (o.responsiveness !== undefined) renderer.setResponsiveness(o.responsiveness);
       const preset = (o.style ? presetsFor(o.style) : CAMERA_PRESETS).find((p) => p.id === o.camera);
       if (preset) renderer.camera.setView(preset.view);
+      // Looks with texture assets (Voyage City) are loaded before the first frame.
+      return renderer.ready();
     },
     lumaTrace(seconds: number, dt: number): number[] {
       return this.exposureTrace(seconds, dt).luma;

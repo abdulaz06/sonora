@@ -186,6 +186,7 @@ export async function renderExport(
         r.setQuality('high');
         r.setLightMode('auto');
         applyShot(r, sh, s.albumPalette, false);
+        await r.ready();
         const unsub = source.subscribe((f) => r.pushFrame(f));
         source.loadOffline(song.mono, sr);
         const tStart = W0 + k0 / fps;

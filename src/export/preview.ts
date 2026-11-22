@@ -82,6 +82,7 @@ export function createPreview(host: HTMLElement): Preview {
       src.loadOffline(song.mono, song.sampleRate);
       const W0 = plan.window.start;
       applyShot(r, plan.shots[0], album, true);
+      await r.ready();
       const warm = Math.min(PREVIEW_WARM_S, W0);
       src.stepOffline(W0 - warm);
       for (let i = 0; i < warm * 60; i++) { src.stepOffline(1 / 60); r.step(1 / 60); }
