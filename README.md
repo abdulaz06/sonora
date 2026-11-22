@@ -27,6 +27,14 @@ Five art styles, each with its own looks and views. Every frame below is a real 
 
 Looks: Ink (Glow, Marble, Sumi), Wisp Depth (Ground, Tunnel), Voyage (Void, City, Ocean). Views: **Depth** (a 3D camera that glides, banks on beats and lurches on drops) or **Flat** (a 2D canvas) for Ink, Silk and Wisp. Aura and Halo from v0.1 live under *Show classic styles*.
 
+## What’s new in 1.1
+
+- **Make videos.** Export (home menu, tray or `E`) turns a song into a video of sonora reacting to it: pick a moment on the song strip (bars, drops, three suggestions) or the whole track, a style, a styles tour, a beat switch or a showcase, 16:9 / 9:16 / 1:1 / 4:5 up to 4K at 30 or 60 fps. Rendered frame by frame in the song’s time (a slower PC just takes longer), hardware H.264 with Windows’ own AAC, into `Videos\sonora`. Every video carries a small sonora mark; an optional end card says where it came from.
+- **Text in videos.** A title card (a corner line or a cinematic card), your own lines with their own timing, place, size and font (four display fonts included), and the now-playing card; the preview shows exactly what renders.
+- **Record live.** `F9` (or the HUD, tray, controller) records the visual itself with the sound sonora hears, in sync within a frame, without slowing the visual.
+- **New Voyage worlds.** City is real aerial farmland, woods, towns and shores with soft shadows and haze; Ocean is a real sea with swells, foam and glints. The palette lives in the light: each one gives the world its own time of day.
+- **A faster browser demo:** the live page loads the styles as you open them.
+
 ## What’s new in 1.0.2
 
 - **Colours from your album art.** The visuals take their palette from the cover of what’s playing, fading to the new album’s colours on a track change. They stay vivid in every style (never muddy or grey); with no cover, an advert or a black-and-white cover your own palette stays. The Album tile comes first in every palette picker; `A` toggles it. The cover is analysed on your computer and never leaves it.
