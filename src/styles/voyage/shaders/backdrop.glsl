@@ -35,8 +35,10 @@ float fbm2(vec2 q) {
 vec4 heightSample(vec2 q) {
   return texture(u_height_tex, vec2(q.x / (6.2831853 * u_land_r), q.y / u_zspan + 0.5));
 }
-float vegH(vec2 q, vec4 L) { return u_hbaked > 0.5 ? heightSample(q).b : vegHRaw(q, L); }
-float groundH(vec2 q, vec4 L) { return u_hbaked > 0.5 ? heightSample(q).r : groundHRaw(q, L); }
+// The renderer only reads the bake (computing it here would inline the whole
+// layout into every march step and multiply the shader's compile time).
+float vegH(vec2 q, vec4 L) { return heightSample(q).b; }
+float groundH(vec2 q, vec4 L) { return heightSample(q).r; }
 
 // ── Light: the palette lives here ──
 vec3 normPeak(vec3 c) { return c / max(max(c.r, max(c.g, c.b)), 1e-3); }
@@ -173,34 +175,32 @@ float sdCity(vec3 pu, out vec4 info) {
 }
 
 // Everything that casts shadows (ground, vegetation, buildings).
-float shadowH(vec2 q) {
-  if (u_hbaked > 0.5) return heightSample(q).g;
-  vec4 L = landSample(q); return max(groundHRaw(q, L), L.b > 0.5 ? buildingH(q) : 0.0);
-}
+float shadowH(vec2 q) { return heightSample(q).g; }
 
 // Soft shadow marched through the heightfield toward the sun (unrolled frame).
 float softShadow(vec3 pu, vec3 Lu, float maxT) {
-  int n = Q == 2 ? 14 : Q == 1 ? 8 : 0;
+  // Loop bounds come from uniforms (D3D's compiler would unroll a constant bound).
+  int n = u_shadow_n;
   if (n == 0) return 1.0;
   float res = 1.0, t = 0.08;
-  for (int i = 0; i < 14; i++) {
-    if (i >= n || t > maxT) break;
+  float grow = Q == 2 ? 1.38 : 1.7;
+  for (int i = 0; i < n; i++) {
+    if (t > maxT) break;
     vec3 p = pu + Lu * t;
     float d = p.y - shadowH(p.xz);
     res = min(res, clamp(10.0 * d / t, 0.0, 1.0));
     if (res < 0.02) break;
-    t *= Q == 2 ? 1.38 : 1.7;
+    t *= grow;
   }
   return res * res * (3.0 - 2.0 * res);
 }
 
 // Horizon occlusion from the heightfield around q.
 float heightAO(vec2 q, float h0) {
-  int n = Q == 2 ? 6 : Q == 1 ? 4 : 0;
+  int n = u_ao_n;
   if (n == 0) return 1.0;
   float occ = 0.0;
-  for (int i = 0; i < 8; i++) {
-    if (i >= n) break;
+  for (int i = 0; i < n; i++) {
     float a = float(i) * 6.2831853 / float(n) + 0.4;
     float r = 0.35 + 0.5 * float(i & 1);
     vec2 d = vec2(cos(a), sin(a)) * r;
@@ -209,6 +209,12 @@ float heightAO(vec2 q, float h0) {
   return clamp(1.0 - occ / float(n) * 0.9, 0.25, 1.0);
 }
 
+vec4 hexTap(vec2 uv, vec2 dx, vec2 dy, vec2 v, float layer) {
+  vec2 h = cellHash(v);
+  float a = h.x * 6.2831853;
+  mat2 R = mat2(cos(a), -sin(a), sin(a), cos(a));
+  return textureGrad(u_tex_detail, vec3(R * uv + h * 7.0, layer), R * dx, R * dy);
+}
 // Hex-tiled sampling of a tiled material (three rotated, offset lookups blended),
 // so nothing visibly repeats; one lookup on Low / Medium.
 vec4 hexTex(vec2 uv, float layer) {
@@ -221,16 +227,8 @@ vec4 hexTex(vec2 uv, float layer) {
   vec2 v1, v2, v3;
   if (w.z > 0.0) { v1 = b; v2 = b + vec2(0, 1); v3 = b + vec2(1, 0); w = vec3(w.z, w.y, w.x); }
   else { v1 = b + 1.0; v2 = b + vec2(1, 0); v3 = b + vec2(0, 1); w = vec3(-w.z, 1.0 - w.y, 1.0 - w.x); }
-  vec4 acc = vec4(0.0); float wt = 0.0;
-  vec2 vs[3] = vec2[3](v1, v2, v3);
-  for (int i = 0; i < 3; i++) {
-    vec2 h = cellHash(vs[i]);
-    float a = h.x * 6.2831853;
-    mat2 R = mat2(cos(a), -sin(a), sin(a), cos(a));
-    vec4 c = textureGrad(u_tex_detail, vec3(R * uv + h * 7.0, layer), R * dx, R * dy);
-    float wi = pow(w[i], 6.0);
-    acc += c * wi; wt += wi;
-  }
+  vec4 acc = hexTap(uv, dx, dy, v1, layer) * pow(w.x, 6.0) + hexTap(uv, dx, dy, v2, layer) * pow(w.y, 6.0) + hexTap(uv, dx, dy, v3, layer) * pow(w.z, 6.0);
+  float wt = pow(w.x, 6.0) + pow(w.y, 6.0) + pow(w.z, 6.0);
   return acc / max(wt, 1e-4);
 }
 
@@ -301,7 +299,7 @@ Ground cityGround(vec2 q, vec4 L, float fp, vec3 nIn, vec3 nn) {
     float e = min(min(bl.x, BLOCK - bl.x), min(bl.y, BLOCK - bl.y));
     float street = 1.0 - step(STREET * 0.5, e);
     float walk = step(STREET * 0.5, e) * (1.0 - step(STREET * 0.5 + WALK, e));
-    vec3 asph = u_tex > 0.01 ? hexTex(q * 0.7, 5.0).rgb * 0.8 : vec3(0.13);
+    vec3 asph = u_tex > 0.01 ? texture(u_tex_detail, vec3(q * 0.7, 5.0)).rgb * 0.8 : vec3(0.13);
     vec3 pave = vec3(0.52, 0.51, 0.49) * (0.92 + 0.12 * vnoise(q * 6.0));
     // Centre lines (dashed) and zebra crossings near the junctions.
     vec2 sc = mod(q + BLOCK * 0.5, BLOCK) - BLOCK * 0.5;
@@ -314,7 +312,7 @@ Ground cityGround(vec2 q, vec4 L, float fp, vec3 nIn, vec3 nn) {
     vec2 bc = floor(q / BLOCK);
     if (cellHash(bc + 3.0).x < 0.09) {
       // Park: lawn and trees from the forest image.
-      vec3 lawn = (u_tex > 0.01 ? hexTex(q * 0.55, 0.0).rgb : vec3(0.22, 0.32, 0.14)) * vec3(0.85, 1.0, 0.8);
+      vec3 lawn = (u_tex > 0.01 ? texture(u_tex_detail, vec3(q * 0.55, 0.0)).rgb : vec3(0.22, 0.32, 0.14)) * vec3(0.85, 1.0, 0.8);
       ground = mix(ground, lawn, (1.0 - street) * (1.0 - walk));
     }
     col = mix(col, ground, smoothstep(0.5, 0.7, city));
@@ -323,47 +321,33 @@ Ground cityGround(vec2 q, vec4 L, float fp, vec3 nIn, vec3 nn) {
   return G;
 }
 
-// Gerstner-style waves on the unrolled surface: heights, normal, folding (foam).
-// Bands: (direction angle, wavelength, amplitude, steepness).
-vec4 waveBand(int i, float scale) {
-  // Two swell trains down the axis, then wind waves and chop across.
-  vec4 w[8] = vec4[8](vec4(0.08, 34.0, 1.7, 0.55), vec4(-0.28, 19.0, 0.85, 0.6), vec4(0.42, 11.0, 0.42, 0.7), vec4(-0.65, 6.3, 0.2, 0.75),
-                      vec4(0.95, 3.7, 0.1, 0.8), vec4(-1.2, 2.2, 0.055, 0.8), vec4(1.6, 1.3, 0.03, 0.8), vec4(-0.4, 0.8, 0.018, 0.8));
-  vec4 b = w[i];
-  return vec4(b.x, b.y * scale, b.z * scale, b.w);
-}
-// Height with the horizontal (Gerstner) displacement undone once, so crests sharpen.
-float waveH(vec2 q, int n, float scale) {
+// Gerstner-style waves on the unrolled surface. Bands (u_waves, from voyage.ts):
+// (direction angle, wavelength, amplitude, steepness); scale shrinks them (lakes).
+// Height with the horizontal (Gerstner) displacement undone once, so crests
+// sharpen; returns (height, d/d around, d/d along, folding). Loop bounds come
+// from the caller's uniform-derived count (no unrolling).
+vec4 waves(vec2 q, int n, float scale) {
   vec2 p = q;
-  for (int i = 0; i < 8; i++) {
-    if (i >= n) break;
-    vec4 b = waveBand(i, scale);
+  for (int i = 0; i < n; i++) {
+    vec4 b = u_waves[i];
     vec2 d = vec2(sin(b.x), cos(b.x));
-    float k = 6.2831853 / b.y, c = sqrt(9.8 * k) * 0.35;
+    float k = 6.2831853 / (b.y * scale), c = sqrt(9.8 * k) * 0.35;
     p -= d * (b.w / k) * cos(k * dot(d, q) - c * u_time) * 0.8;
   }
-  float h = 0.0;
-  for (int i = 0; i < 8; i++) {
-    if (i >= n) break;
-    vec4 b = waveBand(i, scale);
+  vec4 o = vec4(0.0);
+  for (int i = 0; i < n; i++) {
+    vec4 b = u_waves[i];
     vec2 d = vec2(sin(b.x), cos(b.x));
-    float k = 6.2831853 / b.y, c = sqrt(9.8 * k) * 0.35;
-    h += b.z * sin(k * dot(d, p) - c * u_time);
+    float k = 6.2831853 / (b.y * scale), c = sqrt(9.8 * k) * 0.35, A = b.z * scale;
+    float ph = k * dot(d, p) - c * u_time;
+    float s0 = sin(ph), c0 = cos(ph);
+    o.x += A * s0;
+    o.yz += A * k * c0 * d;
+    o.w += b.w * s0 * min(1.0, A * k * 1.4);
   }
-  return h;
+  return o;
 }
-// Folding: where the horizontal squeeze of the waves exceeds the surface (Jacobian < 1).
-float waveFold(vec2 q, int n, float scale) {
-  float j = 0.0;
-  for (int i = 0; i < 8; i++) {
-    if (i >= n) break;
-    vec4 b = waveBand(i, scale);
-    vec2 d = vec2(sin(b.x), cos(b.x));
-    float k = 6.2831853 / b.y, c = sqrt(9.8 * k) * 0.35;
-    j += b.w * sin(k * dot(d, q) - c * u_time) * min(1.0, b.z * k * 1.4);
-  }
-  return j;
-}
+float oceanMarchH(vec2 q) { return waves(q, u_wave_march, 1.0).x; }
 
 // Shading for any water surface. n: normal; depth 0 shallow … 1 deep; crest: wave height factor.
 vec3 shadeWater(vec3 n, vec3 rd, vec3 Lw, float depth, float crest, float foam, float fp, float shadow) {
@@ -402,8 +386,8 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   vec4 binfo = vec4(0.0);
   vec3 pu = vec3(0.0);
   vec4 L = vec4(0.0);
-  for (int i = 0; i < 112; i++) {
-    if (i >= u_land_steps || t > tGround) break;
+  for (int i = 0; i < u_land_steps; i++) {
+    if (t > tGround) break;
     pu = unroll(ro + rd * t);
     L = landSample(pu.xz);
     float dG = (pu.y - groundH(pu.xz, L)) * 0.45;
@@ -433,9 +417,14 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   if (mat == 2) {
     vec4 inf;
     float e = 0.01;
-    vec3 gu = vec3(sdCity(pu + vec3(e, 0, 0), inf) - sdCity(pu - vec3(e, 0, 0), inf),
-                   sdCity(pu + vec3(0, e, 0), inf) - sdCity(pu - vec3(0, e, 0), inf),
-                   sdCity(pu + vec3(0, 0, e), inf) - sdCity(pu - vec3(0, 0, e), inf));
+    // Tetrahedral gradient in one loop whose bound the compiler can't fold
+    // (one copy of sdCity instead of six).
+    vec3 gu = vec3(0.0);
+    int taps = 4 + min(u_q, 0);
+    for (int i = 0; i < taps; i++) {
+      vec3 k = vec3(float(((i + 3) >> 1) & 1), float((i >> 1) & 1), float(i & 1)) * 2.0 - 1.0;
+      gu += k * sdCity(pu + k * e, inf);
+    }
     vec3 nu = normalize(gu + vec3(0.0, 1e-6, 0.0));
     vec3 n = normalize(tA * nu.x + nIn * nu.y + zA * nu.z);
     float kind = floor(binfo.w / 100.0), base = binfo.w - kind * 100.0;
@@ -498,11 +487,9 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
     if (G.water > 0.01) {
       // Lakes and rivers: small wind waves and ripples (scaled-down wave bands).
       float fd = 1.0 - smoothstep(0.05, 0.5, fp);
-      int nb = Q == 2 ? 8 : Q == 1 ? 6 : 4;
       vec2 wq = pu.xz;
-      float we = max(0.03, fp * 0.4);
-      float w0 = waveH(wq, nb, 0.06), wx = waveH(wq + vec2(we, 0.0), nb, 0.06), wz = waveH(wq + vec2(0.0, we), nb, 0.06);
-      vec3 wn = normalize(nIn - (tA * (wx - w0) + zA * (wz - w0)) / we * fd);
+      vec4 wv = waves(wq, u_wave_n, 0.06);
+      vec3 wn = normalize(nIn - (tA * wv.y + zA * wv.z) * fd);
       float shoreFoam = smoothstep(0.5, 0.54, L.g) * (1.0 - smoothstep(0.56, 0.66, L.g)) * smoothstep(0.45, 0.7, vnoise(wq * 3.0 + u_time * 0.3)) * 0.8;
       float wsh = softShadow(vec3(pu.x, 0.0, pu.z), Lu, 10.0);
       vec3 wcol = shadeWater(wn, rd, Ls, G.depth, 0.0, shoreFoam, fp, wsh);
@@ -517,7 +504,6 @@ vec3 cityWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
 }
 
 // ── Ocean world: the cylinder covered by sea, swells rolling down the axis ──
-float oceanMarchH(vec2 q) { return waveH(q, 4, 1.0); }
 
 vec3 oceanWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   vec3 atm = atmosphere(rd) * mix(0.6, 1.0, u_light);
@@ -528,8 +514,8 @@ vec3 oceanWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   float t = max(cylExit(ro, rd, u_land_r - AMAX), 0.0);
   bool hit = false;
   vec3 pu;
-  for (int i = 0; i < 112; i++) {
-    if (i >= u_land_steps || t > tFar) break;
+  for (int i = 0; i < u_land_steps; i++) {
+    if (t > tFar) break;
     pu = unroll(ro + rd * t);
     float d = (pu.y - oceanMarchH(pu.xz)) * 0.5;
     float eps = max(pix * t * 0.6, 0.004);
@@ -549,13 +535,10 @@ vec3 oceanWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   vec3 Ls = normalize(nIn * SUN_UP + u_sun * SUN_ALONG);
   float fp = pix * t;
   // Normal from every band near the eye; the short bands fade out with distance (no shimmer).
-  int nb = fp < 0.03 ? 8 : fp < 0.08 ? 6 : fp < 0.2 ? 5 : 4;
-  if (Q == 0) nb = min(nb, 5);
-  float e = max(0.06, fp * 0.5);
-  float h0 = waveH(pu.xz, nb, 1.0);
-  float hx = waveH(pu.xz + vec2(e, 0.0), nb, 1.0) - h0;
-  float hz = waveH(pu.xz + vec2(0.0, e), nb, 1.0) - h0;
-  vec3 n = normalize(nIn - (tA * hx + zA * hz) / e);
+  int nb = min(u_wave_n, fp < 0.03 ? 8 : fp < 0.08 ? 6 : fp < 0.2 ? 5 : 4);
+  vec4 wv = waves(pu.xz, nb, 1.0);
+  float h0 = wv.x;
+  vec3 n = normalize(nIn - (tA * wv.y + zA * wv.z));
   // Fine ripples up close (normal only).
   float fd = 1.0 - smoothstep(0.02, 0.12, fp);
   if (fd > 0.0) {
@@ -565,7 +548,7 @@ vec3 oceanWorld(vec3 ro, vec3 rd, float pix, out float tHit) {
   }
   float crest = smoothstep(0.2, 1.6, h0);
   // Foam where the waves fold, streaked along the swell, fading as it ages.
-  float fold = waveFold(pu.xz, nb, 1.0);
+  float fold = wv.w;
   float streak = vnoise(pu.xz * vec2(1.4, 0.35) + vec2(0.0, -u_time * 0.6)) * 0.6 + vnoise(pu.xz * 3.2) * 0.4;
   float foam = smoothstep(0.5, 0.9, fold * 0.55 + crest * 0.35) * smoothstep(0.35, 0.75, streak);
   foam = mix(foam, foam * 0.6, smoothstep(0.1, 0.5, fp));
