@@ -73,6 +73,16 @@ const BACKDROP_INDEX: Record<Backdrop, number> = { void: 0, city: 1, ocean: 2 };
 const LAND_TEX = 2048;
 const LAND_ZSPAN = 240;
 const LAND_FOG = 0.0105;
+/** Wave bands for Ocean and the City's lakes: (direction angle, wavelength, amplitude, steepness).
+ * Two swell trains down the axis, then wind waves and chop across. */
+const WAVES = new Float32Array([
+  0.08, 34, 1.7, 0.55, -0.28, 19, 0.85, 0.6, 0.42, 11, 0.42, 0.7, -0.65, 6.3, 0.2, 0.75,
+  0.95, 3.7, 0.1, 0.8, -1.2, 2.2, 0.055, 0.8, 1.6, 1.3, 0.03, 0.8, -0.4, 0.8, 0.018, 0.8,
+]);
+/** Per quality: wave bands shaded, soft-shadow taps, horizon AO taps. */
+const WORLD_TAPS: Record<QualityLevel, { waves: number; shadow: number; ao: number }> = {
+  low: { waves: 5, shadow: 0, ao: 0 }, medium: { waves: 6, shadow: 8, ao: 4 }, high: { waves: 8, shadow: 14, ao: 6 },
+};
 /** City textures fade in over this long when they arrive mid-flight (s). */
 const TEX_FADE_S = 0.6;
 /** Wide shots: after this long without one (s), a calm moment also pulls out. */
@@ -539,7 +549,8 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     },
 
     render(ctx: StyleContext): void {
-      if (backdrop === 'city') { ensureLand(); void requestTextures(); if (tex || texFailed || !deps.loadAssets) ensureHeights(); }
+      // Heights are baked at once (plain), and again with the imagery when it arrives.
+      if (backdrop === 'city') { ensureLand(); void requestTextures(); ensureHeights(); }
       if (tex) texMix = Math.min(1, texMix + ctx.dt / TEX_FADE_S);
       ensure(ctx.width, ctx.height);
       const L = low!, H = hist!;
@@ -582,6 +593,8 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_shimmer: clamp01(0.6 * ctx.highPresence + 0.6 * ctx.highHits) * fade,
         u_fog: fogS, u_light: 0.45 + 0.55 * fade,
         u_tex: tex ? texMix : 0, u_q: quality.level === 'high' ? 2 : quality.level === 'medium' ? 1 : 0,
+        u_waves: WAVES, u_wave_n: WORLD_TAPS[quality.level].waves, u_wave_march: 4,
+        u_shadow_n: WORLD_TAPS[quality.level].shadow, u_ao_n: WORLD_TAPS[quality.level].ao,
         u_tex_detail: tex ? tex.detail : blankArray, u_tex_aerial: tex ? tex.aerial : blankArray,
         u_height_tex: heightTex && heightBakedWith !== 'none' ? heightTex.tex[0] : H.read.tex[0], u_hbaked: heightTex && heightBakedWith !== 'none' && backdrop === 'city' ? 1 : 0,
       });
