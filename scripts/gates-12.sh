@@ -29,9 +29,11 @@ if [ "$batch" = filters ]; then
       SONORA_FILTER=$f node scripts/verify.mjs --flicker --style $style --variant $look $vf --resp 1 --track dense-128 2>&1 | grep -E "swings|PASS|FAIL|rror" | sed "s/^/FLICKER $tag /" | tee -a "$log"
     done
   done
-  combos=""
-  for c in $DEFAULTS; do combos="$combos $c $c:glyph $c:reeded"; done
-  node scripts/cost.mjs $combos --q medium --rounds 2 2>&1 | grep -E "COST|exception" | tee -a "$log"
+  if [ -z "${NOCOST:-}" ]; then
+    combos=""
+    for c in $DEFAULTS; do combos="$combos $c $c:glyph $c:reeded"; done
+    node scripts/cost.mjs $combos --q medium --rounds 2 2>&1 | grep -E "COST|exception" | tee -a "$log"
+  fi
 fi
 
 if [ "$batch" = motion ]; then
@@ -52,7 +54,7 @@ fi
 
 if [ "$batch" = dt ]; then
   log="$out/dt.log"; : > "$log"
-  for c in silk:helix:flat stage:club:flat cymatics:stone:flat glass:bubbles:flat cover:cover:flat echo:glow:flat memory:forest:flat; do
+  for c in ${DT_COMBOS:-silk:helix:flat stage:club:flat cymatics:stone:flat glass:bubbles:flat cover:cover:flat echo:glow:flat memory:forest:flat}; do
     IFS=: read -r style look view <<< "$c"
     vf=""; [ "$view" = flat ] && vf="--flat"
     node scripts/verify.mjs --dt-sweep --style $style --variant $look $vf --track house-124 --start 44 --secs 4 2>&1 | grep -E "PASS|FAIL|seen|rise|drift|fine|pop|rror" | sed "s/^/DT $style $look $view /" | tee -a "$log"
