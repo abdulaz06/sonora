@@ -121,18 +121,20 @@
    "sep_min": 11.6
   },
   "voyage-city": {
-   "chroma_min": 0.0532,
-   "grey_max": 0.232,
-   "off_max": 0.25,
-   "olive_max": 0.094,
-   "sep_min": 12.5
+   "mode": "light",
+   "light_off_max": 0.15,
+   "light_chroma_min": 0.08,
+   "L_min": 0.35,
+   "L95_max": 0.85,
+   "_note": "1.1 (D89): realistic materials, the palette in the light. Calibrated on the 1.1 renders (all nine palettes: light off <= 8%, light chroma >= 0.095, L 0.44-0.48, L95 <= 0.70)."
   },
   "voyage-ocean": {
-   "chroma_min": 0.0532,
-   "grey_max": 0.216,
-   "off_max": 0.17,
-   "olive_max": 0.051,
-   "sep_min": 12.5
+   "mode": "light",
+   "light_off_max": 0.15,
+   "light_chroma_min": 0.08,
+   "L_min": 0.35,
+   "L95_max": 0.85,
+   "_note": "1.1 (D89): realistic materials, the palette in the light. Calibrated on the 1.1 renders (all nine palettes: light off <= 8%, light chroma >= 0.095, L 0.44-0.48, L95 <= 0.70)."
   }
  },
  "expo_tol": {
