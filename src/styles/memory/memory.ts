@@ -68,6 +68,10 @@ const RING_GAIN: Record<Look, number> = { forest: 1.1, coast: 1.8, desert: 2.4 }
 const RING_CAP: Record<Look, number> = { forest: 0.8, coast: 0.92, desert: 0.5 };
 /** Scene light per look: the desert is a moonlit night (dark enough that the ring reads). */
 const GAIN: Record<Look, number> = { forest: 1, coast: 1, desert: 0.6 };
+/** The desert's moonlight takes this much of the palette's primary hue (the light carries the palette, D89). */
+const MOON_TINT = 0.6;
+/** How much of the primary the bright fogs take (Forest, Coast): a near-white fog read grey in pale palettes. */
+const FOG_TINT = 0.6;
 /** Low quality draws every other splat. */
 const LOW_STRIDE = 2;
 
@@ -171,6 +175,15 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
   let ringT = 9;
   let ringArmed = true;
 
+  const gainCol = (pal: StyleContext['palette']): [number, number, number] => {
+    const g = GAIN[look];
+    if (look !== 'desert') return [g, g, g];
+    const h = pal.primary, m = Math.max(h[0], h[1], h[2], 1e-3);
+    const c = [0, 1, 2].map((i) => 1 + (h[i] / m - 1) * MOON_TINT);
+    const k = g / Math.max(0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], 0.05);
+    return [c[0] * k, c[1] * k, c[2] * k];
+  };
+
   return {
     id: 'memory',
 
@@ -208,8 +221,9 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
       const fade = ctx.fadeInOut;
       const cam = ctx.camera;
       // Fog and light from the palette (the forest's fog is bright, as in reel01; the desert's is night).
-      const fogCol: [number, number, number] = look === 'forest' ? mix3(pal.paper, pal.highlight, 0.25)
-        : look === 'coast' ? mix3(mix3(pal.highlight, pal.paper, 0.45), pal.secondary, 0.15) : mix3(mix3(pal.secondary, pal.bg, 0.55), pal.accent, 0.12);
+      // The palette lives in the light (D89): the fog and sky take the palette's hues, the scans stay natural.
+      const fogCol: [number, number, number] = look === 'forest' ? mix3(mix3(pal.paper, pal.highlight, 0.3), pal.primary, FOG_TINT)
+        : look === 'coast' ? mix3(mix3(mix3(pal.highlight, pal.paper, 0.45), pal.secondary, 0.15), pal.primary, FOG_TINT) : mix3(mix3(pal.secondary, pal.bg, 0.55), pal.accent, 0.12);
       const night = mix3(pal.bg, pal.shade, 0.3);
       const fogNow = mix3(fogCol, night, points * 0.8);
       ctx.bindScene();
@@ -272,7 +286,7 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
         u_dissolve: dissolve * 0.85, u_push: clamp01(ctx.bassPresence) * 0.5 + kick * 0.5, u_apart: apart, u_points: points,
         u_fog_near: fn * (1 - loopK * 0.9) * (0.75 + 0.25 * fade), u_fog_far: ff * (1 - loopK * 0.85) * (0.8 + 0.2 * fade), u_fog_col: fogNow,
         u_lift_share: KICK_LIFT[look][0], u_lift_glow: KICK_LIFT[look][1],
-        u_ring: [RING_R0 + RING_SPEED * ringT, ringT < 2 ? Math.exp(-ringT / RING_TAU) * fade : 0, RING_WIDTH + 0.12 * RING_SPEED * ringT], u_ring_gain: RING_GAIN[look], u_gain: GAIN[look],
+        u_ring: [RING_R0 + RING_SPEED * ringT, ringT < 2 ? Math.exp(-ringT / RING_TAU) * fade : 0, RING_WIDTH + 0.12 * RING_SPEED * ringT], u_ring_gain: RING_GAIN[look], u_gain: gainCol(pal),
         u_ring_cap: RING_CAP[look] * (look === 'desert' ? 1 : 0.299 * fogNow[0] + 0.587 * fogNow[1] + 0.114 * fogNow[2]),
         u_light: mix3(pal.highlight, [1, 1, 1], 0.4),
         u_shadow: mix3(pal.shade, [0, 0, 0], 0.3), u_grade: GRADE + 0.25 * points, u_edge: EDGE * (es.section === 'silence' ? 1.2 : 1), u_glow: points * 0.6,

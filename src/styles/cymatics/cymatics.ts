@@ -87,6 +87,10 @@ function modesOf(c: number): Mode[] {
   return out;
 }
 
+/** Key light: share of white mixed into the primary's hue, and its luminance. */
+const LIGHT_WHITE = 0.42;
+const LIGHT_LUMA = 0.88;
+
 export function createCymaticsStyle(deps: StyleDeps): VisualStyle {
   const { gl, quadVAO } = deps;
   const rng = createRng(deps.seed ^ 0xc1ad);
@@ -177,9 +181,14 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec4 c = texture(u_src, uv) * 0
     lastModeT = time;
   }
 
+  // The palette lives in the light (as Voyage City, D89): the stone and sand stay natural, the key
+  // light takes the primary's hue (a near-white key left every palette grey: colour gate).
   const lightCol = (pal: StyleContext['palette']): RGB => {
-    const h = pal.highlight;
-    return [0.75 + 0.25 * h[0], 0.75 + 0.25 * h[1], 0.75 + 0.25 * h[2]];
+    const p = pal.primary;
+    const m = Math.max(p[0], p[1], p[2], 1e-3);
+    const c: RGB = [p[0] / m + (1 - p[0] / m) * LIGHT_WHITE, p[1] / m + (1 - p[1] / m) * LIGHT_WHITE, p[2] / m + (1 - p[2] / m) * LIGHT_WHITE];
+    const k = LIGHT_LUMA / Math.max(0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], 0.05);
+    return [c[0] * k, c[1] * k, c[2] * k];
   };
 
   return {

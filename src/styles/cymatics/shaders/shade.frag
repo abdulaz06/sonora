@@ -135,7 +135,8 @@ void main() {
   vec3 spec = u_light_col * pow(max(dot(reflect(-L, N), vec3(0.0, 0.0, 1.0)), 0.0), 60.0) * 1.4;
   vec3 col = mix(bottom * (0.6 + 0.4 * shadow), sky * 0.5, fres) + spec * shadow;
 #else
-  vec3 albedo = LOOK == 1 ? vec3(0.72, 0.64, 0.52) : vec3(0.62, 0.62, 0.64);
+  // Pale, nearly neutral sand: a warm albedo cancelled cool palette light into grey.
+  vec3 albedo = LOOK == 1 ? vec3(0.68, 0.65, 0.61) : vec3(0.62, 0.62, 0.64);
   // Fine grain everywhere on the stone/sand (texture over blur).
   // Stone grain at two scales (texture over blur).
   float grain = 0.82 + 0.22 * snoise(vec3(p * 420.0, 0.0)) + 0.12 * snoise(vec3(p * 36.0, 3.0));

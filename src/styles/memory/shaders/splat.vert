@@ -35,7 +35,7 @@ uniform float u_lift_glow;          // how bright the lifting splats glow
 uniform vec3 u_ring;                // kick light ring: radius (m), amplitude, width (m)
 uniform float u_ring_gain;          // how bright the ring lights what it passes
 uniform float u_ring_cap;           // the ring lifts colours up to this luminance, never past it
-uniform float u_gain;               // the look's light level (the desert is a moonlit night)
+uniform vec3 u_gain;                // the look's light (the desert: a moonlit night in the palette's hue)
 out vec4 v_col;
 out vec2 v_g;                       // gaussian coordinates (σ units)
 out float v_point;
