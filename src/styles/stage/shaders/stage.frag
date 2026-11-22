@@ -71,6 +71,8 @@ float vnoise(vec3 p) {
   return mix(mix(mix(n000, n100, f.x), mix(n010, n110, f.x), f.y), mix(mix(n001, n101, f.x), mix(n011, n111, f.x), f.y), f.z);
 }
 
+const float BEAM_PHASE_MAX = 1.8;
+
 // Henyey-Greenstein, scaled so side-on (90°) ≈ 1.
 float phase(float c, float g) {
   float g2 = g * g;
@@ -116,7 +118,11 @@ vec3 beams(vec3 ro, vec3 rd, float tMax, float wMul) {
     // Falls off along the beam (scaled to the room: long beams in the arena).
     float fs = s / (0.55 * u_room.y);
     k *= 1.0 / (1.0 + fs * fs);
-    k *= phase(-b, u_beam_ext[i].y);
+    // Forward scattering, capped: a wide beam swinging through the lens otherwise washed the whole
+    // frame (the night jumped 0.03 a frame: motion gate's background step).
+    k *= min(phase(-b, u_beam_ext[i].y), BEAM_PHASE_MAX);
+    // A beam aimed straight at the camera dims (the operator keeps heads off the lens).
+    k *= 1.0 - 0.75 * smoothstep(0.86, 0.98, dot(D, normalize(ro - P)));
     acc += u_beam_col[i].rgb * k;
   }
   return acc;

@@ -65,11 +65,15 @@ const AIM_TAU: Record<Program_, number> = { breathe: 0.9, sweep: 0.22, converge:
 /** Searchlight rise speed (m/s) and curtain fade (s). */
 const SEARCH_RISE = 22;
 const CURTAIN_TAU = 1.2;
-/** Strobe: attack and decay (s), level; drop always asks, big hits in a drop section ask this often.
- * The attack spreads the rise over a few frames so no single frame jumps (flicker gate). */
+/** Blinder hit: attack and decay (s); drop always asks, big hits in a drop section ask this often.
+ * The fixtures blast (heads and LED bars to white-hot), not the room: a whole-room wash lifts the
+ * dark haze in one frame, and the background may not step more than 0.02 a frame (motion gate).
+ * The room itself takes only a faint wash. */
 const STROBE_ATTACK = 0.035;
-const STROBE_TAU = 0.07;
-const STROBE_LEVEL = 0.16;
+const STROBE_TAU = 0.12;
+const STROBE_HAZE = 0.02;
+const BLINDER_HEADS = 1.6;
+const BLINDER_BARS = 4;
 /** The drop strobe starts this long after the drop's cut (a cut and a blast on one frame jump too far). */
 const STROBE_DELAY = 0.06;
 const STROBE_HIT_CHANCE = 0.4;
@@ -360,7 +364,8 @@ void main() { frag = vec4(texture(u_tex, gl_FragCoord.xy / u_res).rgb, u_a); }`)
       // ── Beams: moving heads + the searchlight ──
       const beamPos: number[] = [], beamDir: number[] = [], beamCol: number[] = [], beamExt: number[] = [];
       const maxHeads = low ? LOW_BEAMS : MAX_BEAMS - 1;
-      const headGain = HEAD_GAIN[prg] * (0.25 + 0.75 * fade) * (prg === 'breathe' ? 0.5 + 0.5 * glowK : 0.7 + 0.5 * glowK);
+      const blinder = strobeT >= 0 && strobeT < 1 ? (strobeT < STROBE_ATTACK ? strobeT / STROBE_ATTACK : Math.exp(-(strobeT - STROBE_ATTACK) / STROBE_TAU)) : 0;
+      const headGain = HEAD_GAIN[prg] * (0.25 + 0.75 * fade) * (prg === 'breathe' ? 0.5 + 0.5 * glowK : 0.7 + 0.5 * glowK) * (1 + BLINDER_HEADS * blinder);
       const used = heads.slice(0, maxHeads);
       used.forEach((hd, i) => {
         let on = 1;
@@ -448,7 +453,7 @@ void main() { frag = vec4(texture(u_tex, gl_FragCoord.xy / u_res).rgb, u_a); }`)
         if (barA.length / 4 >= MAX_BARS) return;
         barA.push(a[0], a[1], a[2], px); barB.push(b[0], b[1], b[2], phase); barC.push(col[0] * gain, col[1] * gain, col[2] * gain, sparkle);
       };
-      const barGain = BAR_GAIN * (0.25 + 0.75 * fade) * (0.45 + 0.55 * glowK) * (1 + 1.4 * groupFlash[4]);
+      const barGain = BAR_GAIN * (0.25 + 0.75 * fade) * (0.45 + 0.55 * glowK) * (1 + 1.4 * groupFlash[4] + BLINDER_BARS * blinder);
       const chase = beatPos() / 4;
       const hwb = cfg.trussHW * 1.15;
       pushBar([-hwb, 1.1, cfg.stageZ + 2], [hwb, 1.1, cfg.stageZ + 2], 48, paletteSlot(pal, 0 + colourShift), barGain, chase);
@@ -463,10 +468,11 @@ void main() { frag = vec4(texture(u_tex, gl_FragCoord.xy / u_res).rgb, u_a); }`)
       hazeNow += (hazeWant - hazeNow) * (1 - Math.exp(-ctx.dt / HAZE_TAU));
       const haze = hazeNow;
       const ambC = mixV(pal.primary, pal.secondary, 0.4);
-      const amb = (0.01 + 0.05 * bassEnv + 0.02 * glowK) * (0.3 + 0.7 * fade);
+      // The room's ambient haze follows the energy only (a bass pulse here lifted the whole night: motion gate).
+      const amb = (0.01 + 0.02 * glowK) * (0.3 + 0.7 * fade);
       const curtainAmb = curtain * 0.07;
       const hazeAmb: V3 = [ambC[0] * amb + pal.primary[0] * curtainAmb, ambC[1] * amb + pal.primary[1] * curtainAmb, ambC[2] * amb + pal.primary[2] * curtainAmb];
-      const strobe = strobeT >= 0 && strobeT < 0.4 ? STROBE_LEVEL * (strobeT < STROBE_ATTACK ? strobeT / STROBE_ATTACK : Math.exp(-(strobeT - STROBE_ATTACK) / STROBE_TAU)) : 0;
+      const strobe = STROBE_HAZE * blinder;
 
       const flo = cfg.floorCol;
       const curtainCol = mixV(pal.primary, pal.shade, 0.15);
