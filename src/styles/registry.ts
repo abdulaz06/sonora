@@ -18,12 +18,13 @@ const LOADERS: Record<StyleId, () => Promise<Factory>> = {
   warp: () => import('./strands/strands').then((m) => m.createWarpStyle),
   voyage: () => import('./voyage/voyage').then((m) => m.createVoyageStyle),
   stage: () => import('./stage/stage').then((m) => m.createStageStyle),
+  cymatics: () => import('./cymatics/cymatics').then((m) => m.createCymaticsStyle),
   aura: () => import('./classic/aura').then((m) => m.createAuraStyle),
   halo: () => import('./classic/halo-spectrum').then((m) => m.createHaloStyle),
 };
 const factories: Partial<Record<StyleId, Factory>> = {};
 /** 1.2 styles: hidden from pickers on the deployed website until the release (release.ts). */
-const UNRELEASED_12: StyleId[] = ['stage'];
+const UNRELEASED_12: StyleId[] = ['stage', 'cymatics'];
 const loading: Partial<Record<StyleId, Promise<Factory>>> = {};
 
 /** Load a style's code (once). */
@@ -86,6 +87,12 @@ export const STYLES: StyleDescriptor[] = [
     variants: STYLE_VARIANTS.stage, defaultVariant: 'club',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: lazy('stage'),
+  },
+  {
+    id: 'cymatics', label: 'Cymatics', category: 'art',
+    variants: STYLE_VARIANTS.cymatics, defaultVariant: 'stone',
+    supportsLight: false, supportsDepth: false, defaultDepth: false,
+    create: lazy('cymatics'),
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',

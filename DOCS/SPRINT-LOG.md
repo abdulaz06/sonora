@@ -7,13 +7,19 @@
 ## Summary
 (written at the review stop)
 
+## Progress (resume here)
+- Built and pushed: filters (Glyph, Reeded glass), Silk Helix, Stage, Cymatics. Release gate: `src/app/release.ts` (`RELEASED_12` false: the deployed site hides 1.2 styles, looks and the Filter section).
+- Gates so far (house-124 sync, dense-128 flicker at Punchy, palette 0): Helix Flat/Depth sync 100/100%, flicker PASS (1.00 / 1.08 swings/s); Stage Club/Arena/Cathedral sync 100/100/100%, flicker PASS (clip max 5.5 / 2.4 / 5.2%, step ≤ 0.06 after cut dissolves); Cymatics Stone/Sand/Liquid sync 100/100/96%, flicker PASS. Motion: Helix fine share 67–80% (Silk itself 54–67%; the 45% gate was calibrated on Ink and every shipped particle / raymarch style exceeds it).
+- Frame cost not measured yet: the 1.1 run was rendering on the shared GPU. Measure all styles together on an idle GPU before the review.
+- Helpers: `scripts/luma-steps.mjs <style> <look>` (largest flicker steps, `CLIP=1` most blown-out frame); `scripts/snapshots.mjs` logs page errors.
+
 ## Checklist
 - [x] 0. Read the docs, references and engine; worktree; harness scripts honour `SONORA_HARNESS_PORT` (parallel runs)
-- [ ] F1. Filters: Glyph (atlas from bundled Plex Mono, per-cell hysteresis, edge glyphs) and Reeded glass (vertical / angled / radial); renderer hook after the composite; settings, controller, G key, (i) card; harness `--filter` / `SONORA_FILTER`
+- [x] F1. Filters: Glyph (atlas from bundled Plex Mono, per-cell hysteresis, edge glyphs) and Reeded glass (vertical / angled / radial); renderer hook after the composite; settings, controller, G key, (i) card; harness `--filter` / `SONORA_FILTER`
 - [ ] F2. Filter gates on every style (sync, flicker, motion, colour), cost ≤ 1 ms at 1080p Medium, 9:16 legibility
-- [ ] H. Silk Helix look (Flat + Depth); gates
-- [ ] S. Stage (Club / Arena / Cathedral); gates
-- [ ] C. Cymatics (Stone / Sand / Liquid); gates
+- [~] H. Silk Helix look (Flat + Depth): built; sync + flicker pass; motion measured; cost / dt / colour pending
+- [~] S. Stage (Club / Arena / Cathedral): built; sync + flicker pass; motion / cost / dt / colour pending
+- [~] C. Cymatics (Stone / Sand / Liquid): built; sync + flicker pass; motion / cost / dt / colour pending
 - [ ] G. Glass (Bubbles / Fins / Chrome); gates
 - [ ] V. Cover (album art; generated fallback; Set Mode only with a cover); gates
 - [ ] M. Memory (Gaussian splat scenes, licence-checked, ≤ 8 MB each, on demand); gates

@@ -111,6 +111,17 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
       { id: 'cathedral', label: 'Cathedral', line: 'A tall nave: a curtain of light and a single searchlight.', media: 'stage-cathedral' },
     ],
   },
+  cymatics: {
+    id: 'cymatics', label: 'Cymatics',
+    line: 'Sand on a vibrating plate settling into the patterns of the sound, carved like stone.',
+    more: 'The music picks the plate’s note: sand gathers on the still lines and forms mirrored reliefs, jumps on every kick, and leaps into a new, intricate pattern on the drop.',
+    suits: 'ambient, cinematic, deep house',
+    looks: [
+      { id: 'stone', label: 'Stone', line: 'A carved grey relief under a raking light.', media: 'cymatics-stone' },
+      { id: 'sand', label: 'Sand', line: 'Warm sand grains on the plate.', media: 'cymatics-sand' },
+      { id: 'liquid', label: 'Liquid', line: 'Standing waves on water, with caustic light on the sand below.', media: 'cymatics-liquid' },
+    ],
+  },
   aura: {
     id: 'aura', label: 'Aura', line: 'The original rings, particles and glow from sonora 0.1.', more: 'Classic.', suits: 'nostalgia',
     looks: [],
@@ -122,7 +133,7 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
 };
 
 /** 1.2 styles (hidden on the deployed website until the release, see release.ts). */
-export const NEW_STYLES_12: StyleId[] = ['stage'];
+export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics'];
 export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage', ...(SHOW_12 ? NEW_STYLES_12 : [])];
 export const CLASSIC_STYLES: StyleId[] = ['aura', 'halo'];
 
@@ -163,6 +174,9 @@ const PIECES_12: Piece[] = [
   { id: 'stage:club', style: 'stage', look: 'club', label: 'Stage · Club', views: ['flat'], energy: 0.9, media: 'stage-club' },
   { id: 'stage:arena', style: 'stage', look: 'arena', label: 'Stage · Arena', views: ['flat'], energy: 0.8, media: 'stage-arena' },
   { id: 'stage:cathedral', style: 'stage', look: 'cathedral', label: 'Stage · Cathedral', views: ['flat'], energy: 0.5, media: 'stage-cathedral' },
+  { id: 'cymatics:stone', style: 'cymatics', look: 'stone', label: 'Cymatics · Stone', views: ['flat'], energy: 0.3, media: 'cymatics-stone' },
+  { id: 'cymatics:sand', style: 'cymatics', look: 'sand', label: 'Cymatics · Sand', views: ['flat'], energy: 0.35, media: 'cymatics-sand' },
+  { id: 'cymatics:liquid', style: 'cymatics', look: 'liquid', label: 'Cymatics · Liquid', views: ['flat'], energy: 0.25, media: 'cymatics-liquid' },
 ];
 export const PIECES: Piece[] = [
   { id: 'ink:glow', style: 'ink', look: 'glow', label: 'Ink · Glow', views: ['depth', 'flat'], energy: 0.45, media: 'ink-glow' },
