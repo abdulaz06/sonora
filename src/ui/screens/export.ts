@@ -88,6 +88,8 @@ export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
   let rendering: AbortController | null = null;
   let preview: Preview | null = null;
   let playhead = -1;
+  /** The preview's still shows this moment (s from the start): the element being edited. */
+  let stillAt = 1;
 
   // ── Layout ──
   const backBtn = button('Menu', { variant: 'ghost', icon: 'arrowLeft', onClick: () => leave() });
@@ -122,7 +124,7 @@ export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
       h('div', { class: 'ex-song-t' },
         h('span', { class: 'ex-song-title' }, song.title || song.file),
         h('span', { class: 's-micro' }, [song.artist, song.album, `${fmt(song.duration)} · ${song.analysis.bpm.toFixed(0)} bpm`].filter(Boolean).join(' · ')))) : null;
-    secSong.replaceChildren(...[head('01', 'the song', songStatus), h('div', { class: 'ex-row ex-row--song' }, info, pick, fileInput),
+    secSong.replaceChildren(...[head('01', 'the song', songStatus), h('div', { class: `ex-row ex-row--song${song ? '' : ' empty'}` }, info, pick, fileInput),
       song ? null : h('p', { class: 's-micro ex-note' }, 'mp3, wav, flac, m4a, ogg / opus, or the sound of an mp4 / mov. artwork in the file gives album colours.'),
       h('p', { class: 'ex-rights' }, 'only export music you have the rights to use.')].filter((x): x is HTMLElement => !!x));
   }
@@ -248,10 +250,10 @@ export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
   const snapT = (t: number): number => (song ? snapToBar(t + windowNow().start, song.analysis.bars) - windowNow().start : t);
   function renderText(): void {
     const D = windowNow().end - windowNow().start;
-    const tSeg = segmented([{ value: 'off', label: 'off' }, { value: 'reel', label: 'reel line' }, { value: 'cinematic', label: 'cinematic' }], prefs.title, (v) => { prefs.title = v; savePrefs(); renderText(); refreshStill(); }, 'Title card');
+    const tSeg = segmented([{ value: 'off', label: 'off' }, { value: 'reel', label: 'reel line' }, { value: 'cinematic', label: 'cinematic' }], prefs.title, (v) => { prefs.title = v; savePrefs(); renderText(); refreshStill(prefs.titleIn + 1); }, 'Title card');
     const num = (v: number, set: (x: number) => void, label: string, max = 600): HTMLInputElement => {
       const i = h('input', { type: 'number', min: 0, max, step: 0.1, value: +v.toFixed(2), class: 'ex-num', 'aria-label': label });
-      i.addEventListener('change', () => { set(Math.max(0, Math.min(max, Number(i.value) || 0))); refreshStill(); });
+      i.addEventListener('change', () => { const x = Math.max(0, Math.min(max, Number(i.value) || 0)); set(x); refreshStill(x + 0.6); });
       return i;
     };
     const txt = (v: string, set: (x: string) => void, label: string, area = false): HTMLInputElement | HTMLTextAreaElement => {
@@ -261,11 +263,11 @@ export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
       return i;
     };
     const rows: HTMLElement[] = [row('title card', tSeg.el)];
-    if (prefs.title !== 'off') {
+    if (prefs.title !== 'off' && song) {
       rows.push(row('song', txt(titleText, (x) => { titleText = x; }, 'Song title'), txt(artistText, (x) => { artistText = x; }, 'Artist')));
       rows.push(row('on screen', h('span', { class: 's-micro' }, 'from'), num(prefs.titleIn, (x) => { prefs.titleIn = x; savePrefs(); }, 'Title in (s)'), h('span', { class: 's-micro' }, 'to'), num(Math.min(prefs.titleOut, D), (x) => { prefs.titleOut = x; savePrefs(); }, 'Title out (s)'), h('span', { class: 's-micro ex-why' }, 's from the start')));
     }
-    rows.push(row('now playing', toggle('', prefs.nowPlaying, (v) => { prefs.nowPlaying = v; savePrefs(); refreshStill(); }).el, h('span', { class: 's-micro ex-why' }, 'the app’s card with the artwork, at the start')));
+    rows.push(row('now playing', toggle('', prefs.nowPlaying, (v) => { prefs.nowPlaying = v; savePrefs(); refreshStill(1.5); }).el, h('span', { class: 's-micro ex-why' }, 'the app’s card with the artwork, at the start')));
     texts.forEach((t, i) => {
       const pos = select(([['tl', 'top left'], ['top', 'top'], ['tr', 'top right'], ['center', 'centre'], ['bl', 'bottom left'], ['bottom', 'bottom'], ['br', 'bottom right']] as [TextPos, string][]).map(([value, label]) => ({ value, label })), t.pos, (v) => { t.pos = v as TextPos; refreshStill(); }, 'Position').el;
       const size = segmented<TextSize>([{ value: 's', label: 's' }, { value: 'm', label: 'm' }, { value: 'l', label: 'l' }, { value: 'xl', label: 'xl' }], t.size, (v) => { t.size = v; refreshStill(); }, 'Size').el;
@@ -275,12 +277,12 @@ export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
       const end = num(t.end, (x) => { t.end = t.snap ? snapT(x) : x; renderText(); }, 'End (s)');
       rows.push(h('div', { class: 'ex-line' },
         h('div', { class: 'ex-line-head' }, h('span', { class: 's-micro' }, `line ${i + 1}`), button('Remove', { size: 'sm', variant: 'ghost', onClick: () => { texts.splice(i, 1); renderText(); refreshStill(); } })),
-        txt(t.text, (x) => { t.text = x; }, `Line ${i + 1} text`, true),
+        txt(t.text, (x) => { t.text = x; stillAt = t.start + 0.6; }, `Line ${i + 1} text`, true),
         row('time', start, h('span', { class: 's-micro' }, 'to'), end, toggle('snap to bars', t.snap, (v) => { t.snap = v; if (v) { t.start = snapT(t.start); t.end = snapT(t.end); renderText(); } }).el),
         row('place', pos, size),
         row('style', font, cs)));
     });
-    rows.push(h('div', { class: 'ex-row' }, h('span', { class: 's-micro ex-rl' }), button('Add a line', { size: 'sm', onClick: () => { const s0 = Math.min(D - 1, 2); texts.push({ text: '', start: s0, end: Math.min(D, s0 + 4), pos: 'center', size: 'l', font: 'inter', case: 'lower', snap: false }); renderText(); } })));
+    rows.push(row('lines', button('Add a line', { size: 'sm', onClick: () => { const s0 = Math.min(D - 1, 2); texts.push({ text: '', start: s0, end: Math.min(D, s0 + 4), pos: 'center', size: 'l', font: 'inter', case: 'lower', snap: false }); renderText(); } }), h('span', { class: 's-micro ex-why' }, 'your own words, each with its own time and place')));
     secText.replaceChildren(head('04', 'text'), ...rows);
   }
 
@@ -291,12 +293,12 @@ export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
     const res = segmented<Res>([{ value: '720', label: '720p' }, { value: '1080', label: '1080p' }, { value: '1440', label: '1440p' }, { value: '2160', label: '4k' }], prefs.res, (v) => { prefs.res = v; savePrefs(); renderOut(); }, 'Resolution');
     const fps = segmented([{ value: '30', label: '30 fps' }, { value: '60', label: '60 fps' }], String(prefs.fps), (v) => { prefs.fps = Number(v) as 30 | 60; savePrefs(); renderOut(); }, 'Frame rate');
     const q = segmented([{ value: 'standard', label: 'standard' }, { value: 'best', label: 'best' }], prefs.quality, (v) => { prefs.quality = v; savePrefs(); renderOut(); }, 'Quality');
-    const corner = segmented<Corner>([{ value: 'tl', label: 'top left' }, { value: 'tr', label: 'top right' }, { value: 'bl', label: 'bottom left' }, { value: 'br', label: 'bottom right' }], prefs.corner, (v) => { prefs.corner = v; savePrefs(); refreshStill(); }, 'Mark corner');
+    const corner = segmented<Corner>([{ value: 'tl', label: 'top left' }, { value: 'tr', label: 'top right' }, { value: 'bl', label: 'bottom left' }, { value: 'br', label: 'bottom right' }], prefs.corner, (v) => { prefs.corner = v; savePrefs(); refreshStill(1); }, 'Mark corner');
     secOut.replaceChildren(head('05', 'output', `${W} × ${H}`),
       row('aspect', asp.el), row('resolution', res.el), row('frame rate', fps.el),
       row('quality', q.el, h('span', { class: 's-micro ex-why' }, prefs.quality === 'best' ? 'supersampled: sharper, slower' : 'rendered at the output size')),
       row('mark', corner.el, h('span', { class: 's-micro ex-why' }, 'the sonora mark, small, on every export')),
-      row('outro', toggle('', prefs.outro, (v) => { prefs.outro = v; savePrefs(); refreshStill(); }).el, h('span', { class: 's-micro ex-why' }, `a ${OUTRO_S} s end card: made with sonora · sonoravisuals.com`)));
+      row('outro', toggle('', prefs.outro, (v) => { prefs.outro = v; savePrefs(); refreshStill(v ? windowNow().end - windowNow().start + 1.6 : 1); }).el, h('span', { class: 's-micro ex-why' }, `a ${OUTRO_S} s end card: made with sonora · sonoravisuals.com`)));
     layoutPreview();
   }
 
@@ -389,9 +391,10 @@ export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
     preview.setGuides(guidesOn && prefs.aspect === '9:16');
     refreshStill();
   }
-  function refreshStill(): void {
+  function refreshStill(at?: number): void {
+    if (at !== undefined) stillAt = at;
     if (!preview || preview.playing()) return;
-    void preview.still(overlaySpec(), Math.min(prefs.titleIn + 1, 1.5));
+    void preview.still(overlaySpec(), stillAt);
   }
   async function playPreview(): Promise<void> {
     if (!song || !preview) return;

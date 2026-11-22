@@ -122,6 +122,8 @@ export interface StyleSignals {
 }
 
 export interface StyleContext extends StyleSignals {
+  /** Offline render (exports): nothing may depend on wall-clock time, so the same plan gives the same frames. */
+  offline: boolean;
   gl: WebGL2RenderingContext;
   canvas: HTMLCanvasElement;
   quadVAO: WebGLVertexArrayObject;

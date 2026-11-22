@@ -180,6 +180,7 @@ async function main(): Promise<void> {
   // to the end of async setup. If anything below stalls or throws, the net
   // still fires and the user gets a visible window.
   armWindowVisibilitySafetyNet();
+  if (import.meta.env.DEV) void import('./app/dev-hooks');
   // And for the whole session: a display that goes away (the TV unplugged)
   // brings the window back to one that's there.
   watchVisibility();

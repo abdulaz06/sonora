@@ -386,12 +386,15 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
       const fade = ctx.fadeInOut;
       const es = ctx.eventState;
 
-      // Adaptive step budget from the real frame interval.
-      const now = performance.now();
-      if (lastReal > 0) realMs += (Math.min(now - lastReal, 100) - realMs) * 0.05;
-      lastReal = now;
-      if (realMs > TARGET_MS * 1.12) stepScale = Math.max(0.55, stepScale - 0.01);
-      else if (realMs < TARGET_MS * 0.9) stepScale = Math.min(1, stepScale + 0.004);
+      // Adaptive step budget from the real frame interval (offline renders: the full budget, so frames never depend on timing).
+      if (ctx.offline) stepScale = 1;
+      else {
+        const now = performance.now();
+        if (lastReal > 0) realMs += (Math.min(now - lastReal, 100) - realMs) * 0.05;
+        lastReal = now;
+        if (realMs > TARGET_MS * 1.12) stepScale = Math.max(0.55, stepScale - 0.01);
+        else if (realMs < TARGET_MS * 0.9) stepScale = Math.min(1, stepScale + 0.004);
+      }
 
       // Fractal parameters drift with presence over seconds; never on beats.
       scaleS += (ctx.midPresence - scaleS) * expApproach(dt, 2.5);

@@ -1,6 +1,6 @@
 /* Export screen: controls on the left, the preview in the chosen aspect on the right. */
 .scr-export .ex-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(420px, 1fr) minmax(0, 1.05fr); gap: clamp(24px, 3vw, 56px); padding: 0 var(--gutter); }
-.scr-export .ex-left { overflow-y: auto; min-height: 0; padding-bottom: 40px; scrollbar-width: thin; scrollbar-color: var(--b12) transparent; }
+.scr-export .ex-left { overflow-y: auto; min-height: 0; padding-right: 14px; scrollbar-width: thin; scrollbar-color: var(--b12) transparent; }
 .scr-export .ex-right { display: flex; flex-direction: column; min-height: 0; padding-bottom: clamp(20px, 3vh, 40px); gap: 12px; }
 .scr-export .ex-pv-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .scr-export .ex-pv { position: relative; outline: 1px solid var(--b12); outline-offset: -1px; background: #000; }
@@ -27,7 +27,7 @@
 .scr-export .ex-legend { margin-top: 6px; }
 .scr-export .ex-num { width: 74px; height: 32px; background: transparent; border: var(--line); color: var(--bone); font-family: var(--f-mono); font-size: 12px; padding: 0 8px; border-radius: 0; }
 .scr-export .ex-text { flex: 1 1 180px; min-width: 0; height: 32px; background: transparent; border: var(--line); color: var(--bone); font-family: var(--f-body); font-size: 14px; padding: 0 10px; border-radius: 0; }
-.scr-export textarea.ex-text { height: auto; padding: 8px 10px; resize: vertical; width: 100%; }
+.scr-export textarea.ex-text { flex: none; height: 64px; padding: 8px 10px; resize: vertical; width: 100%; }
 .scr-export .ex-num:focus-visible, .scr-export .ex-text:focus-visible { outline: 1px solid var(--bone); outline-offset: -1px; }
 .scr-export .ex-hue { flex: 1 1 200px; min-width: 160px; }
 .scr-export .ex-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 6px 14px; width: 100%; }
@@ -35,7 +35,11 @@
 .scr-export .ex-line { border: var(--line); padding: 10px 12px; margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
 .scr-export .ex-line-head { display: flex; justify-content: space-between; align-items: center; }
 .scr-export .ex-line .ex-row { grid-template-columns: 76px minmax(0, 1fr); }
-.scr-export .ex-go { position: sticky; bottom: 0; background: var(--night); }
+.scr-export .ex-go { position: sticky; bottom: 0; background: var(--night); padding-bottom: clamp(20px, 3vh, 40px); z-index: 2; }
+.scr-export .s-seg { display: inline-flex; width: auto; flex-wrap: wrap; }
+.scr-export .s-seg > button { flex: none; width: auto; padding: 0 13px; overflow: visible; text-overflow: clip; }
+.scr-export .ex-row > .s-btn, .scr-export .ex-row--song > .s-btn { justify-self: start; }
+.scr-export .ex-row--song.empty > .s-btn { grid-column: 1 / -1; }
 .scr-export .ex-go-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: space-between; }
 .scr-export .ex-bar { height: 2px; background: var(--b12); margin: 6px 0 14px; }
 .scr-export .ex-bar-fill { display: block; height: 100%; width: 0; background: var(--bone); transition: width 200ms linear; }
