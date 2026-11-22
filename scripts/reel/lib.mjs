@@ -82,7 +82,7 @@ export function analyse(song) {
   const src = join(ROOT, 'scripts', 'reel', 'analyse.ts');
   const bundle = join(ROOT, 'node_modules', '.cache', 'reel-analyse.mjs');
   const stale = (f, ...deps) => !existsSync(f) || deps.some((d) => statSync(d).mtimeMs > statSync(f).mtimeMs);
-  if (stale(bundle, src, join(ROOT, 'src', 'engine', 'events.ts'))) {
+  if (stale(bundle, src, join(ROOT, 'src', 'engine', 'events.ts'), join(ROOT, 'src', 'export', 'analysis.ts'))) {
     mkdirSync(dirname(bundle), { recursive: true });
     execFileSync(join(ROOT, 'node_modules', '.bin', process.platform === 'win32' ? 'esbuild.cmd' : 'esbuild'), [src, '--bundle', '--platform=node', '--format=esm', `--outfile=${bundle}`, '--log-level=warning'], { shell: process.platform === 'win32' });
   }

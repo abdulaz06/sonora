@@ -1,3 +1,31 @@
+# 1.1 — export, recording, text in exports, AAA Voyage worlds, faster /live
+
+> Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
+> Local-only media (songs, exports, recordings, masters): `local-media/` (git-ignored). Render scratch outside OneDrive.
+
+## Checklist
+- [ ] 0. Baseline: gates and numbers before 1.1 (cost, sync, flicker, motion, Lighthouse /live + landing, installer size); Voyage before stills and clips
+- [ ] A1. Shared modules: analysis, window picking, bar snapping, cut plans, strip, overlays → `src/export/`; studio uses them and still works
+- [ ] A2. Rust: Videos\sonora files (positional writes), Media Foundation AAC encoder, disk space, open folder
+- [ ] A3. Offline renderer: fixed-step, warm-up from the song's start, per-shot warm-ups, supersampling, compositor, WebCodecs H.264 + mp4 muxer
+- [ ] A4. Export screen: file (tags, artwork, album colours), section strip (bars, markers, three suggestions), formats, visual, output, live preview with safe zones, progress / estimate / cancel, open folder; menu + tray + shortcut
+- [ ] A5. Corner mark (always) + optional outro; rights line; D-entry
+- [ ] A6. Measurements: render speed, determinism, encoder choice logged; installer growth ≤ 3 MB
+- [ ] B1. Rust: record audio ring (no allocation in the callback), sample clock on frames, AAC stream
+- [ ] B2. Recorder: async readback, hardware encoder, indicator + time, disk-space warning, clean stop; HUD, controller, tray, shortcut
+- [ ] B3. A/V sync check with a click track in the harness (≤ 1 frame); pacing with recording on (no held frames), cost logged
+- [ ] C1. Title card (reel / cinematic), text overlays (timing, bar snap, position, size, style), now-playing card; fonts (brand + OFL, licences)
+- [ ] C2. Safe zones respected; preview = render
+- [ ] D1. Voyage before: stills (palettes × lights), wide-shot clips, frame times per preset
+- [ ] D2. Assets (CC0 / public domain) → KTX2/Basis, `ASSETS.md`, lazy loading on the site
+- [ ] D3. City: irregular farmland, forests, roads, hedgerows, farm buildings; buildings, streets, parks, windows
+- [ ] D4. Lighting: GGX, heightfield soft shadows, AO, atmospheric scattering; palette lives in the light
+- [ ] D5. Water: Gerstner bands, Fresnel sky reflection, crest SSS, fold/shore foam, depth colour, glints, ripples (City + Ocean)
+- [ ] D6. Budgets: frame time per preset, compile time, installer ≤ +25 MB; palette metrics recalibrated for City/Ocean
+- [ ] D7. After stills and clips; `npm run media`, palette thumbnails
+- [ ] E1. /live code split: shell first, styles + shaders on demand; Lighthouse desktop 90+, mobile 100; `test:live` extended (Export hidden on the web)
+- [ ] R. Full gates; review summary; `verify/review-1.1/index.html`; stop
+
 # Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — shipped (v1.0.2; trailer A2 on the site)
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
