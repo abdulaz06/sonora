@@ -125,6 +125,10 @@ function brandImages(): Promise<{ glint: HTMLImageElement; word: HTMLImageElemen
   brand ??= Promise.all([svgImage(smallMarkSvg), svgImage(wordmarkSvg), svgImage(lockupSvg)]).then(([glint, word, lockup]) => ({ glint, word, lockup }));
   return brand;
 }
+/** Fonts and brand images, loaded ahead (recordings start without a hitch). */
+export function preloadOverlay(): Promise<void> {
+  return Promise.all([loadOverlayFonts(), brandImages()]).then(() => undefined, () => undefined);
+}
 const loadImage = (src: string): Promise<HTMLImageElement | null> => new Promise((ok) => {
   const img = new Image();
   img.onload = () => ok(img);

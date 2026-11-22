@@ -10,6 +10,7 @@ import type { Controller } from './controller';
 import type { Platform } from './platform';
 import { createSetMode, type SetMode } from './set-mode';
 import { audioStatus, feedLevel, nowPlaying } from './stores';
+import { videoPrefs } from '../export/video-prefs';
 import { getStyle, visibleStyles } from '../styles/registry';
 import type { StyleId } from '../styles/visual-style';
 import { closeInfo, toast } from '../ui/ds/components';
@@ -38,6 +39,8 @@ export interface Shell {
   key(k: string): void;
   /** Open the Export screen (desktop). */
   goExport(): void;
+  /** Start or stop a recording (desktop). */
+  toggleRecord(): void;
 }
 
 export interface ShellOptions {
@@ -117,6 +120,30 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     menu: () => goMenu(),
     settings: (sec) => settings.open(sec),
     setMode: (on) => setSetMode(on),
+    record: platform.recorder ? () => toggleRecord() : undefined,
+  });
+
+  // ── Recording (desktop) ──
+  function toggleRecord(): void {
+    const rec = platform.recorder;
+    if (!rec) return;
+    const st = rec.status().state;
+    if (st === 'recording') {
+      void rec.stop().then((r) => {
+        if (!r) return;
+        if (r.error && !r.bytes) { toast(`recording failed: ${r.error}`, { ms: 6000 }); return; }
+        const m = Math.floor(r.seconds / 60), sec = Math.round(r.seconds % 60);
+        toast(`recording saved · ${m}:${String(sec).padStart(2, '0')} · ${(r.bytes / 1048576).toFixed(0)} MB`, { ms: 8000, action: platform.revealFile ? { label: 'open folder', onClick: () => platform.revealFile?.(r.path) } : undefined });
+      });
+    } else if (st === 'idle') {
+      if (screen !== 'visual') void goVisual();
+      const p = videoPrefs();
+      void rec.start({ preset: p.recPreset, fps: p.recFps, corner: p.corner, outro: p.outro }).catch(() => undefined);
+    }
+  }
+  platform.recorder?.onChange((st) => {
+    platform.setTrayRecording?.(st.state === 'recording' || st.state === 'finishing');
+    if (st.warning) toast(st.warning, { ms: 5000 });
   });
   document.body.append(menu.el, detail.el);
   const fps = createFpsReadout(renderer);
@@ -229,7 +256,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
 
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey || e.altKey || e.metaKey || typing(e.target)) return;
-    if (e.key === 'F11') e.preventDefault();
+    if (e.key === 'F11' || e.key === 'F9') e.preventDefault();
     if (e.key.startsWith('Arrow') && !settings.isOpen() && (screen === 'menu' || screen === 'detail')) e.preventDefault();
     handleKey(e.key, false);
   });
@@ -239,6 +266,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
   function handleKey(k: string, remote: boolean): void {
     const lower = k.toLowerCase();
     if (k === 'F11' || lower === 'f') { platform.toggleFullscreen(); return; }
+    if (k === 'F9' && platform.recorder && screen !== 'intro' && screen !== 'boot' && screen !== 'export') { toggleRecord(); return; }
     if ((!remote && settings.isOpen()) || screen === 'intro' || screen === 'boot') return;
     if (lower === 'r') { platform.openController?.(); return; }
     if (k === 'Escape') {
@@ -299,6 +327,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     else if (a === 'setmode') setSetMode(!s.setMode.on);
     else if (a === 'controller') platform.openController?.();
     else if (a === 'export') void goExport();
+    else if (a === 'record') toggleRecord();
   });
 
   // ── Start ──
@@ -336,5 +365,6 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     setSetMode,
     key: (k) => handleKey(k, true),
     goExport: () => void goExport(),
+    toggleRecord,
   };
 }

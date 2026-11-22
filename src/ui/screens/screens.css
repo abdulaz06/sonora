@@ -294,3 +294,11 @@ body.sonora-idle .sm-label { opacity: 0.45; }
 .scard:not(.is-open) .detail { position: absolute; visibility: hidden; }
 .scard .cap { justify-content: flex-start; gap: clamp(8px, 1.3vh, 16px); }
 .scard .cap-bottom { align-items: flex-start; }
+
+/* ── Recording indicator (desktop) ── */
+.rec-ind { position: fixed; z-index: 880; top: clamp(20px, 3vh, 36px); right: var(--gutter); display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.rec-ind .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bone); animation: rec-blink 1.6s var(--ease-io) infinite; }
+.rec-ind.finishing .rec-dot { animation: none; opacity: 0.4; }
+@keyframes rec-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+body.sonora-clean .rec-ind { display: none; }
+@media (prefers-reduced-motion: reduce) { .rec-ind .rec-dot { animation: none; } }

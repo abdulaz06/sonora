@@ -1,4 +1,4 @@
-//! System tray: Show, Menu, Set Mode (checkable), Controller, Export, Fullscreen, Quit.
+//! System tray: Show, Menu, Set Mode (checkable), Controller, Record, Export, Fullscreen, Quit.
 //! Left-click toggles the window. Actions the web side owns (menu, Set Mode,
 //! fullscreen) are sent to it as `tray` events; `set_tray_set_mode` keeps the
 //! Set Mode check in sync when it changes in the app.
@@ -16,10 +16,11 @@ const TRAY_ICON: &[u8] = include_bytes!("../icons/tray-32.png");
 
 pub struct TrayState {
     set_mode: Mutex<Option<CheckMenuItem<Wry>>>,
+    record: Mutex<Option<MenuItem<Wry>>>,
 }
 
 pub fn state() -> TrayState {
-    TrayState { set_mode: Mutex::new(None) }
+    TrayState { set_mode: Mutex::new(None), record: Mutex::new(None) }
 }
 
 fn show(app: &AppHandle) {
@@ -36,11 +37,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let set_i = CheckMenuItem::with_id(app, "setmode", "Set Mode", true, false, None::<&str>)?;
     let ctl_i = MenuItem::with_id(app, "controller", "Controller (second screen)", true, None::<&str>)?;
     let exp_i = MenuItem::with_id(app, "export", "Export a video…", true, None::<&str>)?;
+    let rec_i = MenuItem::with_id(app, "record", "Record", true, None::<&str>)?;
     let fs_i = MenuItem::with_id(app, "fullscreen", "Fullscreen", true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_i, &menu_i, &set_i, &ctl_i, &exp_i, &fs_i, &sep, &quit_i])?;
+    let menu = Menu::with_items(app, &[&show_i, &menu_i, &set_i, &ctl_i, &rec_i, &exp_i, &fs_i, &sep, &quit_i])?;
     *app.state::<TrayState>().set_mode.lock() = Some(set_i);
+    *app.state::<TrayState>().record.lock() = Some(rec_i);
 
     TrayIconBuilder::with_id("sonora-tray")
         .icon(Image::from_bytes(TRAY_ICON)?)
@@ -49,7 +52,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| match event.id.as_ref() {
             "show" => show(app),
-            "menu" | "setmode" | "fullscreen" | "export" => {
+            "menu" | "setmode" | "fullscreen" | "export" | "record" => {
                 show(app);
                 let _ = app.emit("tray", event.id.as_ref());
             }
@@ -81,5 +84,13 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 pub fn set_tray_set_mode(state: tauri::State<TrayState>, on: bool) {
     if let Some(item) = state.set_mode.lock().as_ref() {
         let _ = item.set_checked(on);
+    }
+}
+
+/// Keep the tray's Record item in step with the app ("Stop recording" while one runs).
+#[tauri::command]
+pub fn set_tray_recording(state: tauri::State<TrayState>, on: bool) {
+    if let Some(item) = state.record.lock().as_ref() {
+        let _ = item.set_text(if on { "Stop recording" } else { "Record" });
     }
 }

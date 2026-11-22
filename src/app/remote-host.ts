@@ -58,6 +58,7 @@ export function initRemoteHost(ctl: Controller, shell: Shell, platform: Platform
       platform: platform.kind,
       monitors,
       outputMonitor,
+      rec: platform.recorder ? { state: platform.recorder.status().state, elapsed: platform.recorder.status().elapsed } : null,
     };
   };
   const sendArt = (): void => {
@@ -75,6 +76,7 @@ export function initRemoteHost(ctl: Controller, shell: Shell, platform: Platform
   };
 
   ctl.subscribe(broadcast);
+  platform.recorder?.onChange(broadcast);
   ctl.album.subscribe(broadcast, false);
   nowPlaying.subscribe(broadcast, false);
   platform.onFullscreenChange((fs) => { fullscreen = fs; broadcast(); void refreshMonitors(); });
@@ -132,6 +134,7 @@ export function initRemoteHost(ctl: Controller, shell: Shell, platform: Platform
         else if (a.a === 'media') platform.mediaControl?.(a.v);
         else if (a.a === 'setDevice') { ctl.settings.audioDevice = a.id; ctl.settings.audioDeviceName = a.id === 'default' ? '' : a.name; ctl.commit(); platform.setDevice(a.id, a.name); }
         else if (a.a === 'key') shell.key(a.key);
+        else if (a.a === 'record') shell.toggleRecord();
         broadcast();
         break;
       }

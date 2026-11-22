@@ -41,6 +41,7 @@ pub fn run() {
             media::get_media_session,
             media::media_control,
             tray::set_tray_set_mode,
+            tray::set_tray_recording,
             controller::open_controller,
             controller::close_controller,
             out::out_open,

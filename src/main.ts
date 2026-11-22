@@ -12,6 +12,7 @@ import { listen } from '@tauri-apps/api/event';
 
 import { TauriFrameSource } from './audio/tauri-source';
 import { initController } from './app/controller';
+import { createRecorder } from './export/recorder';
 import type { MediaAction, Platform } from './app/platform';
 import { initRemoteHost } from './app/remote-host';
 import { initShell } from './app/shell';
@@ -241,9 +242,11 @@ async function main(): Promise<void> {
   const source = new TauriFrameSource();
   source.subscribe((frame) => controller.onFrame(frame));
   await source.start();
+  platform.recorder = createRecorder(renderer, (cb) => source.subscribe(cb));
 
   const shell = await initShell(controller, platform);
   const host = initRemoteHost(controller, shell, platform);
+  if (import.meta.env.DEV) window.__sonoraHooks = { ...(window.__sonoraHooks ?? {}), shell, platform, renderer } as typeof window.__sonoraHooks;
   if (import.meta.env.DEV) {
     // Dev checks without devtools: the link and preview cost on the dev console.
     window.setInterval(() => {
@@ -373,6 +376,8 @@ async function desktopPlatform(settings: PersistedSettings, persist: () => void)
       } catch (err) { console.warn('Could not move the output:', err); }
     },
     outputMonitor: async () => { try { return (await currentMonitor())?.name ?? ''; } catch { return ''; } },
+    revealFile: (path) => { void invoke('out_reveal', { path }).catch(() => undefined); },
+    setTrayRecording: (on) => { void invoke('set_tray_recording', { on }).catch(() => undefined); },
     async videoIo() {
       const d = await import('./export/desktop-io');
       return { sink: (name) => d.desktopSink(name), aac: (sr, ch, kbps) => d.openAac(sr, ch, kbps), reveal: (path) => { void d.revealFile(path); } };

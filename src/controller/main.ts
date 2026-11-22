@@ -125,8 +125,11 @@ export async function bootController(desktop: Desktop = {}): Promise<void> {
       ? button(st.fullscreen ? 'Leave fullscreen' : 'Fullscreen', { icon: st.fullscreen ? 'collapse' : 'expand', onClick: () => act({ a: 'toggleFullscreen' }) })
       : button('Show the visual', { icon: 'play', variant: 'primary', onClick: () => act({ a: 'goVisual' }) });
     third.classList.add('ctl-big');
-    actions.replaceChildren(black, freeze, third);
-    badge.textContent = st.blackout ? 'blackout' : st.frozen ? 'frozen' : st.screen !== 'visual' ? 'menu on screen' : '';
+    const clock = (t: number): string => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+    const rec = st.rec ? button(st.rec.state === 'recording' ? `Stop · ${clock(st.rec.elapsed)}` : st.rec.state === 'finishing' ? 'Saving…' : 'Record', { onClick: () => act({ a: 'record' }) }) : null;
+    if (rec) { rec.classList.add('ctl-big'); rec.setAttribute('aria-pressed', String(st.rec?.state === 'recording')); }
+    actions.replaceChildren(black, freeze, third, ...(rec ? [rec] : []));
+    badge.textContent = st.blackout ? 'blackout' : st.frozen ? 'frozen' : st.rec?.state === 'recording' ? 'recording' : st.screen !== 'visual' ? 'menu on screen' : '';
     badge.hidden = !badge.textContent;
     desc.textContent = describe(s.mode, ctl.variantFor(s.mode), ctl.depthFor(s.mode), getStyle(s.mode).supportsDepth);
   }

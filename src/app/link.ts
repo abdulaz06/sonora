@@ -44,7 +44,8 @@ export type RemoteAction =
   | { a: 'moveOutput'; monitor: string }
   | { a: 'media'; v: 'prev' | 'playpause' | 'next' }
   | { a: 'setDevice'; id: string; name: string }
-  | { a: 'key'; key: string };
+  | { a: 'key'; key: string }
+  | { a: 'record' };
 
 export interface RemoteState {
   settings: PersistedSettings;
@@ -61,6 +62,8 @@ export interface RemoteState {
   /** Displays and the one the output is on (desktop). */
   monitors: MonitorInfo[];
   outputMonitor: string;
+  /** Recording (desktop; null where there's none). */
+  rec: { state: string; elapsed: number } | null;
 }
 
 export type LinkMsg =

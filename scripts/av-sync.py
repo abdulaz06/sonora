@@ -5,7 +5,7 @@ turns white after each click. Pass: every pair within one frame.
 
   python scripts/av-sync.py <video.mp4> [--json]
 """
-import json, subprocess, sys
+import json, re, subprocess, sys
 sys.stdout.reconfigure(encoding="utf-8")
 import numpy as np
 
@@ -16,7 +16,6 @@ def main():
     path = sys.argv[1]
     ff = ffmpeg()
     info = subprocess.run([ff, '-hide_banner', '-i', path], capture_output=True, text=True).stderr
-    import re
     m = re.search(r'(\d+(?:\.\d+)?) fps', info)
     fps = float(m.group(1)) if m else 60.0
     sr = 48000
@@ -29,10 +28,14 @@ def main():
         if i - last > sr * 0.2:
             clicks.append(i / sr); last = i
     # Video: mean of the bottom-left 6% square per frame (gray).
-    v = subprocess.check_output([ff, '-v', 'error', '-i', path, '-map', '0:v:0', '-vf', 'crop=iw*0.06:iw*0.06:0:ih-iw*0.06,scale=8:8,format=gray', '-f', 'rawvideo', '-'])
-    fr = np.frombuffer(v, dtype=np.uint8).reshape(-1, 64).mean(axis=1)
+    # Each frame's own timestamp (recordings have variable frame timing), from showinfo.
+    p = subprocess.run([ff, '-v', 'info', '-i', path, '-map', '0:v:0', '-vf', 'crop=iw*0.06:iw*0.06:0:ih-iw*0.06,scale=8:8,format=gray,showinfo', '-vsync', 'passthrough', '-f', 'rawvideo', '-'], capture_output=True)
+    fr = np.frombuffer(p.stdout, dtype=np.uint8).reshape(-1, 64).mean(axis=1)
+    pts = [float(x) for x in re.findall(r'pts_time:\s*([-\d.]+)', p.stderr.decode('utf8', 'replace'))]
+    n = min(len(pts), len(fr))
+    fr, pts = fr[:n], np.array(pts[:n])
     on = fr > 200
-    starts = [k / fps for k in np.flatnonzero(on[1:] & ~on[:-1]) + 1]
+    starts = [pts[k] for k in np.flatnonzero(on[1:] & ~on[:-1]) + 1]
     pairs = []
     for c in clicks:
         nxt = [s for s in starts if s >= c - 2.5 / fps]
