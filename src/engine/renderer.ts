@@ -80,6 +80,8 @@ const MAX_BACKING_LONG_SIDE = 3840;
 /** A/V sync probe: an analysis frame whose instant energy is above this and
  * this many times the previous frame's counts as a click. */
 const SYNC_FLASH_MIN = 0.002, SYNC_FLASH_JUMP = 4;
+/** The probe stays white this long (s), so a recording at 60 fps sees it whatever the display rate. */
+const SYNC_FLASH_HOLD_S = 0.03;
 
 /** Default post values for art styles. */
 const POST_DEFAULTS: PostControls = {
@@ -174,6 +176,8 @@ export interface Renderer {
   /** Called after every drawn frame, with the canvas still holding it (the
    * controller's preview tap reads it back asynchronously here). */
   setFrameHook(cb: ((gl: WebGL2RenderingContext, timeMs: number) => void) | null): void;
+  /** Another after-frame hook (the recorder), alongside the preview tap's; returns its remover. */
+  addFrameHook(cb: (gl: WebGL2RenderingContext, timeMs: number) => void): () => void;
   onEvent(cb: (e: SonoraEvent) => void): () => void;
   stats(): RendererStats;
 }
@@ -267,6 +271,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   let blackout = false, blackLevel = 1;
   let frozen = false;
   let frameHook: ((gl: WebGL2RenderingContext, timeMs: number) => void) | null = null;
+  const extraHooks = new Set<(gl: WebGL2RenderingContext, timeMs: number) => void>();
   let pending: StyleDescriptor | null = null;
   /** Look / view to apply when the pending style swaps in (transition()). */
   let pendingLook: { variant: string; depth: boolean } | null = null;
@@ -412,7 +417,9 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       post.bloom *= glow;
       artPost.apply(quadVAO, post, time, fadeAlpha * blackLevel, holdSmooth);
     }
-    if (syncLatched && debugFlags.syncFlash) {
+    if (syncLatched) { syncHold = SYNC_FLASH_HOLD_S; syncLatched = false; }
+    if (syncHold > 0 && debugFlags.syncFlash) {
+      syncHold -= dt;
       // A/V sync probe: a white corner on the frame that first shows a click.
       const k = Math.round(Math.min(canvas.width, canvas.height) * 0.12);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -423,13 +430,17 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.disable(gl.SCISSOR_TEST);
     }
-    syncLatched = false;
-    frameHook?.(gl, performance.now());
+    if (frameHook || extraHooks.size) {
+      const now = performance.now();
+      frameHook?.(gl, now);
+      for (const h of extraHooks) h(gl, now);
+    }
   }
 
   // A/V sync probe (debugFlags.syncFlash): a click is an energy jump in one analysis frame.
   let syncLatched = false;
   let syncPrev = 0;
+  let syncHold = 0;
 
   // Beat onsets arrive at analysis rate; latch so a render frame never misses one.
   let beatOnsetLatched = false;
@@ -624,6 +635,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     setFrozen(on: boolean): void { frozen = on; },
     isFrozen: () => frozen,
     setFrameHook(cb): void { frameHook = cb; },
+    addFrameHook(cb) { extraHooks.add(cb); return () => { extraHooks.delete(cb); }; },
     onEvent(cb: (e: SonoraEvent) => void): () => void {
       eventListeners.push(cb);
       return () => {

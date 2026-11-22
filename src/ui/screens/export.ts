@@ -21,6 +21,7 @@ import { FONTS, OUTRO_S, type Corner, type FontId, type OverlaySpec, type TextCa
 import { buildPlan, COMBOS, PALETTE_NAMES, snapToBar, styleLine, type PalettePick, type Plan, type StudioState } from '../../export/plan-lib.mjs';
 import { createPreview, type Preview } from '../../export/preview';
 import { loadSong, type Song } from '../../export/song';
+import { setVideoPrefs, videoPrefs } from '../../export/video-prefs';
 import { button, segmented, select, slider, toggle } from '../ds/components';
 import { h } from '../ds/dom';
 import { lockup } from './brand';
@@ -75,7 +76,13 @@ const fmtEta = (s: number): string => (s >= 3600 ? `${Math.floor(s / 3600)} h ${
 
 export function createExport(io: ExportIo, on: { back(): void }): ExportScreen {
   const prefs: Prefs = { ...DEFAULTS, ...(() => { try { return JSON.parse(localStorage.getItem(PREFS_KEY) ?? '{}') as Partial<Prefs>; } catch { return {}; } })() };
-  const savePrefs = (): void => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* private mode */ } };
+  // The mark's corner and the outro are shared with recordings.
+  const vp = videoPrefs();
+  prefs.corner = vp.corner; prefs.outro = vp.outro;
+  const savePrefs = (): void => {
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* private mode */ }
+    setVideoPrefs({ corner: prefs.corner, outro: prefs.outro });
+  };
 
   let song: Song | null = null;
   let album: Palette | null = null;

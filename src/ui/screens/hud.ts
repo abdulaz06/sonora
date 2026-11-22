@@ -23,6 +23,8 @@ export interface HudHandlers {
   menu(): void;
   settings(section?: string): void;
   setMode(on: boolean): void;
+  /** Desktop: start / stop a recording. */
+  record?: () => void;
 }
 
 export interface Hud {
@@ -53,15 +55,31 @@ export function createHud(ctl: Controller, platform: Platform, on: HudHandlers):
   const palBtn = button('', { title: 'Palette', onClick: () => toggleQuick() });
   palBtn.append(swatch);
   const fsBtn = button('', { icon: 'expand', title: 'Fullscreen (F)', onClick: () => platform.toggleFullscreen() });
+  // Recording (desktop): the button shows the time while it runs; a small indicator stays in the corner.
+  const recBtn = on.record ? button('Record', { title: 'Record the visual with the sound (F9)', onClick: () => on.record?.() }) : null;
+  const recDot = h('i', { class: 'rec-dot' });
+  const recTime = h('span', { class: 's-label s-bone' });
+  const recInd = h('div', { class: 'rec-ind s-root', hidden: true }, recDot, recTime);
   const bar = h('div', { class: 'hud-bar' },
     h('div', null, button('Menu', { icon: 'grid', title: 'Menu (Esc)', onClick: () => on.menu() }), now),
-    h('div', null, smBtn, palBtn, fsBtn, button('', { icon: 'settings', title: 'Settings', onClick: () => on.settings() })));
+    h('div', null, smBtn, recBtn, palBtn, fsBtn, button('', { icon: 'settings', title: 'Settings', onClick: () => on.settings() })));
   const qs = h('div', { class: 'qs', role: 'dialog', 'aria-label': 'Quick switcher' });
   const hud = h('div', { class: 'hud s-root', hidden: true }, qs, bar);
   const smLabel = h('div', { class: 'sm-label s-root', hidden: true }, glint(), h('span', { class: 's-label s-bone' }, 'set mode'));
   smLabel.querySelector('svg')!.setAttribute('style', 'width:18px;height:18px;color:var(--bone)');
   const np = h('div', { class: 'np-overlay s-root' });
-  document.body.append(hud, smLabel, np);
+  document.body.append(hud, smLabel, np, recInd);
+  const clock = (t: number): string => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+  platform.recorder?.onChange((st) => {
+    const on2 = st.state === 'recording' || st.state === 'finishing' || st.state === 'starting';
+    recInd.hidden = !on2;
+    recInd.classList.toggle('finishing', st.state === 'finishing');
+    recTime.textContent = st.state === 'starting' ? 'rec' : st.state === 'finishing' ? `saving · ${clock(st.elapsed)}` : `rec · ${clock(st.elapsed)}`;
+    if (recBtn) {
+      recBtn.querySelector('span')!.textContent = st.state === 'recording' ? `Stop · ${clock(st.elapsed)}` : st.state === 'finishing' ? 'Saving…' : 'Record';
+      recBtn.setAttribute('aria-pressed', String(st.state === 'recording'));
+    }
+  });
   now.addEventListener('click', () => toggleQuick());
 
   platform.onFullscreenChange((fs) => fsBtn.replaceChildren(icon(fs ? 'collapse' : 'expand')));

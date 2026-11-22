@@ -7,6 +7,9 @@
  */
 
 import { mediaFor, PIECES, SHORTCUTS, STYLE_INFO } from '../../app/catalog';
+import type { Corner as MarkCorner } from '../../export/overlay';
+import type { RecPreset } from '../../export/recorder';
+import { setVideoPrefs, videoPrefs } from '../../export/video-prefs';
 import type { Controller } from '../../app/controller';
 import type { Platform } from '../../app/platform';
 import { audioStatus } from '../../app/stores';
@@ -24,7 +27,7 @@ import { albumInfo, albumTile } from './album-tile';
 import { lockup } from './brand';
 
 const PRESET_MATCH = 0.03;
-export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'performance', 'system', 'keys', 'about'] as const;
+export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'recording', 'performance', 'system', 'keys', 'about'] as const;
 export type SectionId = typeof SECTIONS[number];
 
 export interface SettingsHandlers {
@@ -93,6 +96,16 @@ const INFO = {
     media: [{ src: mediaFor('explain-resp-smooth'), caption: 'smooth' }, { src: mediaFor('explain-resp-punchy'), caption: 'punchy' }],
   }),
   rings: (): InfoContent => ({ title: 'rings', scope: 'for aura', body: ['How many concentric shapes Aura draws.'] }),
+  recSize: (): InfoContent => ({
+    title: 'recording', scope: 'desktop',
+    body: ['F9, the Record button or the tray records the visual itself (not your desktop) with the sound sonora hears, into Videos\sonora.',
+      '“As shown” records at the size of the window or screen; a preset scales it. Picture and sound stay in sync within a frame.'],
+  }),
+  recMark: (): InfoContent => ({
+    title: 'mark and outro', scope: 'recordings and exports',
+    body: ['Every video sonora makes carries a small sonora mark in a corner you choose (inside the safe zones on 9:16).',
+      'The outro adds a 2 s end card: made with sonora · sonoravisuals.com. Turn it off here or on the Export screen.'],
+  }),
   setmode: (): InfoContent => ({
     title: 'set mode',
     body: ['Lets sonora choose, like a VJ: it switches style, look and view when the track changes, and sometimes on a big drop after a long build.',
@@ -159,15 +172,17 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
   let monitors: { value: string; label: string }[] = [];
 
   const sections: Record<string, HTMLElement> = {};
-  nav.append(...SECTIONS.map((id) => {
+  // Recording and exports are desktop features.
+  const shown = SECTIONS.filter((id) => id !== 'recording' || platform.kind === 'desktop');
+  nav.append(...shown.map((id) => {
     const b = h('button', { type: 'button' }, id);
     b.addEventListener('click', () => sections[id]?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
     return b;
   }));
   sh.body.addEventListener('scroll', () => {
     const top = sh.body.getBoundingClientRect().top + 8;
-    let cur = SECTIONS[0] as string;
-    for (const id of SECTIONS) if (sections[id] && sections[id].getBoundingClientRect().top <= top) cur = id;
+    let cur = shown[0] as string;
+    for (const id of shown) if (sections[id] && sections[id].getBoundingClientRect().top <= top) cur = id;
     nav.querySelectorAll('button').forEach((b) => b.setAttribute('aria-current', String(b.textContent === cur)));
   });
 
@@ -304,6 +319,14 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       row(platform.kind === 'web' ? 'Source' : 'Listen to', INFO.device(platform.kind), dev, h('div', null, audioCtl, h('div', { style: { marginTop: '14px' } }, mtr.el),
         h('p', { class: 'st-note' }, audioStatus.get().device ? `Now: ${audioStatus.get().device}.` : 'Nothing found yet.'))));
 
+    // Recording (desktop): size, frame rate, the mark's corner and the outro (shared with exports).
+    const vp = videoPrefs();
+    const recording = platform.kind === 'desktop' ? section('recording', 'recording', 'f9',
+      row('Size', INFO.recSize(), null, segmented([{ value: 'output', label: 'as shown' }, { value: '720', label: '720p' }, { value: '1080', label: '1080p' }, { value: '1440', label: '1440p' }, { value: '2160', label: '4k' }], vp.recPreset, (v) => { setVideoPrefs({ recPreset: v as RecPreset }); }, 'Recording size').el),
+      row('Frame rate', INFO.recSize(), null, segmented([{ value: '30', label: '30 fps' }, { value: '60', label: '60 fps' }], String(vp.recFps), (v) => { setVideoPrefs({ recFps: Number(v) as 30 | 60 }); }, 'Recording frame rate').el),
+      row('Mark', INFO.recMark(), null, segmented([{ value: 'tl', label: 'top left' }, { value: 'tr', label: 'top right' }, { value: 'bl', label: 'bottom left' }, { value: 'br', label: 'bottom right' }], vp.corner, (v) => { setVideoPrefs({ corner: v as MarkCorner }); }, 'Mark corner').el),
+      row('Outro', INFO.recMark(), null, toggle('', vp.outro, (v) => { setVideoPrefs({ outro: v }); }).el, true)) : null;
+
     // Performance
     const perf = section('performance', 'performance', 'all styles',
       row('Quality', INFO.quality(), s.quality, segmented((['low', 'medium', 'high', 'auto'] as QualityPreset[]).map((q) => ({ value: q, label: q })), s.quality, (v) => ctl.setQuality(v), 'Quality').el),
@@ -336,7 +359,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license. third-party licenses: third-party-notices.md in the install folder.')));
 
     const scroll = sh.body.scrollTop;
-    content.replaceChildren(visual, colour, camera, feel, setmode, np, audio, perf, system, keys, about);
+    content.replaceChildren(...[visual, colour, camera, feel, setmode, np, audio, recording, perf, system, keys, about].filter((x): x is HTMLElement => !!x));
     sh.body.scrollTop = scroll;
   }
 

@@ -39,4 +39,10 @@ export interface Platform {
   outputMonitor?(): Promise<string>;
   /** Exports and recordings write video files (desktop only; the web page has no Export). */
   videoIo?(): Promise<import('../ui/screens/export').ExportIo>;
+  /** Live recording of the visual with the system audio (desktop). */
+  recorder?: import('../export/recorder').Recorder;
+  /** Show a saved video in Explorer (desktop). */
+  revealFile?(path: string): void;
+  /** Tell the tray whether a recording runs. */
+  setTrayRecording?(on: boolean): void;
 }

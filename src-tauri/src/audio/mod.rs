@@ -62,6 +62,13 @@ fn run_pipeline(
 ) -> Result<(), String> {
     let buffer = Arc::new(Mutex::new(AudioBuffer::new(BUFFER_CAPACITY)));
 
+    // Development builds only: SONORA_FAKE_CAPTURE=<16-bit wav> feeds a file through the
+    // capture path in real time instead of the speakers (recording sync checks, silently).
+    #[cfg(debug_assertions)]
+    if let Ok(path) = std::env::var("SONORA_FAKE_CAPTURE") {
+        return fake::run(app_handle, buffer, &path);
+    }
+
     let mut active: Option<ActiveCapture> = None;
     let mut analysis: Option<Analyzer> = None;
 
@@ -308,6 +315,73 @@ fn apply_swap_inner(
             eprintln!("Failed to start capture on {name}: {e}");
             device_state.set_current(String::new());
             let _ = app_handle.emit("audio-device-changed", "");
+        }
+    }
+}
+
+#[cfg(debug_assertions)]
+mod fake {
+    //! A WAV file played into the capture path at real-time pace (development builds only).
+    use super::*;
+
+    fn read_wav(path: &str) -> Result<(u32, usize, Vec<f32>), String> {
+        let b = std::fs::read(path).map_err(|e| e.to_string())?;
+        let (mut p, mut rate, mut ch, mut data) = (12usize, 48000u32, 2usize, None);
+        while p + 8 <= b.len() {
+            let id = &b[p..p + 4];
+            let len = u32::from_le_bytes([b[p + 4], b[p + 5], b[p + 6], b[p + 7]]) as usize;
+            if id == b"fmt " {
+                ch = u16::from_le_bytes([b[p + 10], b[p + 11]]) as usize;
+                rate = u32::from_le_bytes([b[p + 12], b[p + 13], b[p + 14], b[p + 15]]);
+            }
+            if id == b"data" {
+                data = Some(&b[p + 8..(p + 8 + len).min(b.len())]);
+            }
+            p += 8 + len + (len % 2);
+        }
+        let d = data.ok_or("no data chunk")?;
+        Ok((rate, ch, d.chunks_exact(2).map(|x| i16::from_le_bytes([x[0], x[1]]) as f32 / 32768.0).collect()))
+    }
+
+    pub fn run(app_handle: tauri::AppHandle, buffer: Arc<Mutex<AudioBuffer>>, path: &str) -> Result<(), String> {
+        let (rate, ch, pcm) = read_wav(path)?;
+        crate::out::record::RATE.store(rate, Ordering::Relaxed);
+        let mut analysis = Analyzer::new(rate);
+        let name = format!("file: {}", std::path::Path::new(path).file_name().and_then(|n| n.to_str()).unwrap_or("?"));
+        eprintln!("Fake capture from {name} ({rate} Hz, {ch} ch)");
+        let _ = app_handle.emit("audio-device-changed", &name);
+        let start = Instant::now();
+        let frames_total = pcm.len() / ch;
+        let mut fed = 0usize;
+        loop {
+            std::thread::sleep(Duration::from_millis(5));
+            // Deliver what real time says is due, in whole 10 ms packets (as WASAPI does).
+            let due = (start.elapsed().as_secs_f64() * rate as f64) as usize;
+            let packet = (rate / 100) as usize;
+            while fed + packet <= due {
+                let mut b = buffer.lock();
+                let mut chunk = Vec::with_capacity(packet * ch);
+                for k in 0..packet {
+                    let i = (fed + k) % frames_total;
+                    let s = &pcm[i * ch..i * ch + ch];
+                    b.write_one(s.iter().sum::<f32>() / ch as f32);
+                    chunk.extend_from_slice(s);
+                }
+                crate::out::record::on_capture(&chunk, ch);
+                fed += packet;
+                drop(b);
+            }
+            let hop = hop_size(rate);
+            if buffer.lock().new_sample_count() < hop {
+                continue;
+            }
+            let clock = {
+                let mut b = buffer.lock();
+                b.read_latest(analysis.window_mut());
+                crate::out::record::CLOCK.load(Ordering::Relaxed)
+            };
+            let frame = analysis.analyze();
+            let _ = app_handle.emit("audio-frame", &Stamped { frame: &frame, clock });
         }
     }
 }

@@ -91,6 +91,8 @@ export interface BandHits {
 }
 
 export interface AudioFeatureFrame {
+  /** Desktop: the capture clock (sample frames since the app started) at the end of this frame's window. */
+  clock?: number;
   bands: Bands;
   spectral: SpectralFeatures;
   energy: EnergyData;
