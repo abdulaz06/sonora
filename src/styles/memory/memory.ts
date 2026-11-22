@@ -54,10 +54,19 @@ const SNAP_TAU = 0.22;
 /** Palette grade share and the frame-edge dissolve. */
 const GRADE = 0.32;
 const EDGE = 0.85;
-/** Kick: how far the fog recedes on the hit (share of its distances). */
-const KICK_CLEAR: Record<Look, number> = { forest: 0.35, coast: 0.35, desert: 0.9 };
-/** Kick: share of splats that lift off and how bright they glow (bright fogs answer by brightening). */
-const KICK_LIFT: Record<Look, [number, number]> = { forest: [0.62, 2.4], coast: [0.62, 2.4], desert: [0.45, 1.3] };
+/** Kick: share of splats that lift off and how bright they glow. Kept small: a lift over most of
+ * the scene brightened the whole frame on every kick (motion gate's background step). */
+const KICK_LIFT: Record<Look, [number, number]> = { forest: [0.2, 1.0], coast: [0.2, 1.0], desert: [0.2, 1.2] };
+/** Kick light ring: starts this far out (m), travels at this speed (m/s), width (m), decay (s), gain per look. */
+const RING_R0 = 2.0;
+const RING_SPEED = 26;
+const RING_WIDTH = 1.6;
+const RING_TAU = 0.32;
+const RING_GAIN: Record<Look, number> = { forest: 1.1, coast: 1.8, desert: 2.4 };
+/** The ring lifts colours up to this share of the fog's luminance (forest, coast) or this luminance (desert). */
+const RING_CAP: Record<Look, number> = { forest: 0.8, coast: 0.92, desert: 0.5 };
+/** Scene light per look: the desert is a moonlit night (dark enough that the ring reads). */
+const GAIN: Record<Look, number> = { forest: 1, coast: 1, desert: 0.6 };
 /** Low quality draws every other splat. */
 const LOW_STRIDE = 2;
 
@@ -158,6 +167,8 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
   let surge = 0;
   let flash = 0;
   let kick = 0;
+  let ringT = 9;
+  let ringArmed = true;
 
   return {
     id: 'memory',
@@ -178,6 +189,9 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
       flash *= Math.exp(-dt / 0.18);
       kick = Math.max(kick * Math.exp(-dt / 0.16), ctx.bassHits * fade);
       dissolve = Math.max(dissolve * Math.exp(-dt / DISSOLVE_TAU), ctx.bassHits * fade);
+      ringT += dt;
+      if (ctx.bassHits < 0.3) ringArmed = true;
+      if (ringArmed && ctx.bassHits > 0.5 && fade > 0.1) { ringArmed = false; ringT = 0; }
       const apartWant = es.section === 'build' ? es.buildProgress * es.buildProgress * APART : 0;
       apart += (apartWant - apart) * (1 - Math.exp(-dt / (apartWant < apart ? SNAP_TAU : 2.5)));
       const ptWant = es.section === 'breakdown' ? 1 : 0;
@@ -248,7 +262,6 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
 
       const [fn, ff] = FOG[look];
       const loopK = Math.max(loopFog, flash * 0.35);
-      const lightK = 1 + 0.35 * kick;
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
       gl.useProgram(prog.prog);
@@ -256,10 +269,11 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
         u_pos: s.posTex, u_nrm: s.nrmTex, u_col: s.colTex, u_tex_w: s.texW,
         u_view: view, u_proj: proj, u_res: [W, H], u_focal: [fy, fy], u_cam: eye, u_time: time,
         u_dissolve: dissolve * 0.85, u_push: clamp01(ctx.bassPresence) * 0.5 + kick * 0.5, u_apart: apart, u_points: points,
-        // Each kick the fog recedes for a moment: the memory sharpens on the beat.
-        u_fog_near: fn * (1 - loopK * 0.9) * (0.75 + 0.25 * fade) * (1 + KICK_CLEAR[look] * kick), u_fog_far: ff * (1 - loopK * 0.85) * (0.8 + 0.2 * fade) * (1 + KICK_CLEAR[look] * kick), u_fog_col: fogNow,
+        u_fog_near: fn * (1 - loopK * 0.9) * (0.75 + 0.25 * fade), u_fog_far: ff * (1 - loopK * 0.85) * (0.8 + 0.2 * fade), u_fog_col: fogNow,
         u_lift_share: KICK_LIFT[look][0], u_lift_glow: KICK_LIFT[look][1],
-        u_light: mix3(pal.highlight, [1, 1, 1], 0.4).map((c) => c * lightK) as [number, number, number],
+        u_ring: [RING_R0 + RING_SPEED * ringT, ringT < 2 ? Math.exp(-ringT / RING_TAU) * fade : 0, RING_WIDTH + 0.12 * RING_SPEED * ringT], u_ring_gain: RING_GAIN[look], u_gain: GAIN[look],
+        u_ring_cap: RING_CAP[look] * (look === 'desert' ? 1 : 0.299 * fogNow[0] + 0.587 * fogNow[1] + 0.114 * fogNow[2]),
+        u_light: mix3(pal.highlight, [1, 1, 1], 0.4),
         u_shadow: mix3(pal.shade, [0, 0, 0], 0.3), u_grade: GRADE + 0.25 * points, u_edge: EDGE * (es.section === 'silence' ? 1.2 : 1), u_glow: points * 0.6,
       });
       gl.bindVertexArray(vao);

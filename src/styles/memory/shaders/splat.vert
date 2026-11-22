@@ -32,6 +32,10 @@ uniform float u_edge;               // the frame's edges dissolve into the fog
 uniform float u_glow;               // point cloud: points glow
 uniform float u_lift_share;         // share of splats that lift off on a kick
 uniform float u_lift_glow;          // how bright the lifting splats glow
+uniform vec3 u_ring;                // kick light ring: radius (m), amplitude, width (m)
+uniform float u_ring_gain;          // how bright the ring lights what it passes
+uniform float u_ring_cap;           // the ring lifts colours up to this luminance, never past it
+uniform float u_gain;               // the look's light level (the desert is a moonlit night)
 out vec4 v_col;
 out vec2 v_g;                       // gaussian coordinates (σ units)
 out float v_point;
@@ -87,8 +91,16 @@ void main() {
   float lum = dot(col, vec3(0.299, 0.587, 0.114));
   vec3 graded = mix(u_shadow, u_light, smoothstep(0.0, 0.75, lum)) * (0.35 + 1.25 * lum);
   col = mix(col, graded, u_grade);
+  col *= u_gain;
   col *= 1.0 + u_glow * (0.6 + 1.4 * fract(h * 3.7));
   col *= 1.0 + lift * u_lift_glow;   // splats lifting off on the kick catch the light
+  // Each kick sends a ring of light out from the walker through the scene: what it passes lights
+  // up for a moment (local, so the fog and the shadows never pulse as a whole).
+  // It lifts darks and mid-tones only: the brightest parts (a bright fog, sunlit sand) never pulse.
+  float rd_ = (dist - u_ring.x) / u_ring.z;
+  float lum0 = max(dot(col, vec3(0.299, 0.587, 0.114)), 1e-3);
+  // Nothing right at the lens flashes (a near rock fills a third of the frame).
+  col *= min(1.0 + u_ring.y * u_ring_gain * exp(-rd_ * rd_) * smoothstep(1.8, 4.0, dist), max(1.0, u_ring_cap / lum0));
   // Fog, and the frame's edges dissolving into it (reel01).
   vec2 ndc = clip.xy / clip.w;
   float fog = smoothstep(u_fog_near, u_fog_far, z);
