@@ -39,6 +39,8 @@ uniform highp sampler2DArray u_tex_detail;  // City materials (textures.ts)
 uniform highp sampler2DArray u_tex_aerial;  // City aerial imagery, A = vegetation height
 uniform float u_tex;         // 0 until the City textures are loaded, then 1 (fades in)
 uniform int u_q;             // quality: 0 low, 1 medium, 2 high
+uniform sampler2D u_height_tex; // baked City heights (heightbake.frag)
+uniform float u_hbaked;      // 1 once the height field is baked
 // March budget
 uniform int u_steps;
 uniform float u_detail;      // surface epsilon in pixels

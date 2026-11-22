@@ -139,7 +139,7 @@ def frame_metrics(path, pal, combo):
     n = int(mask.sum())
     out = {'lit': n / mask.size, 'Lall': float(L.mean())}
     if n < 50:
-        out.update(chroma=0.0, M=0.0, grey=1.0, white=0.0, off=0.0, olive=0.0, L=0.0, L95=0.0, sep=0.0, minor=0.0)
+        out.update(chroma=0.0, M=0.0, grey=1.0, white=0.0, off=0.0, olive=0.0, L=0.0, L95=0.0, sep=0.0, minor=0.0, light_off=1.0, light_chroma=0.0)
         return out
     Lc, Cc, hc = L[mask], C[mask], h[mask]
     rgb = im[mask] * 255
@@ -156,6 +156,13 @@ def frame_metrics(path, pal, combo):
     # when darker (L 0.50 at 75 deg) — a medium gold reads gold, by eye.
     lmax = 0.50 + 0.12 * np.clip((hc - OLIVE_H[0]) / 20.0, 0.0, 1.0)
     olive = (hc > OLIVE_H[0]) & (hc < OLIVE_H[1]) & (Lc < lmax) & (Cc > 0.03)
+    # The light (Voyage City / Ocean, D89): the brightest content (sun, sky light, haze,
+    # glints, city lights) carries the palette; the materials stay natural.
+    lm = Lc >= np.percentile(Lc, 85)
+    lcol = lm & (Cc >= C_GREY * 0.6)
+    light_chroma = float(Cc[lm].mean()) if lm.any() else 0.0
+    loff = off_palette(hc[lcol], hs, arcs) if lcol.any() else np.zeros(0)
+    light_off = float((Cc[lcol] * loff).sum() / max(Cc[lcol].sum(), 1e-9)) if lcol.any() else 1.0
     sub = lab[mask]
     if len(sub) > 6000:
         sub = sub[np.random.default_rng(1).choice(len(sub), 6000, replace=False)]
@@ -164,6 +171,7 @@ def frame_metrics(path, pal, combo):
         chroma=float(Cc.mean()), M=float(M), grey=float(grey.mean()),
         white=float((grey & (Lc > 0.85)).mean()), off=off_share, olive=float(olive.mean()),
         L=float(Lc.mean()), L95=float(np.percentile(Lc, 95)), sep=sep, minor=minor,
+        light_off=light_off, light_chroma=light_chroma,
     )
     return out
 
@@ -181,7 +189,7 @@ def analytic(pal):
     }
 
 
-KEYS = ['chroma', 'M', 'grey', 'white', 'off', 'olive', 'L', 'L95', 'Lall', 'sep', 'minor', 'lit']
+KEYS = ['chroma', 'M', 'grey', 'white', 'off', 'olive', 'L', 'L95', 'Lall', 'sep', 'minor', 'lit', 'light_off', 'light_chroma']
 
 
 def run(frames, sheets, make_sheets=True):
@@ -366,6 +374,15 @@ def gate(metrics_path, th_path, quiet=False, ref_path=None):
         ref = ps.get(DEFAULT) or (refm['combos'].get(c, {}).get(DEFAULT) if refm else None)
         for p, x in ps.items():
             f = []
+            if t.get('mode') == 'light':
+                # City / Ocean (D89): the palette lives in the light; materials are natural.
+                # Gate: the light is in the palette and visibly coloured, the scene neither muddy nor blown.
+                if x.get('light_off', 1) > t['light_off_max']: f.append(f"light off {x['light_off']:.0%}>{t['light_off_max']:.0%}")
+                if x.get('light_chroma', 0) < t['light_chroma_min']: f.append(f"light chroma {x['light_chroma']:.3f}<{t['light_chroma_min']:.3f}")
+                if x['L'] < t['L_min']: f.append(f"muddy L {x['L']:.2f}<{t['L_min']:.2f}")
+                if x['L95'] > t['L95_max']: f.append(f"blown L95 {x['L95']:.2f}>{t['L95_max']:.2f}")
+                if f: fails.setdefault(p, []).append((c, f))
+                continue
             if x['chroma'] < t['chroma_min']: f.append(f"chroma {x['chroma']:.3f}<{t['chroma_min']:.3f}")
             if x['grey'] > t['grey_max']: f.append(f"grey {x['grey']:.0%}>{t['grey_max']:.0%}")
             if x['off'] > t['off_max']: f.append(f"off {x['off']:.0%}>{t['off_max']:.0%}")
