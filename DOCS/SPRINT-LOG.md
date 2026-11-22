@@ -3,36 +3,78 @@
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
 > Local-only media (songs, exports, recordings, masters): `local-media/` (git-ignored). Render scratch outside OneDrive.
 
-## Progress (resume here)
-- **Done:** A1–A3, B1–B2, E1 (pushed). Export screen works in the app; recording works (HUD, F9, tray, controller, settings).
-- **Measured:** export 1080p60 Ink Glow Depth 51 fps incl. warm-up (0.85× real time), Voyage Void 30 fps; exports deterministic (frame hashes equal over 3–5 runs); export A/V sync 39/39 clicks within a frame (−16.5…0 ms); recording sync 30/30 within a frame (−16.9…+16.5 ms); recording pacing at 180 Hz: 0 held frames, worst 5.8 ms, capture 0.19 ms/frame; /live Lighthouse desktop 47 → 95, mobile 100; `test:live` 321/321.
-- **Voyage before** (D1): `verify/voyage-1.1/before/` stills (palettes 0,2,3,6,7 × t 20/62/92), clips at 89 s, `cost.json` (1080p ms, City low/med/high ≈ 1.4–1.9 / 2.8–3.6 / 9.2–12.8; Ocean ≈ 1.7–2.0 / 3.7–4.2 / 10.5–13.1).
-- **D2 in progress:** sources downloaded to `local-media/textures-src/` (git-ignored): Poly Haven CC0 aerial_grass_rock (+nor), aerial_mud_1, aerial_rocks_02 (+nor), snow_field_aerial, aerial_beach_01, aerial_asphalt_01 (2k jpg, dl.polyhaven.org); ambientCG CC0 Ground037 1K; USGS NAIP (public domain, imagery.nationalmap.gov USGSNAIPImagery exportImage, bboxes in `naip/sources.txt`): farm-lancaster, farm-east, farm-amish, forest-vermont, town-phila (shore retry pending). Tooling chosen: `ktx2-encoder` (MIT, Basis encoder wasm, Apache-2.0) for KTX2 at build time; Basis transcoder (three.js `examples/jsm/libs/basis`, Apache-2.0, 527 KB wasm) at runtime in a worker. Not using the third-party `basisu.exe`.
-- **Next:** texture build script + `ASSETS.md`; KTX2 loader (worker transcode → BC7/S3TC, mips, anisotropy; loads only when City/Ocean shows, not in the site prewarm worker; harness `configure` awaits it); backdrop rewrite (NAIP-driven farmland regions with canopy heights from imagery, forest canopy, heightfield soft shadows + AO, GGX, scattering haze, palette in sun/sky/haze/lights; Gerstner water with Fresnel, SSS, fold/shore foam, depth colour, glints); budgets; palette metric recalibration for City/Ocean; after-captures; `npm run media`. Then A4 album-art/outro/cinematic export checks, A6 installer size, C2, full gates, review page.
-- Dev app for checks: `bash scripts/app/dev.sh` (own WebView2 profile, CDP :9333; `SONORA_FAKE_CAPTURE=<wav>` for silent sync checks). Checks: `scripts/app/export-check.mjs [--sync|--twice]`, `scripts/app/rec-check.mjs`, `scripts/app/export-ui.mjs <song>`.
+## Summary (review stop: waiting for Abdul)
+
+Review page: `verify/review-1.1/index.html` (every file below, with paths).
+
+### Try in `npm run tauri dev`
+- **Export** (menu › Export, tray › Export a video…, **E**): pick a real song (an mp3 with embedded artwork gives album colours and the now-playing card's cover). Try a part (click a drop on the strip, drag, the three suggestions) and the whole track; each format (single style, styles tour, beat switch with "pick the bar", showcase); 9:16 with safe zones on in the preview, and 16:9; a title card (reel line, cinematic), a text line or two (fonts, sizes, snap to bars), now playing; outro on and off; Best quality once. Render, watch the progress / estimate / Cancel, then Open folder (`Videos\sonora`). The screen says "only export music you have the rights to use."
+- **Record** with Spotify playing: F9 (or HUD › Record, tray › Record, the controller's Record). The indicator shows the time; stop with F9; the toast offers Open folder. Settings › Recording: size (as shown / 720p–4K), 30 / 60 fps, mark corner, outro. *Only measured with the click track through the development fake capture: real WASAPI capture with Spotify is yours to try.*
+- **Voyage City and Ocean** in several palettes (1–9), Low / Medium / High; the wide shots come in breakdowns.
+
+### Export and recording
+| measurement | result |
+|---|---|
+| encoders (WebView2 / Edge 158, RX 7700S) | WebCodecs H.264 hardware (also AV1; no HEVC); **no AAC in WebCodecs** → Windows' Media Foundation AAC from Rust (192 kbps, no priming offset); mp4-muxer (MIT); D86 |
+| render speed, 1080p60 | Ink Glow Depth 51 fps incl. the 8 s warm-up (0.85× real time); Voyage Void 30 fps; samples supersampled 1.5×: 9:16 tour 15.2 fps, 16:9 Voyage City 6.4 fps (GPU shared with another session's renders) |
+| determinism | same plan → identical frames (hashes of the encoder's VideoFrames): Voyage City 3/3, Silk Depth 5/5 at 1080p |
+| A/V sync, export | click track: 39/39 clicks, flash − click −16.5 … 0 ms (one frame 16.7 ms) PASS |
+| A/V sync, recording | click track through the capture path: 30/30 (and 19/20, 29/29), −16.9 … +16.5 ms PASS |
+| pacing with recording on (180 Hz) | 0 held frames, worst 5.8 ms, same as off; capture 0.19 ms CPU per recorded frame |
+| installer | NSIS 17.6 → 29.6 MB (+12.0): Voyage textures 9.9 + transcoder 0.5 MB (Part D, budget 25); the rest ≤ 1.65 MB incl. export code, the analyser wasm, fonts, Rust and the 1.2 session's code (Part A budget 3) |
+
+Sample exports (the real song, album colours from its embedded cover): `verify/review-1.1/exports/portrait.mp4` (9:16 tour, cinematic title, now-playing card, Instrument Serif line, outro on), `landscape.mp4` (16:9 Voyage City, reel title, outro off).
+
+### Voyage worlds (D89)
+- Sheets (5 palettes × 3 moments, before and after): `verify/review-1.1/voyage/city-before-sheet.jpg`, `city-after-sheet.jpg`, `ocean-before-sheet.jpg`, `ocean-after-sheet.jpg`; wide shot side by side per palette: `city-wide-before-after.jpg`, `ocean-wide-before-after.jpg`; clips of the wide shot: `city-clip-before.mp4`, `city-clip-after.mp4`, `ocean-clip-…`; the shipped thumbnails before / after: `media-voyage-*-before.webp`, `-after.webp`.
+- Frame time at 1080p (ms; 1.0.2 → 1.1): City Low 1.4–1.9 → 1.7–3.2, Medium 2.8–3.6 → 4.4–4.8, High 9.2–12.8 → 10.7–12.7; Ocean Low 1.7–2.0 → 2.7, Medium 3.7–4.2 → 5.8–6.4, High 10.5–13.1 → 12.5–14.9 (another session's renders shared the GPU). Medium holds 60 fps with room.
+- Shader compile + link (cold, D3D11): 1.0.2 median 4.4 s, 1.1 median 4.0 s (a first version took 25 s; fixed, D89).
+- Textures: 9.9 MB KTX2, loaded only when City shows (site included). Licences: `ASSETS.md` (Poly Haven CC0, ambientCG CC0, USGS NAIP public domain; Basis transcoder Apache-2.0; fonts OFL).
+- Palette in the light: every palette passes the recalibrated City / Ocean colour gate (light off-palette ≤ 8%, light chroma ≥ 0.095, L 0.44–0.48, L95 ≤ 0.70) and the flicker gates (≤ 0.75 swings/s, clip ≤ 0.5%).
+
+### /live Lighthouse (D90)
+Desktop 47 → **95** (Edge; 94 in Playwright's Chromium while Edge was mid-update), mobile 100 → **100** (TBT 0 ms). Landing page unchanged: 100 desktop, 99 mobile. `test:live` 321 / 321 (adds: Export and Record stay off the web).
+
+### Gates, before → after
+| gate | result |
+|---|---|
+| Ink look and motion | pixel-identical to 1.0.2: Glow Depth, Marble Depth, Sumi Flat 120 / 120 frames (`verify/gates-1.1/identical.log`) |
+| Warp | identical 120 / 120 |
+| Silk Depth, Wisp Tunnel | identical to 1.0.2 with all of 1.1 (`identical-mine.log`); **differ in current main** because of the 1.2 session's Silk Helix commit (`1047936`, `identical-prehelix.log`): see below |
+| beat sync | Voyage City / Ocean 23 / 23 kicks on both tracks (1.0.2: 23 / 23); others unchanged by 1.1 (identical frames) |
+| flicker | City / Ocean pass in all nine palettes |
+| motion | Voyage City / Ocean equal to 1.0.2 (fine share 74–76%, Voyage's known baseline) |
+| dt sweep | Ink Marble Depth PASS, same numbers as 1.0.2 (rise 23.4 / 24.1 / 24.7%, fine share 72%, pop p99 0.10–0.11) |
+| pacing | 0 held frames at match and 1/2, same as 1.0.2 interleaved |
+| palette gates | City / Ocean recalibrated (light), all pass; other combos unchanged (identical frames) |
+| tests | `tsc` clean, clippy clean, `npm test` 52 passed (47 + 5 new) |
+
+### For your decision
+- **Current `main` includes the 1.2 session's work** (Glyph / Reeded filters, Silk Helix, Stage, release flag `RELEASED_12` hiding 1.2 styles on the website only). Silk Depth and Wisp Tunnel render differently from 1.0.2 in main because of the Helix commit (not 1.1). Releasing 1.1.0 from main would ship that work in the app; tell me if 1.1.0 should come from a branch without it.
+- Ocean's quieter palettes (Neon / Violet / Sunset) read close to each other in the wide shot: the palette is in the sun, sky and glints only, as asked. Say if you want the light stronger.
 
 ## Checklist
-- [ ] 0. Baseline: gates and numbers before 1.1 (cost, sync, flicker, motion, Lighthouse /live + landing, installer size); Voyage before stills and clips
+- [x] 0. Baseline: gates and numbers before 1.1 (cost, sync, flicker, motion, Lighthouse /live + landing, installer size); Voyage before stills and clips
 - [x] A1. Shared modules: analysis, window picking, bar snapping, cut plans, strip, overlays → `src/export/`; studio uses them and still works
 - [x] A2. Rust: Videos\sonora files (positional writes), Media Foundation AAC encoder, disk space, open folder
 - [x] A3. Offline renderer: fixed-step, warm-up from the song's start, per-shot warm-ups, supersampling, compositor, WebCodecs H.264 + mp4 muxer
-- [ ] A4. Export screen: file (tags, artwork, album colours), section strip (bars, markers, three suggestions), formats, visual, output, live preview with safe zones, progress / estimate / cancel, open folder; menu + tray + shortcut
-- [ ] A5. Corner mark (always) + optional outro; rights line; D-entry
-- [ ] A6. Measurements: render speed, determinism, encoder choice logged; installer growth ≤ 3 MB
+- [x] A4. Export screen: file (tags, artwork, album colours), section strip (bars, markers, three suggestions), formats, visual, output, live preview with safe zones, progress / estimate / cancel, open folder; menu + tray + shortcut
+- [x] A5. Corner mark (always) + optional outro; rights line; D-entry
+- [x] A6. Measurements: render speed, determinism, encoder choice logged; installer growth ≤ 3 MB
 - [x] B1. Rust: record audio ring (no allocation in the callback), sample clock on frames, AAC stream
 - [x] B2. Recorder: async readback, hardware encoder, indicator + time, disk-space warning, clean stop; HUD, controller, tray, shortcut
-- [ ] B3. A/V sync check with a click track in the harness (≤ 1 frame); pacing with recording on (no held frames), cost logged
-- [ ] C1. Title card (reel / cinematic), text overlays (timing, bar snap, position, size, style), now-playing card; fonts (brand + OFL, licences)
-- [ ] C2. Safe zones respected; preview = render
+- [x] B3. A/V sync check with a click track in the harness (≤ 1 frame); pacing with recording on (no held frames), cost logged
+- [x] C1. Title card (reel / cinematic), text overlays (timing, bar snap, position, size, style), now-playing card; fonts (brand + OFL, licences)
+- [x] C2. Safe zones respected; preview = render
 - [x] D1. Voyage before: stills (palettes × lights), wide-shot clips, frame times per preset
-- [ ] D2. Assets (CC0 / public domain) → KTX2/Basis, `ASSETS.md`, lazy loading on the site
-- [ ] D3. City: irregular farmland, forests, roads, hedgerows, farm buildings; buildings, streets, parks, windows
-- [ ] D4. Lighting: GGX, heightfield soft shadows, AO, atmospheric scattering; palette lives in the light
-- [ ] D5. Water: Gerstner bands, Fresnel sky reflection, crest SSS, fold/shore foam, depth colour, glints, ripples (City + Ocean)
-- [ ] D6. Budgets: frame time per preset, compile time, installer ≤ +25 MB; palette metrics recalibrated for City/Ocean
-- [ ] D7. After stills and clips; `npm run media`, palette thumbnails
+- [x] D2. Assets (CC0 / public domain) → KTX2/Basis, `ASSETS.md`, lazy loading on the site
+- [x] D3. City: irregular farmland, forests, roads, hedgerows, farm buildings; buildings, streets, parks, windows
+- [x] D4. Lighting: GGX, heightfield soft shadows, AO, atmospheric scattering; palette lives in the light
+- [x] D5. Water: Gerstner bands, Fresnel sky reflection, crest SSS, fold/shore foam, depth colour, glints, ripples (City + Ocean)
+- [x] D6. Budgets: frame time per preset, compile time, installer ≤ +25 MB; palette metrics recalibrated for City/Ocean
+- [x] D7. After stills and clips; `npm run media`, palette thumbnails
 - [x] E1. /live code split: shell first, styles + shaders on demand; Lighthouse desktop 90+, mobile 100; `test:live` extended (Export hidden on the web)
-- [ ] R. Full gates; review summary; `verify/review-1.1/index.html`; stop
+- [x] R. Full gates; review summary; `verify/review-1.1/index.html`; stop
 
 # Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — shipped (v1.0.2; trailer A2 on the site)
 
