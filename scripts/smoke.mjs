@@ -41,11 +41,12 @@ try {
   // Menu → detail → visual → menu.
   await page.goto(`${base}?fresh=1&onboarded=1&nolaunch=1&demo=1`);
   await page.waitForSelector('.scr-menu:not([hidden])');
-  check('five style cards', (await page.locator('.scard').count()) === 5);
+  check('eleven style cards', (await page.locator('.scard').count()) === 11);
   await page.click('.scard:nth-child(2)');
   await page.waitForSelector('.scr-detail:not([hidden])');
   check('detail opens for silk', (await page.textContent('.scr-detail .nm')) === 'silk');
-  await page.click('.scr-detail .opts.two .s-thumb:nth-child(1)');
+  // The view row is the last two-option group (Silk's looks are two options too since Helix).
+  await page.locator('.scr-detail .opts.two').last().locator('.s-thumb').first().click();
   check('picking a view updates the preview', (await page.textContent('.stage-cap .s-label'))?.includes('Depth') ?? false);
   await page.click('text=Start');
   await page.waitForSelector('.hud:not([hidden])', { timeout: 5000 });
