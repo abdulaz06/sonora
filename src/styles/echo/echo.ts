@@ -29,6 +29,7 @@ import capsuleVert from './shaders/capsule.vert?raw';
 import capsuleFrag from './shaders/capsule.frag?raw';
 import displayFrag from './shaders/display.frag?raw';
 import movesUrl from '../../assets/echo/moves.bin?url';
+import { trackAsset } from '../../engine/assets';
 
 // ── Tuning ──────────────────────────────────────────────────────
 /** Joint names in the move file's order (convert-cmu.py JOINTS). */
@@ -73,7 +74,7 @@ interface Moves { joints: number; bones: [number, number][]; clips: Clip[] }
 let moves: Moves | null = null;
 let loading: Promise<void> | null = null;
 function loadMoves(): Promise<void> {
-  loading ??= fetch(movesUrl).then((r) => r.arrayBuffer()).then((buf) => {
+  loading ??= trackAsset(fetch(movesUrl).then((r) => r.arrayBuffer()).then((buf) => {
     const v = new DataView(buf);
     let o = 4;
     const u32 = (): number => { const x = v.getUint32(o, true); o += 4; return x; };
@@ -91,7 +92,7 @@ function loadMoves(): Promise<void> {
       clips.push({ name, fps, frames, period, first, data });
     }
     moves = { joints: nJ, bones, clips };
-  });
+  }));
   return loading;
 }
 

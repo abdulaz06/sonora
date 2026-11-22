@@ -24,6 +24,7 @@ import { initRenderer } from '../engine/renderer';
 import { defaultSettings, mergeWithDefaults, parseFilter, type PersistedSettings } from '../ipc/settings';
 import { filtersReady } from '../engine/filters/filters';
 import { setCoverArt } from '../engine/cover-art';
+import { assetsSettled } from '../engine/assets';
 import type { QualityPreset } from '../engine/quality';
 import type { SonoraEvent } from '../engine/events';
 import type { LightMode, StyleId } from '../styles/visual-style';
@@ -321,6 +322,8 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       if (!pcm) throw new Error('could not decode wav');
       source.loadOffline(pcm.mono, pcm.sampleRate);
       hits.length = 0;
+      // Styles that fetch assets (Memory's scenes, Echo's moves) have them before rendering starts.
+      await assetsSettled();
       return { duration: pcm.mono.length / pcm.sampleRate, sampleRate: pcm.sampleRate };
     },
     async loadTrackUrl(url: string) {
