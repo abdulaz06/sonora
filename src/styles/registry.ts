@@ -100,12 +100,14 @@ export const STYLES: StyleDescriptor[] = [
   },
   {
     id: 'glass', label: 'Glass', category: 'art',
+    glyphKick: 1,
     variants: STYLE_VARIANTS.glass, defaultVariant: 'bubbles',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: lazy('glass'),
   },
   {
     id: 'cover', label: 'Cover', category: 'art',
+    glyphKick: 1,
     variants: STYLE_VARIANTS.cover, defaultVariant: 'cover',
     supportsLight: true, supportsDepth: false, defaultDepth: false,
     create: lazy('cover'),
@@ -118,6 +120,7 @@ export const STYLES: StyleDescriptor[] = [
   },
   {
     id: 'memory', label: 'Memory', category: 'art',
+    glyphKick: 1,
     variants: STYLE_VARIANTS.memory, defaultVariant: 'forest',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: lazy('memory'),

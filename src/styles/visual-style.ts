@@ -221,6 +221,10 @@ export interface StyleDescriptor {
   defaultDepth: boolean;
   /** Per-style views for camera presets (by preset id), e.g. Silk's Planet. */
   cameraPresets?: Partial<Record<string, { height: number; tilt: number; curve: number }>>;
+  /** How much the Glyph filter adds its own kick lift (0–1, default 0): for styles whose kick light
+   * is subtle, so the character grid would hide it. Styles that already flash on kicks leave it off
+   * (doubling their swings fails the flicker gate). */
+  glyphKick?: number;
   create(deps: StyleDeps): VisualStyle;
 }
 
