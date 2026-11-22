@@ -28,6 +28,7 @@ const cfg = {
   camera: process.env.SEQ_CAMERA || undefined,
   responsiveness: process.env.SEQ_RESP !== undefined ? Number(process.env.SEQ_RESP) : undefined,
   debug: process.env.SEQ_DEBUG ? JSON.parse(process.env.SEQ_DEBUG) : undefined,
+  light: process.env.SEQ_LIGHT || undefined,
 };
 
 const server = spawn('npx', ['vite', '--port', String(process.env.SONORA_HARNESS_PORT || 5199), '--strictPort'], { shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: process.env.SONORA_VITE_CACHE || 'node_modules/.vite-verify' } });
@@ -40,6 +41,11 @@ try {
   await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await p.waitForFunction(() => window.__sonora?.ready === true);
   await p.evaluate((c) => window.__sonora.configure(c), cfg);
+  if (process.env.SEQ_COVER) {
+    const { readFileSync } = await import('node:fs');
+    const ext = process.env.SEQ_COVER.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+    await p.evaluate((u) => window.__sonora.setCover(u), `data:image/${ext};base64,${readFileSync(process.env.SEQ_COVER).toString('base64')}`);
+  }
   await p.evaluate((n) => window.__sonora.loadTrack(n), track);
   const start = Number(t0);
   const warm = Math.min(warmup, start);

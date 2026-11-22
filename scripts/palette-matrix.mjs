@@ -62,7 +62,28 @@ export const COMBOS = [
   { id: 'voyage-void', style: 'voyage', variant: 'void', depth: false },
   { id: 'voyage-city', style: 'voyage', variant: 'city', depth: false },
   { id: 'voyage-ocean', style: 'voyage', variant: 'ocean', depth: false },
+  // 1.2
+  { id: 'silk-helix-flat', style: 'silk', variant: 'helix', depth: false },
+  { id: 'silk-helix-depth', style: 'silk', variant: 'helix', depth: true },
+  { id: 'stage-club', style: 'stage', variant: 'club', depth: false },
+  { id: 'stage-arena', style: 'stage', variant: 'arena', depth: false },
+  { id: 'stage-cathedral', style: 'stage', variant: 'cathedral', depth: false },
+  { id: 'cymatics-stone', style: 'cymatics', variant: 'stone', depth: false },
+  { id: 'cymatics-sand', style: 'cymatics', variant: 'sand', depth: false },
+  { id: 'cymatics-liquid', style: 'cymatics', variant: 'liquid', depth: false },
+  { id: 'glass-bubbles', style: 'glass', variant: 'bubbles', depth: false },
+  { id: 'glass-fins', style: 'glass', variant: 'fins', depth: false },
+  { id: 'glass-chrome', style: 'glass', variant: 'chrome', depth: false },
+  { id: 'cover-light', style: 'cover', variant: 'cover', depth: false, light: 'light' },
+  { id: 'cover-dark', style: 'cover', variant: 'cover', depth: false, light: 'dark' },
+  { id: 'echo-glow', style: 'echo', variant: 'glow', depth: false },
+  { id: 'echo-trace', style: 'echo', variant: 'trace', depth: false, light: 'light' },
+  { id: 'memory-forest', style: 'memory', variant: 'forest', depth: false },
+  { id: 'memory-coast', style: 'memory', variant: 'coast', depth: false },
+  { id: 'memory-desert', style: 'memory', variant: 'desert', depth: false },
 ];
+/** The 1.2 combos (palette-matrix --combos new12). */
+export const NEW12 = COMBOS.slice(COMBOS.findIndex((c) => c.id === 'silk-helix-flat')).map((c) => c.id);
 
 function parseArgs(argv) {
   const o = { name: 'matrix', set: 'presets', hues: 0, drift: 0, base: 0, only: '', combos: '', tracks: '', size: '640x360', frames: '', jobs: 2, metrics: true };
@@ -271,7 +292,8 @@ try {
     await page0.evaluate((d) => window.__sonora.setPalette(d), p.def);
     p.resolved = await page0.evaluate(() => window.__sonora.currentPalette());
   }
-  const combos = opts.combos ? COMBOS.filter((c) => opts.combos.split(',').includes(c.id)) : COMBOS;
+  const want = opts.combos === 'new12' ? NEW12 : opts.combos ? opts.combos.split(',') : null;
+  const combos = want ? COMBOS.filter((c) => want.includes(c.id)) : COMBOS;
   writeFileSync(join(outFrames, 'index.json'), JSON.stringify({
     name: opts.name, size: [W, H], combos, tracks: trackNames, palettes: pals,
     markers: Object.fromEntries(trackNames.map((n) => [n, tracks[n].markers])),

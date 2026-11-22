@@ -6,7 +6,7 @@
  * quality and frame rate are global.
  */
 
-import { mediaFor, PIECES, SHORTCUTS, STYLE_INFO } from '../../app/catalog';
+import { ART_STYLES, mediaFor, PIECES, SHORTCUTS, STYLE_INFO } from '../../app/catalog';
 import type { Corner as MarkCorner } from '../../export/overlay';
 import type { RecPreset } from '../../export/recorder';
 import { setVideoPrefs, videoPrefs } from '../../export/video-prefs';
@@ -47,7 +47,7 @@ const INFO = {
   style: (): InfoContent => ({
     title: 'style', scope: 'the visual',
     body: ['The kind of visual on screen. Each style has its own personality and keeps its own settings (colours, feel, camera).'],
-    options: (['ink', 'silk', 'wisp', 'warp', 'voyage'] as const).map((s) => [STYLE_INFO[s].label, STYLE_INFO[s].line]),
+    options: ART_STYLES.map((s) => [STYLE_INFO[s].label, STYLE_INFO[s].line]),
   }),
   look: (style: string): InfoContent => ({
     title: 'look', scope: `for ${style}`,
