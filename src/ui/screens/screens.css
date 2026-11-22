@@ -78,6 +78,12 @@ body.scr-overlay #canvas { visibility: hidden; }
 .scard .open-hint { position: absolute; right: clamp(16px, 1.25vw, 26px); top: clamp(14px, 1.7vh, 22px); display: flex; align-items: center; gap: 8px; color: var(--bone); opacity: 0; transition: opacity var(--d3) var(--ease); }
 .scard.is-open .open-hint { opacity: 1; transition-delay: 200ms; }
 .scard.is-open .heavy { margin-right: 92px; }
+/* Many styles (1.2: eleven): the open card takes more room, closed cards show their name vertically. */
+.strip.many .scard.is-open { flex-grow: 5.2; }
+.strip.many .scard:not(.is-open) .name { writing-mode: vertical-rl; transform: rotate(180deg); font-size: clamp(20px, 1.45vw, 30px); line-height: 1; }
+.strip.many .scard:not(.is-open) .cap { padding-left: clamp(10px, 0.8vw, 16px); padding-right: clamp(10px, 0.8vw, 16px); }
+.strip.many .scard:not(.is-open) .detail, .strip.many .scard:not(.is-open) .looks { display: none; }
+.strip.many .scard .cap { height: clamp(170px, 21vh, 228px); }
 
 .dock { flex: none; display: grid; grid-template-columns: 1.15fr 1fr 1.1fr; margin: clamp(14px, 2vh, 28px) var(--gutter) clamp(18px, 2.6vh, 36px); border-top: var(--line); position: relative; }
 .dock > * { padding: clamp(14px, 1.8vh, 22px) clamp(16px, 1.4vw, 28px) 0; min-width: 0; text-align: left; }

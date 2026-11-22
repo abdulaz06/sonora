@@ -47,8 +47,9 @@ export function createMenu(ctl: Controller, on: MenuHandlers, platform: 'desktop
   const classicRow = h('div', { class: 'classic-row' });
   const head = h('div', { class: 'menu-head' },
     h('h1', { class: 's-display' }, 'choose a style'),
-    h('div', { class: 'menu-sub' }, classicRow, h('span', { class: 's-micro' }, '01 — 05 · enter to open')));
-  const strip = h('div', { class: 'strip', role: 'list' });
+    h('div', { class: 'menu-sub' }, classicRow, h('span', { class: 's-micro' }, `01 — ${String(ART_STYLES.length).padStart(2, '0')} · enter to open`)));
+  // Many styles: closed cards get narrow, so their names stand vertically (screens.css).
+  const strip = h('div', { class: ART_STYLES.length > 6 ? 'strip many' : 'strip', role: 'list' });
   const cards: { id: StyleId; el: HTMLButtonElement; media: Media }[] = [];
   let openIdx = 0;
 
