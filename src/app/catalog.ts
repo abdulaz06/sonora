@@ -100,6 +100,17 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
       { id: 'ocean', label: 'Ocean', line: 'A world-sized ocean with huge swells.', media: 'voyage-ocean' },
     ],
   },
+  stage: {
+    id: 'stage', label: 'Stage',
+    line: 'A concert light show: moving beams, lasers and haze, run like a lighting operator would.',
+    more: 'A few beams breathe in the quiet, converge and sweep faster through a build, and the whole rig fires on the drop. Breakdowns fall to a curtain of light with one white searchlight.',
+    suits: 'EDM, techno, anything that drops',
+    looks: [
+      { id: 'club', label: 'Club', line: 'A low club ceiling packed with lasers.', media: 'stage-club' },
+      { id: 'arena', label: 'Arena', line: 'A huge arena with long beams.', media: 'stage-arena' },
+      { id: 'cathedral', label: 'Cathedral', line: 'A tall nave: a curtain of light and a single searchlight.', media: 'stage-cathedral' },
+    ],
+  },
   aura: {
     id: 'aura', label: 'Aura', line: 'The original rings, particles and glow from sonora 0.1.', more: 'Classic.', suits: 'nostalgia',
     looks: [],
@@ -110,7 +121,9 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
   },
 };
 
-export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage'];
+/** 1.2 styles (hidden on the deployed website until the release, see release.ts). */
+export const NEW_STYLES_12: StyleId[] = ['stage'];
+export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage', ...(SHOW_12 ? NEW_STYLES_12 : [])];
 export const CLASSIC_STYLES: StyleId[] = ['aura', 'halo'];
 
 /** Media name for what's on screen for a style / look / view. */
@@ -145,6 +158,12 @@ export function describe(style: StyleId, look: string, depth: boolean, hasDepth:
  * the views it may use.
  */
 export interface Piece { id: string; style: StyleId; look: string; label: string; views: ('depth' | 'flat')[]; energy: number; media: string }
+/** 1.2 pieces (calm 0 → driving 1). */
+const PIECES_12: Piece[] = [
+  { id: 'stage:club', style: 'stage', look: 'club', label: 'Stage · Club', views: ['flat'], energy: 0.9, media: 'stage-club' },
+  { id: 'stage:arena', style: 'stage', look: 'arena', label: 'Stage · Arena', views: ['flat'], energy: 0.8, media: 'stage-arena' },
+  { id: 'stage:cathedral', style: 'stage', look: 'cathedral', label: 'Stage · Cathedral', views: ['flat'], energy: 0.5, media: 'stage-cathedral' },
+];
 export const PIECES: Piece[] = [
   { id: 'ink:glow', style: 'ink', look: 'glow', label: 'Ink · Glow', views: ['depth', 'flat'], energy: 0.45, media: 'ink-glow' },
   { id: 'ink:marble', style: 'ink', look: 'marble', label: 'Ink · Marble', views: ['depth', 'flat'], energy: 0.35, media: 'ink-marble' },
@@ -158,6 +177,7 @@ export const PIECES: Piece[] = [
   { id: 'voyage:void', style: 'voyage', look: 'void', label: 'Voyage · Void', views: ['flat'], energy: 0.55, media: 'voyage-void' },
   { id: 'voyage:city', style: 'voyage', look: 'city', label: 'Voyage · City', views: ['flat'], energy: 0.5, media: 'voyage-city' },
   { id: 'voyage:ocean', style: 'voyage', look: 'ocean', label: 'Voyage · Ocean', views: ['flat'], energy: 0.45, media: 'voyage-ocean' },
+  ...(SHOW_12 ? PIECES_12 : []),
 ];
 
 export const SHORTCUTS: [string[], string][] = [

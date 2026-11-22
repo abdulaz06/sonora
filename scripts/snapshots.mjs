@@ -10,6 +10,8 @@ try {
   for (let i = 0; i < 80; i++) { try { if ((await fetch(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html`)).ok) break; } catch {} await new Promise((r) => setTimeout(r, 400)); }
   const b = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: Number(process.env.SNAP_W || 960), height: Number(process.env.SNAP_H || 540) } });
+  p.on('console', (m) => { if (m.type() === 'error') console.log('  [page error]', m.text().slice(0, 600)); });
+  p.on('pageerror', (e) => console.log('  [page exception]', e.message.slice(0, 600)));
   await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await p.waitForFunction(() => window.__sonora?.ready === true);
   await p.evaluate(([s, v, d]) => window.__sonora.configure({ style: s, variant: v || undefined, depth: d === '' ? undefined : d === '1', drift: false }), [style, process.env.SNAP_LOOK || '', process.env.SNAP_DEPTH ?? '']);
