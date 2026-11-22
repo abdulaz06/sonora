@@ -37,4 +37,6 @@ export interface Platform {
   moveOutput?(monitor: string): Promise<void>;
   /** The display the output window is on (monitor name), '' if unknown. */
   outputMonitor?(): Promise<string>;
+  /** Exports and recordings write video files (desktop only; the web page has no Export). */
+  videoIo?(): Promise<import('../ui/screens/export').ExportIo>;
 }

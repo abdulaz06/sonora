@@ -3,6 +3,7 @@ mod config;
 mod controller;
 mod ipc;
 mod media;
+mod out;
 mod tray;
 
 use std::sync::Arc;
@@ -29,6 +30,8 @@ pub fn run() {
         .manage(device_state)
         .manage(media_state)
         .manage(tray::state())
+        .manage(out::state())
+        .manage(out::record::state())
         .invoke_handler(tauri::generate_handler![
             config::settings::load_settings,
             config::settings::save_settings,
@@ -40,6 +43,19 @@ pub fn run() {
             tray::set_tray_set_mode,
             controller::open_controller,
             controller::close_controller,
+            out::out_open,
+            out::out_write,
+            out::out_close,
+            out::out_abort,
+            out::out_free,
+            out::out_reveal,
+            out::aac_open,
+            out::aac_encode,
+            out::aac_close,
+            out::record::rec_start,
+            out::record::rec_pull,
+            out::record::rec_stop,
+            out::record::rec_end,
             dev_log,
         ])
         .setup(move |app| {

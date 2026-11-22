@@ -24,7 +24,7 @@ import { createSettings } from '../ui/screens/settings';
 import '../ui/ds/ds.css';
 import '../ui/screens/screens.css';
 
-type Screen = 'boot' | 'intro' | 'menu' | 'detail' | 'visual';
+type Screen = 'boot' | 'intro' | 'menu' | 'detail' | 'visual' | 'export';
 
 export interface Shell {
   screen(): Screen;
@@ -36,13 +36,15 @@ export interface Shell {
   setSetMode(on: boolean): void;
   /** Run a keyboard shortcut as if pressed here (the controller forwards keys). */
   key(k: string): void;
+  /** Open the Export screen (desktop). */
+  goExport(): void;
 }
 
 export interface ShellOptions {
   /** Skip the launch moment (web screenshots, tests). */
   noLaunch?: boolean;
   /** Start on this screen (web: ?screen=). */
-  start?: 'menu' | 'detail' | 'visual' | 'intro';
+  start?: 'menu' | 'detail' | 'visual' | 'intro' | 'export';
   startStyle?: StyleId;
 }
 
@@ -102,6 +104,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     openKeys: () => settings.open('keys'),
     openAbout: () => settings.open('about'),
     openAudio,
+    openExport: platform.videoIo ? () => void goExport() : undefined,
   }, platform.kind);
   const detail = createDetail(ctl, {
     back: () => goMenu(),
@@ -122,8 +125,28 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
 
   function overlay(on: boolean): void { document.body.classList.toggle('scr-overlay', on); }
 
+  // ── Export (desktop): loaded on first use ──
+  let exportScr: import('../ui/screens/export').ExportScreen | null = null;
+  async function goExport(): Promise<void> {
+    if (!platform.videoIo || screen === 'export' || screen === 'intro' || screen === 'boot') return;
+    closeInfo();
+    renderer.stop();
+    ctl.setCanvasInput(false);
+    hud.hide(); menu.hide(); detail.hide();
+    overlay(true);
+    screen = 'export';
+    syncFps();
+    if (!exportScr) {
+      const [{ createExport }, io] = await Promise.all([import('../ui/screens/export'), platform.videoIo()]);
+      exportScr = createExport(io, { back: () => goMenu() });
+      document.body.append(exportScr.el);
+    }
+    if (screen === 'export') exportScr.show();
+  }
+
   function goMenu(): void {
     if (screen === 'menu') return;
+    if (screen === 'export') { if (exportScr?.busy()) return; exportScr?.hide(); }
     closeInfo();
     renderer.stop();
     ctl.setCanvasInput(false);
@@ -146,6 +169,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
   let entering = false;
   async function goVisual(from?: HTMLElement): Promise<void> {
     if (screen === 'visual' || entering) return;
+    if (screen === 'export') { if (exportScr?.busy()) return; exportScr?.hide(); }
     entering = true;
     closeInfo();
     const exp = from ? await expandFrom(from) : null;
@@ -222,7 +246,9 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
       else if (screen === 'detail') goMenu();
       return;
     }
+    if (screen === 'export') { if (k === 'Escape' && !exportScr?.busy()) goMenu(); return; }
     if (lower === 'm') { setSetMode(!s.setMode.on); return; }
+    if (lower === 'e' && platform.videoIo && (screen === 'menu' || screen === 'visual' || screen === 'detail')) { void goExport(); return; }
     if (screen === 'visual') {
       if (lower === 'h') hud.setClean(!hud.isClean());
       else if (lower === 'd') ctl.toggleDebug();
@@ -272,6 +298,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     if (a === 'menu') goMenu();
     else if (a === 'setmode') setSetMode(!s.setMode.on);
     else if (a === 'controller') platform.openController?.();
+    else if (a === 'export') void goExport();
   });
 
   // ── Start ──
@@ -284,6 +311,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
   if (start === 'intro') startIntro();
   else if (start === 'visual') { screen = 'boot'; void goVisual(); }
   else if (start === 'detail') { screen = 'boot'; openStyle(opts.startStyle ?? ART_STYLES[0]); }
+  else if (start === 'export') { goMenu(); void goExport(); }
   else goMenu();
   if (s.setMode.on && start === 'visual') setMode.switchNow(false);
 
@@ -307,5 +335,6 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
     openStyle,
     setSetMode,
     key: (k) => handleKey(k, true),
+    goExport: () => void goExport(),
   };
 }

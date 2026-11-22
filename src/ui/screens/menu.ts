@@ -21,6 +21,8 @@ export interface MenuHandlers {
   openKeys(): void;
   openAbout(): void;
   openAudio(): void;
+  /** Desktop: the Export screen (absent on the web page). */
+  openExport?: () => void;
 }
 
 export interface MenuScreen { el: HTMLElement; show(): void; hide(): void; refresh(): void; focusFirst(): void }
@@ -33,6 +35,7 @@ export function createMenu(ctl: Controller, on: MenuHandlers, platform: 'desktop
   const top = h('header', { class: 'topbar' },
     lockup(),
     h('div', { class: 'topbar-right' }, npSlot,
+      on.openExport ? button('Export', { variant: 'ghost', title: 'Export a video from a song (E)', onClick: () => on.openExport?.() }) : null,
       button('Settings', { variant: 'ghost', onClick: () => on.openSettings() }),
       button('Keys', { variant: 'ghost', onClick: () => on.openKeys() }),
       button('About', { variant: 'ghost', onClick: () => on.openAbout() })));

@@ -120,6 +120,8 @@ export interface CameraInput {
 }
 
 export class WorldCamera {
+  /** Portrait framing for tall exports (0..1); null = the debug flag (reel studio). */
+  portraitFraming: number | null = null;
   // ── 2D state ──
   center: [number, number] = [0, 0];
   viewHeight = 1;
@@ -281,7 +283,7 @@ export class WorldCamera {
     const lift = section === 'breakdown' ? 0.12 : section === 'silence' ? 0.08 : 0;
     const altTarget = altitude * (1 + (ALTITUDE_WANDER / ALTITUDE_BASE) * 0.5 * simplex2(t * 0.025, this.seed + 71)) + lift;
     this.position[1] += expApproach(dt, 1.2) * (altTarget - this.position[1]);
-    const portrait = this.aspect < 1 ? debugFlags.portrait : 0;
+    const portrait = this.aspect < 1 ? this.portraitFraming ?? debugFlags.portrait : 0;
     this.pitch = clamp(-tilt - PORTRAIT_TILT * portrait + PITCH_WANDER * wander * simplex2(t * 0.02, this.seed + 3) + LURCH_PITCH * this.lurch, -1.53, -0.03);
     this.fov = FOV_BASE + (PORTRAIT_FOV - FOV_BASE) * portrait + LURCH_FOV * this.lurch;
 
