@@ -128,6 +128,8 @@ export interface RendererOptions {
   fixedSize?: boolean;
   /** Offline render (exports): exposure readback and adaptive budgets never depend on wall-clock time. */
   offline?: boolean;
+  /** Load style texture assets (default true; the site's shader prewarm passes false). */
+  loadAssets?: boolean;
 }
 
 export interface Renderer {
@@ -176,6 +178,8 @@ export interface Renderer {
   /** Called after every drawn frame, with the canvas still holding it (the
    * controller's preview tap reads it back asynchronously here). */
   setFrameHook(cb: ((gl: WebGL2RenderingContext, timeMs: number) => void) | null): void;
+  /** Resolves once the current style (and look) has its code and assets (exports and the harness wait). */
+  ready(): Promise<void>;
   /** Another after-frame hook (the recorder), alongside the preview tap's; returns its remover. */
   addFrameHook(cb: (gl: WebGL2RenderingContext, timeMs: number) => void): () => void;
   onEvent(cb: (e: SonoraEvent) => void): () => void;
@@ -262,7 +266,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   const BLANK: VisualStyle = { id: 'ink', update: () => undefined, render: () => undefined, dispose: () => undefined };
   const makeStyle = (d: StyleDescriptor): VisualStyle => {
     if (!styleLoaded(d.id)) return BLANK;
-    const s = d.create({ gl, canvas, quadVAO, quality: quality.params, seed });
+    const s = d.create({ gl, canvas, quadVAO, quality: quality.params, seed, loadAssets: options.loadAssets !== false });
     s.setVariant?.(variant);
     if (ringCount !== null) s.setRingCount?.(ringCount);
     return s;
@@ -645,6 +649,11 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     setFrozen(on: boolean): void { frozen = on; },
     isFrozen: () => frozen,
     setFrameHook(cb): void { frameHook = cb; },
+    async ready() {
+      await loadStyle(descriptor.id);
+      if (style === BLANK && styleLoaded(descriptor.id) && !pending) { style = makeStyle(descriptor); fadeAlpha = 1; }
+      await style.ready?.();
+    },
     addFrameHook(cb) { extraHooks.add(cb); return () => { extraHooks.delete(cb); }; },
     onEvent(cb: (e: SonoraEvent) => void): () => void {
       eventListeners.push(cb);

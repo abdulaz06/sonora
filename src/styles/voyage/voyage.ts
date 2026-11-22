@@ -36,6 +36,7 @@ import marchFrag from './shaders/march.frag?raw';
 import resolveFrag from './shaders/resolve.frag?raw';
 import presentFrag from './shaders/present.frag?raw';
 import backdropSrc from './shaders/backdrop.glsl?raw';
+import { loadVoyageTextures, type VoyageTextures } from './textures';
 import landBakeFrag from './shaders/landbake.frag?raw';
 import fullscreenVert from '../../engine/shaders/fullscreen.vert?raw';
 
@@ -69,7 +70,9 @@ type Backdrop = 'void' | 'city' | 'ocean';
 const BACKDROP_INDEX: Record<Backdrop, number> = { void: 0, city: 1, ocean: 2 };
 const LAND_TEX = 2048;
 const LAND_ZSPAN = 240;
-const LAND_FOG = 0.0075;
+const LAND_FOG = 0.0105;
+/** City textures fade in over this long when they arrive mid-flight (s). */
+const TEX_FADE_S = 0.6;
 /** Wide shots: after this long without one (s), a calm moment also pulls out. */
 const VISTA_IDLE_S = 60;
 /** Exit: give up flying out after this long and cut (s); "outside" = |p|∞ beyond. */
@@ -154,6 +157,20 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     drawQuad(gl, quadVAO);
     gl.deleteProgram(bake.prog);
   }
+  // City textures (aerial imagery and materials): loaded the first time City shows.
+  let tex: VoyageTextures | null = null;
+  let texReq: Promise<void> | null = null;
+  let texMix = 0;
+  let texFailed = false;
+  const blankArray = gl.createTexture()!;
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, blankArray);
+  gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, 1, 1, 1);
+  gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+  const requestTextures = (): Promise<void> => {
+    if (!deps.loadAssets || texFailed) return Promise.resolve();
+    texReq ??= loadVoyageTextures(gl).then((t) => { tex = t; }, (e: unknown) => { texFailed = true; console.warn('sonora: Voyage textures failed to load', e); });
+    return texReq;
+  };
   const resolve = makeProgram(gl, fullscreenVert, resolveFrag);
   const present = makeProgram(gl, fullscreenVert, presentFrag);
   let low: Target | null = null;
@@ -493,8 +510,14 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
       fogS += (fogT - fogS) * expApproach(dt, 1.5);
     },
 
+    ready(): Promise<void> {
+      if (backdrop !== 'city') return Promise.resolve();
+      return requestTextures().then(() => { if (tex) texMix = 1; });
+    },
+
     render(ctx: StyleContext): void {
-      if (backdrop === 'city') ensureLand();
+      if (backdrop === 'city') { ensureLand(); void requestTextures(); }
+      if (tex) texMix = Math.min(1, texMix + ctx.dt / TEX_FADE_S);
       ensure(ctx.width, ctx.height);
       const L = low!, H = hist!;
       const b = BUDGET[quality.level];
@@ -535,6 +558,8 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_glow: clamp01(0.5 * ctx.intensityGlow + 0.5 * ctx.eventState.buildProgress + 0.6 * ctx.eventState.dropEnvelope) * fade,
         u_shimmer: clamp01(0.6 * ctx.highPresence + 0.6 * ctx.highHits) * fade,
         u_fog: fogS, u_light: 0.45 + 0.55 * fade,
+        u_tex: tex ? texMix : 0, u_q: quality.level === 'high' ? 2 : quality.level === 'medium' ? 1 : 0,
+        u_tex_detail: tex ? tex.detail : blankArray, u_tex_aerial: tex ? tex.aerial : blankArray,
       });
       drawQuad(gl, quadVAO);
 
@@ -578,6 +603,8 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     dispose(): void {
       deleteTarget(gl, low);
       deleteTarget(gl, landTex);
+      gl.deleteTexture(blankArray);
+      // The City textures stay with the GL context (loadVoyageTextures caches them per context).
       hist?.dispose();
       gl.deleteProgram(march.prog);
       gl.deleteProgram(resolve.prog);

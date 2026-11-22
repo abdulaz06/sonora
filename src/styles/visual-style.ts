@@ -79,6 +79,8 @@ export interface StyleDeps {
   quality: QualityParams;
   /** Session seed, so the same song twice looks related but not identical. */
   seed: number;
+  /** Load texture assets when a look needs them (false: the site's shader prewarm). */
+  loadAssets: boolean;
 }
 
 /** Per-frame post-processing controls. Reset to defaults every frame. */
@@ -158,6 +160,8 @@ export interface StyleContext extends StyleSignals {
 
 export interface VisualStyle {
   readonly id: StyleId;
+  /** Resolves once the current look's assets are loaded (exports and the harness wait for it). */
+  ready?(): Promise<void>;
   update(ctx: StyleContext): void;
   render(ctx: StyleContext): void;
   dispose(): void;

@@ -35,6 +35,10 @@ uniform int u_land_steps;    // backdrop march budget (quality)
 uniform float u_land_fog;    // aerial perspective density
 uniform sampler2D u_land_tex; // baked City layout (landbake.frag)
 uniform float u_zspan;       // z range the layout texture covers
+uniform highp sampler2DArray u_tex_detail;  // City materials (textures.ts)
+uniform highp sampler2DArray u_tex_aerial;  // City aerial imagery, A = vegetation height
+uniform float u_tex;         // 0 until the City textures are loaded, then 1 (fades in)
+uniform int u_q;             // quality: 0 low, 1 medium, 2 high
 // March budget
 uniform int u_steps;
 uniform float u_detail;      // surface epsilon in pixels
