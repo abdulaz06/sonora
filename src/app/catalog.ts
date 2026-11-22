@@ -141,6 +141,16 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
     suits: 'any album you love',
     looks: [],
   },
+  echo: {
+    id: 'echo', label: 'Echo',
+    line: 'A dancer made of light, its steps on your beat, trailing echoes of itself.',
+    more: 'Real dance moves, retimed so the steps land on the beat. Echoes of the last moments follow the dancer; on the drop they multiply and fan out around it.',
+    suits: 'dance, pop, R&B',
+    looks: [
+      { id: 'glow', label: 'Glow', line: 'Light on black.', media: 'echo-glow' },
+      { id: 'trace', label: 'Trace', line: 'Red and violet echoes on a bright ground.', media: 'echo-trace' },
+    ],
+  },
   aura: {
     id: 'aura', label: 'Aura', line: 'The original rings, particles and glow from sonora 0.1.', more: 'Classic.', suits: 'nostalgia',
     looks: [],
@@ -152,7 +162,7 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
 };
 
 /** 1.2 styles (hidden on the deployed website until the release, see release.ts). */
-export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover'];
+export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo'];
 export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage', ...(SHOW_12 ? NEW_STYLES_12 : [])];
 export const CLASSIC_STYLES: StyleId[] = ['aura', 'halo'];
 
@@ -200,6 +210,8 @@ const PIECES_12: Piece[] = [
   { id: 'glass:fins', style: 'glass', look: 'fins', label: 'Glass · Fins', views: ['flat'], energy: 0.55, media: 'glass-fins' },
   { id: 'glass:chrome', style: 'glass', look: 'chrome', label: 'Glass · Chrome', views: ['flat'], energy: 0.6, media: 'glass-chrome' },
   { id: 'cover', style: 'cover', look: 'cover', label: 'Cover', views: ['flat'], energy: 0.5, media: 'cover' },
+  { id: 'echo:glow', style: 'echo', look: 'glow', label: 'Echo · Glow', views: ['flat'], energy: 0.6, media: 'echo-glow' },
+  { id: 'echo:trace', style: 'echo', look: 'trace', label: 'Echo · Trace', views: ['flat'], energy: 0.45, media: 'echo-trace' },
 ];
 export const PIECES: Piece[] = [
   { id: 'ink:glow', style: 'ink', look: 'glow', label: 'Ink · Glow', views: ['depth', 'flat'], energy: 0.45, media: 'ink-glow' },

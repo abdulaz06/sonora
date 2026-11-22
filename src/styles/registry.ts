@@ -21,12 +21,13 @@ const LOADERS: Record<StyleId, () => Promise<Factory>> = {
   cymatics: () => import('./cymatics/cymatics').then((m) => m.createCymaticsStyle),
   glass: () => import('./glass/glass').then((m) => m.createGlassStyle),
   cover: () => import('./cover/cover').then((m) => m.createCoverStyle),
+  echo: () => import('./echo/echo').then((m) => m.createEchoStyle),
   aura: () => import('./classic/aura').then((m) => m.createAuraStyle),
   halo: () => import('./classic/halo-spectrum').then((m) => m.createHaloStyle),
 };
 const factories: Partial<Record<StyleId, Factory>> = {};
 /** 1.2 styles: hidden from pickers on the deployed website until the release (release.ts). */
-const UNRELEASED_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover'];
+const UNRELEASED_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo'];
 const loading: Partial<Record<StyleId, Promise<Factory>>> = {};
 
 /** Load a style's code (once). */
@@ -107,6 +108,12 @@ export const STYLES: StyleDescriptor[] = [
     variants: STYLE_VARIANTS.cover, defaultVariant: 'cover',
     supportsLight: true, supportsDepth: false, defaultDepth: false,
     create: lazy('cover'),
+  },
+  {
+    id: 'echo', label: 'Echo', category: 'art',
+    variants: STYLE_VARIANTS.echo, defaultVariant: 'glow',
+    supportsLight: true, supportsDepth: false, defaultDepth: false,
+    create: lazy('echo'),
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',

@@ -380,7 +380,8 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       h('p', { class: 's-small', style: { margin: '0' } }, 'sonora analyses sound on your computer only. no audio, song or usage data ever leaves it.'),
       h('p', { class: 's-small', style: { margin: '0' } }, 'album covers are read on this computer for album colours and never leave it.'),
       h('p', { class: 's-micro', style: { margin: '0' } }, 'free for non-commercial use: polyform noncommercial license 1.0.0. © 2026 abdul.'),
-      h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license. third-party licenses: third-party-notices.md in the install folder.')));
+      h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license. third-party licenses: third-party-notices.md in the install folder.'),
+      SHOW_12 ? h('p', { class: 's-micro', style: { margin: '0' } }, 'echo’s dance moves: the data used in this project was obtained from mocap.cs.cmu.edu. the database was created with funding from nsf eia-0196217. sources and licences of every asset: assets.md.') : null));
 
     const scroll = sh.body.scrollTop;
     content.replaceChildren(...[visual, colour, filterSec, camera, feel, setmode, np, audio, recording, perf, system, keys, about].filter((x): x is HTMLElement => !!x));

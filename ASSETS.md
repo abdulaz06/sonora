@@ -76,3 +76,26 @@ All SIL Open Font License 1.1; the licence text is next to each font.
 | Space Grotesk (600) | export text overlays | `LICENSE-SpaceGrotesk.txt` |
 
 The four export fonts come from the Fontsource packages (latin subsets, woff2).
+
+## Echo motion data (`src/assets/echo/moves.bin`, 669 KB)
+
+Seven dance clips from the **CMU Graphics Lab Motion Capture Database**
+(https://mocap.cs.cmu.edu), converted by `scripts/echo/convert-cmu.py` into
+joint positions (27 joints, 30 fps, millimetres, 16-bit): subject 5 trials 2,
+6, 13 (modern dance), subject 60 trials 2 and 8 (salsa), subject 55 trial 2
+(lambada), subject 141 trial 12 (the twist). The raw ASF/AMC files stay in the
+git-ignored `local-media/cmu/`.
+
+Terms, quoted from the site (checked 2026-11-22): "This dataset of motions is
+free for all uses." "The motion capture data may be copied, modified, or
+redistributed without permission." (FAQ) "You may include this data in
+commercially-sold products, but you may not resell this data directly, even in
+converted form." Requested acknowledgement (shown in About):
+"The data used in this project was obtained from mocap.cs.cmu.edu. The
+database was created with funding from NSF EIA-0196217."
+
+## Glyph filter characters
+
+Drawn at runtime from the bundled IBM Plex Mono SemiBold
+(`src/assets/fonts/ibm-plex-mono-latin-600-normal.woff2`, SIL Open Font
+License 1.1, already listed with the fonts above); no new file.
