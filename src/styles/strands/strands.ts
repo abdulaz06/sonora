@@ -743,7 +743,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         ...groundU,
         u_horizon: horizon,
         u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
-        u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight,
+        u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight, u_shade: pal.shade,
         u_light: kind === 'silk' ? silkLight : false, u_gain: cfg.display * (depth && kind === 'wisp' ? WISP_DEPTH_SMOKE : 1), u_fade: ctx.fadeInOut,
         u_pulse: ctx.bassHits, u_smoke_hue: inkExp('smokeHue', SMOKE_HUE),
         u_agents: agentUv, u_agent_dir: agentDir, u_agent_count: kind === 'wisp' ? agents.length : 0,

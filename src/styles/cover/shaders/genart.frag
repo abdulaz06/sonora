@@ -33,7 +33,7 @@ void main() {
   // thin stripes across one third
   float k = floor(hash(s + 8.0) * 3.0) / 3.0;
   float stripe = step(k, p.y) * step(p.y, k + 0.33) * step(0.5, fract(p.x * 18.0));
-  col = mix(col, u_c3, stripe * 0.55);
+  col = mix(col, mix(u_c3, u_c0, 0.3), stripe * 0.55);   // pale highlights lean to the primary (Aurora read dull)
   // grain
   col += (hash2(gl_FragCoord.xy) - 0.5) * 0.05;
   frag = vec4(col, 1.0);

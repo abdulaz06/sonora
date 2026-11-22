@@ -308,7 +308,9 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         addFigure(p, ramp(k), inten, light ? Math.min(1, 0.55 * (1 - 0.75 * k) * (1 + 1.6 * kick)) : 0.35, off, side * FAN_TURN * fan, light ? 1 - 0.15 * k : 0.38 - 0.12 * k);
       }
       const live = hist[hist.length - 1]?.p;
-      const liveCol: RGB = light ? [pal.primary[0] * 0.75, pal.primary[1] * 0.75, pal.primary[2] * 0.75] : [pal.highlight[0] * 0.7 + pal.primary[0] * 0.3, pal.highlight[1] * 0.7 + pal.primary[1] * 0.3, pal.highlight[2] * 0.7 + pal.primary[2] * 0.3];
+      // On paper the live dancer is the primary's dark tone (the shade slot: never olive), so it stands
+      // apart from its lighter echoes even when primary and secondary are close (Solar).
+      const liveCol: RGB = light ? mixRgb(pal.shade, pal.primary, 0.3) : [pal.highlight[0] * 0.7 + pal.primary[0] * 0.3, pal.highlight[1] * 0.7 + pal.primary[1] * 0.3, pal.highlight[2] * 0.7 + pal.primary[2] * 0.3];
       const liveI = (light ? 1 - 0.3 * kick : 0.7) * (0.45 + 0.55 * fadeIn) * (1 + KICK_FLARE * kick * (light ? 0 : 1));
       const echoN = n;
       // The body's volume as a faint wide glow, the skeleton as bright lines of light.

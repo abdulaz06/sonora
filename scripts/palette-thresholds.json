@@ -135,6 +135,150 @@
    "L_min": 0.35,
    "L95_max": 0.85,
    "_note": "1.1 (D89): realistic materials, the palette in the light. Calibrated on the 1.1 renders (all nine palettes: light off <= 8%, light chroma >= 0.095, L 0.44-0.48, L95 <= 0.70)."
+  },
+  "silk-helix-flat": {
+   "chroma_min": 0.0744,
+   "grey_max": 0.1,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 16.1,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "silk-helix-depth": {
+   "chroma_min": 0.0774,
+   "grey_max": 0.1,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 17.0,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "stage-club": {
+   "chroma_min": 0.0731,
+   "grey_max": 0.174,
+   "off_max": 0.204,
+   "olive_max": 0.177,
+   "sep_min": 15.5,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "stage-arena": {
+   "chroma_min": 0.0776,
+   "grey_max": 0.147,
+   "off_max": 0.142,
+   "olive_max": 0.261,
+   "sep_min": 14.6,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "stage-cathedral": {
+   "chroma_min": 0.0733,
+   "grey_max": 0.19,
+   "off_max": 0.218,
+   "olive_max": 0.21,
+   "sep_min": 14.2,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "cymatics-stone": {
+   "chroma_min": 0.0602,
+   "grey_max": 0.113,
+   "off_max": 0.101,
+   "olive_max": 0.05,
+   "sep_min": 11.3,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "cymatics-sand": {
+   "chroma_min": 0.0446,
+   "grey_max": 0.142,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 10.2,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "cymatics-liquid": {
+   "chroma_min": 0.0715,
+   "grey_max": 0.105,
+   "off_max": 0.1,
+   "olive_max": 0.05,
+   "sep_min": 14.6,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "glass-bubbles": {
+   "chroma_min": 0.0709,
+   "grey_max": 0.115,
+   "off_max": 0.386,
+   "olive_max": 0.05,
+   "sep_min": 13.6,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "glass-fins": {
+   "chroma_min": 0.0652,
+   "grey_max": 0.154,
+   "off_max": 0.392,
+   "olive_max": 0.053,
+   "sep_min": 8.4,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "glass-chrome": {
+   "chroma_min": 0.0742,
+   "grey_max": 0.102,
+   "off_max": 0.106,
+   "olive_max": 0.051,
+   "sep_min": 18.1,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "cover-light": {
+   "chroma_min": 0.0573,
+   "grey_max": 0.524,
+   "off_max": 0.123,
+   "olive_max": 0.05,
+   "sep_min": 27.3,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "cover-dark": {
+   "chroma_min": 0.0974,
+   "grey_max": 0.103,
+   "off_max": 0.218,
+   "olive_max": 0.05,
+   "sep_min": 14.6,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "echo-glow": {
+   "chroma_min": 0.0771,
+   "grey_max": 0.109,
+   "off_max": 0.148,
+   "olive_max": 0.05,
+   "sep_min": 24.7,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "echo-trace": {
+   "chroma_min": 0.0445,
+   "grey_max": 0.672,
+   "off_max": 0.17,
+   "olive_max": 0.05,
+   "sep_min": 19.6,
+   "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
+  },
+  "memory-forest": {
+   "mode": "light",
+   "light_off_max": 0.15,
+   "light_chroma_min": 0.04,
+   "L_min": 0.35,
+   "L95_max": 0.85,
+   "_note": "1.2 (as D89): photoscans stay natural, the palette is in the fog and the light. Measured on all nine palettes: light off <= 3%, light chroma >= 0.056 (a pale fog: the floor is 0.04, half Voyage City's), L 0.55-0.56, L95 <= 0.70."
+  },
+  "memory-coast": {
+   "mode": "light",
+   "light_off_max": 0.15,
+   "light_chroma_min": 0.04,
+   "L_min": 0.35,
+   "L95_max": 0.85,
+   "_note": "1.2 (as D89): photoscans stay natural, the palette is in the fog and the light. Measured on all nine palettes: light off <= 4%, light chroma >= 0.048 (a pale fog: the floor is 0.04, half Voyage City's), L 0.53-0.56, L95 <= 0.66."
+  },
+  "memory-desert": {
+   "mode": "light",
+   "light_off_max": 0.15,
+   "light_chroma_min": 0.04,
+   "L_min": 0.35,
+   "L95_max": 0.85,
+   "_note": "1.2 (as D89): photoscans stay natural, the palette is in the fog and the light. Measured on all nine palettes: light off <= 0%, light chroma >= 0.058 (a pale fog: the floor is 0.04, half Voyage City's), L 0.45-0.54, L95 <= 0.63."
   }
  },
  "expo_tol": {

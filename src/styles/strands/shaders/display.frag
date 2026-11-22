@@ -11,6 +11,7 @@ uniform vec3 u_c0;   // primary
 uniform vec3 u_c1;   // secondary
 uniform vec3 u_c2;   // accent
 uniform vec3 u_c3;   // highlight
+uniform vec3 u_shade; // the primary's dark tone (never olive)
 uniform float u_smoke_hue;   // Wisp: share of hue-preserving smoke compression
 uniform int u_light;
 uniform float u_gain;
@@ -56,8 +57,18 @@ void main() {
     // Threads light up on the frame of each bass hit (energy glow).
     float e = 1.0 + 0.6 * u_pulse;
     col = u_bg * 0.6;
+#ifdef HELIX
+    // Faint threads take the primary's dark tone (a dim amber read olive in Solar).
+    col += mix(u_shade, u_c0, smoothstep(0.1, 0.6, c)) * c * 1.1 * e;
+#else
     col += u_c0 * c * 1.1 * e;
+#endif
+#ifdef HELIX
+    // Helix threads crowd into mid densities: their highlight leans to the primary (dim yellow = olive).
+    col += mix(u_c3, u_c0, 0.35) * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 0.9 * e;
+#else
     col += u_c3 * smoothstep(0.55 - 0.2 * u_pulse, 1.0, c) * 0.9 * e;
+#endif
 #ifdef HELIX
     // Helix glints burn whiter than the threads, leaning to the primary (a dim yellow-white read
     // olive in Ember, grey in Sunset: colour gate).

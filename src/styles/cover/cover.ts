@@ -244,7 +244,7 @@ export function createCoverStyle(deps: StyleDeps): VisualStyle {
       const sec = pal.secondary, sl = Math.max(0.2126 * sec[0] + 0.7152 * sec[1] + 0.0722 * sec[2], 1e-3);
       const secN = sec.map((x) => x * Math.min(2, Math.max(0.4, DARK_SEC_LUMA / sl))) as [number, number, number];
       const bg2 = light ? mix3(pal.paper, pal.secondary, 0.18) : mix3(pal.bg, secN, 0.22);
-      const halo = light ? mix3(pal.shade, [0, 0, 0], 0.4) : mix3(pal.primary, pal.highlight, 0.3);
+      const halo = light ? mix3(pal.shade, [0, 0, 0], 0.4) : mix3(pal.primary, pal.highlight, 0.15);
       setUniforms(gl, cp, {
         u_cover: coverTex, u_prev: prevTex, u_fb: fb.read.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
         u_bg: bg, u_bg2: bg2, u_halo: halo, u_light: light,
