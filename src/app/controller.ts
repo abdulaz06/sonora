@@ -9,6 +9,7 @@
 import type { CameraView } from '../engine/camera';
 import type { QualityPreset } from '../engine/quality';
 import { setDefaultFilter, type FilterSettings } from '../engine/filters/filters';
+import { setCoverArt } from '../engine/cover-art';
 import type { Renderer } from '../engine/renderer';
 import { defaultStylePrefs, type PersistedSettings, type StylePrefs } from '../ipc/settings';
 import { getStyle, presetsFor } from '../styles/registry';
@@ -105,6 +106,8 @@ export function initController(opts: ControllerOptions): Controller {
   // Album colours follow now playing (the cover drives the palette while on).
   const album = createAlbumColours(renderer.colorEngine, () => settings.albumColours);
   nowPlaying.subscribe((m) => album.feed(m));
+  // The Cover style shows the artwork itself (grey covers too; adverts and no-art never).
+  album.state.subscribe((st) => { void setCoverArt(st.status === 'cover' || st.status === 'grey' ? st.art : ''); });
   let blackout = false;
   /** Picking a palette by hand turns album colours off (the pick is what you want now). */
   const leaveAlbum = (): void => {

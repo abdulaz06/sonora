@@ -23,6 +23,7 @@ import { presetsFor, preloadStyles } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
 import { defaultSettings, mergeWithDefaults, parseFilter, type PersistedSettings } from '../ipc/settings';
 import { filtersReady } from '../engine/filters/filters';
+import { setCoverArt } from '../engine/cover-art';
 import type { QualityPreset } from '../engine/quality';
 import type { SonoraEvent } from '../engine/events';
 import type { LightMode, StyleId } from '../styles/visual-style';
@@ -87,6 +88,8 @@ export interface HarnessApi {
   /** Controller preview tap on this page's renderer (cost measurements): on/off, and
    * capture every n-th frame (0 = the real rate, PREVIEW_FPS by time). */
   previewTap(o: { on: boolean; every?: number; mode?: 'bitmap' | 'pbo' }): PreviewStats | null;
+  /** Cover style: show a cover (data: URL), or '' for none (generated artwork). */
+  setCover(src: string): Promise<void>;
   /** Album colours: extract a cover (data: URL) exactly as the app does. */
   albumExtract(src: string): Promise<{ kind: string; hues: unknown; resolved: ResolvedPalette | null; colours: { lch: number[]; share: number; neutral: boolean }[] }>;
 }
@@ -464,6 +467,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       renderer.setFrameHook(o.on ? (_g, now) => t.onFrame(now) : null);
       return { ...t.stats };
     },
+    setCover: (src: string) => setCoverArt(src, src ? undefined : ''),
     async albumExtract(src: string) {
       const px = await coverPixels(src);
       if (!px) return { kind: 'unreadable', hues: null, resolved: null, colours: [] };

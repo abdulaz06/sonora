@@ -11,6 +11,7 @@ import type { SonoraEvent } from '../engine/events';
 import { PALETTES } from '../engine/color-engine';
 import type { AudioFeatureFrame } from '../types/audio-frame';
 import { PIECES, type Piece } from './catalog';
+import { coverArt } from '../engine/cover-art';
 import type { Controller } from './controller';
 
 // ── Tuning ──────────────────────────────────────────────────────
@@ -60,6 +61,8 @@ export function createSetMode(ctl: Controller, onChange: (on: boolean) => void, 
     let inc = s.setMode.include.length ? PIECES.filter((p) => s.setMode.include.includes(p.id)) : PIECES;
     // Locked: only the current style's looks and views.
     if (s.setMode.lockStyle) inc = PIECES.filter((p) => p.style === s.mode);
+    // Cover only while something with a cover plays.
+    if (!coverArt()) inc = inc.filter((p) => p.style !== 'cover');
     if (!inc.length) return null;
     const current = currentPieceId();
     let pool = inc.filter((p) => !history.includes(p.id) && p.id !== current);

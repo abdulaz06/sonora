@@ -20,12 +20,13 @@ const LOADERS: Record<StyleId, () => Promise<Factory>> = {
   stage: () => import('./stage/stage').then((m) => m.createStageStyle),
   cymatics: () => import('./cymatics/cymatics').then((m) => m.createCymaticsStyle),
   glass: () => import('./glass/glass').then((m) => m.createGlassStyle),
+  cover: () => import('./cover/cover').then((m) => m.createCoverStyle),
   aura: () => import('./classic/aura').then((m) => m.createAuraStyle),
   halo: () => import('./classic/halo-spectrum').then((m) => m.createHaloStyle),
 };
 const factories: Partial<Record<StyleId, Factory>> = {};
 /** 1.2 styles: hidden from pickers on the deployed website until the release (release.ts). */
-const UNRELEASED_12: StyleId[] = ['stage', 'cymatics', 'glass'];
+const UNRELEASED_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover'];
 const loading: Partial<Record<StyleId, Promise<Factory>>> = {};
 
 /** Load a style's code (once). */
@@ -100,6 +101,12 @@ export const STYLES: StyleDescriptor[] = [
     variants: STYLE_VARIANTS.glass, defaultVariant: 'bubbles',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: lazy('glass'),
+  },
+  {
+    id: 'cover', label: 'Cover', category: 'art',
+    variants: STYLE_VARIANTS.cover, defaultVariant: 'cover',
+    supportsLight: true, supportsDepth: false, defaultDepth: false,
+    create: lazy('cover'),
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',

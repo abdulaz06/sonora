@@ -15,6 +15,11 @@ try {
   await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await p.waitForFunction(() => window.__sonora?.ready === true);
   await p.evaluate(([s, v, d]) => window.__sonora.configure({ style: s, variant: v || undefined, depth: d === '' ? undefined : d === '1', drift: false }), [style, process.env.SNAP_LOOK || '', process.env.SNAP_DEPTH ?? '']);
+  if (process.env.SNAP_COVER) {
+    const { readFileSync } = await import('node:fs');
+    const ext = process.env.SNAP_COVER.toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+    await p.evaluate((u) => window.__sonora.setCover(u), `data:image/${ext};base64,${readFileSync(process.env.SNAP_COVER).toString('base64')}`);
+  }
   await p.evaluate((n) => window.__sonora.loadTrack(n), track);
   let now = 0;
   for (const ts of times) {

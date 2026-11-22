@@ -134,6 +134,13 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
       { id: 'chrome', label: 'Chrome', line: 'A field of mirror tubes riding a wave.', media: 'glass-chrome' },
     ],
   },
+  cover: {
+    id: 'cover', label: 'Cover',
+    line: 'The album art of what’s playing becomes the visual, swept into orbits of itself.',
+    more: 'Copies of the cover sweep around it on the beat, slice into strips through a build and fall into a tunnel of covers on the drop. Each new song flips in tile by tile. With no cover, it paints its own artwork from your palette.',
+    suits: 'any album you love',
+    looks: [],
+  },
   aura: {
     id: 'aura', label: 'Aura', line: 'The original rings, particles and glow from sonora 0.1.', more: 'Classic.', suits: 'nostalgia',
     looks: [],
@@ -145,7 +152,7 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
 };
 
 /** 1.2 styles (hidden on the deployed website until the release, see release.ts). */
-export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass'];
+export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover'];
 export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage', ...(SHOW_12 ? NEW_STYLES_12 : [])];
 export const CLASSIC_STYLES: StyleId[] = ['aura', 'halo'];
 
@@ -192,6 +199,7 @@ const PIECES_12: Piece[] = [
   { id: 'glass:bubbles', style: 'glass', look: 'bubbles', label: 'Glass · Bubbles', views: ['flat'], energy: 0.4, media: 'glass-bubbles' },
   { id: 'glass:fins', style: 'glass', look: 'fins', label: 'Glass · Fins', views: ['flat'], energy: 0.55, media: 'glass-fins' },
   { id: 'glass:chrome', style: 'glass', look: 'chrome', label: 'Glass · Chrome', views: ['flat'], energy: 0.6, media: 'glass-chrome' },
+  { id: 'cover', style: 'cover', look: 'cover', label: 'Cover', views: ['flat'], energy: 0.5, media: 'cover' },
 ];
 export const PIECES: Piece[] = [
   { id: 'ink:glow', style: 'ink', look: 'glow', label: 'Ink · Glow', views: ['depth', 'flat'], energy: 0.45, media: 'ink-glow' },
