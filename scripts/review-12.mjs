@@ -112,7 +112,7 @@ function gateRows(it) {
   const fl = read(join(LOGS, 'filters.log')).split('\n');
   const mo = read(join(LOGS, 'motion.log')).split('\n');
   const dt = read(join(LOGS, 'dt.log')).split('\n');
-  const cost = read(join(LOGS, 'cost.log')).split('\n');
+  const cost = (read(join(LOGS, 'cost.log')) + read(join(LOGS, 'filter-cost.log'))).split('\n');
   const comp = read(join(LOGS, 'compile.log')).split('\n');
   const col = read(join(LOGS, 'colour.log')).split('\n');
   const L = light === 'auto' ? 'auto' : light;
