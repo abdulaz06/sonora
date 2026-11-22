@@ -38,7 +38,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.PALETTE_PORT || 5199);
+const PORT = Number(process.env.PALETTE_PORT || process.env.SONORA_HARNESS_PORT || 5199);
 const DT = 1 / 60;
 
 /** Every style / look / view the app offers (classic styles excluded). */
@@ -115,7 +115,7 @@ try {
 } catch { /* free */ }
 
 const server = spawn('npx', ['vite', '--port', String(PORT), '--strictPort'], {
-  cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: 'node_modules/.vite-verify' },
+  cwd: ROOT, shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: process.env.SONORA_VITE_CACHE || 'node_modules/.vite-verify' },
 });
 const cleanup = () => { try { execFileSync('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* gone */ } };
 process.on('exit', cleanup);

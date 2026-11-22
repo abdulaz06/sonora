@@ -15,13 +15,13 @@ const SHOTS = 24;
 const COLS = 6;
 const W = 480, H = 270;
 
-const server = spawn('npx', ['vite', '--port', '5199', '--strictPort'], { shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: 'node_modules/.vite-verify' } });
+const server = spawn('npx', ['vite', '--port', String(process.env.SONORA_HARNESS_PORT || 5199), '--strictPort'], { shell: true, stdio: 'ignore', env: { ...process.env, SONORA_VITE_CACHE: process.env.SONORA_VITE_CACHE || 'node_modules/.vite-verify' } });
 const kill = () => { try { execFileSync('taskkill', ['/pid', String(server.pid), '/T', '/F'], { stdio: 'ignore' }); } catch { /* gone */ } };
 try {
-  for (let i = 0; i < 80; i++) { try { if ((await fetch('http://localhost:5199/web.html')).ok) break; } catch { /* wait */ } await new Promise((r) => setTimeout(r, 400)); }
+  for (let i = 0; i < 80; i++) { try { if ((await fetch(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html`)).ok) break; } catch { /* wait */ } await new Promise((r) => setTimeout(r, 400)); }
   const b = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: W, height: H } });
-  await p.goto('http://localhost:5199/web.html?harness=1');
+  await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1`);
   await p.waitForFunction(() => window.__sonora?.ready === true);
   await p.evaluate(([s, v, d]) => window.__sonora.configure({ style: s, variant: v, depth: d, drift: false }), [style, look, view === 'depth']);
   await p.evaluate((n) => window.__sonora.loadTrack(n), track);

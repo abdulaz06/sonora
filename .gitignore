@@ -69,3 +69,6 @@ local-media/
 
 # Vercel CLI link (project and org ids)
 .vercel/
+
+# New-style reference frames (reels; local only, never shipped)
+DOCS/reference/new-styles/
