@@ -71,7 +71,7 @@ const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-ma
 
     .lv-fallback { display: none; position: fixed; inset: 0; overflow: auto; background: var(--night); z-index: 3000; }
     html.lv-static .lv-fallback { display: block; }
-    html.lv-static #canvas, html.lv-static .lv-strip { display: none; }
+    html.lv-static #canvas, html.lv-static .lv-strip, html.lv-static .lv-sheet, html.lv-static .lv-drop { display: none; }
     .lv-lockup { width: 220px; height: auto; }
     .lv-fb-in { max-width: 1200px; margin: 0 auto; padding: clamp(28px, 6vh, 72px) var(--gutter); }
     .lv-fb-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 36px; }
@@ -130,7 +130,7 @@ const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-ma
       <div class="lv-fb-grid">
         {loops.map((l) => (
           <figure>
-            <video muted loop playsinline autoplay preload="metadata" poster={l.stillSmall} aria-label={`${l.n.replace('-', ' ')}, recorded from the engine`}>{l.loop && <source src={l.loop} type="video/webm" />}</video>
+            <video muted loop playsinline preload="none" data-poster={l.stillSmall} data-loop={l.loop} aria-label={`${l.n.replace('-', ' ')}, recorded from the engine`}></video>
             <figcaption class="lv-micro">{l.n.replace('-', ' · ')}</figcaption>
           </figure>
         ))}
@@ -139,7 +139,8 @@ const loops = ['ink-glow', 'silk', 'wisp-tunnel', 'warp', 'voyage-city', 'ink-ma
   </section>
 
   <script>
-    import { bootLive } from '../live/main';
-    void bootLive();
+    // Phones and browsers without WebGL 2 get the recordings only: the app's code never loads.
+    if (document.documentElement.classList.contains('lv-static')) void import('../live/static').then((m) => m.bootStatic());
+    else void import('../live/main').then((m) => m.bootLive());
   </script>
 </Base>

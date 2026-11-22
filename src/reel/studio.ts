@@ -18,7 +18,7 @@ import { decodeWavMono } from '../audio/wav';
 import { WasmFrameSource } from '../audio/wasm-source';
 import { setDebugFlags } from '../engine/debug-flags';
 import { initRenderer } from '../engine/renderer';
-import { presetsFor } from '../styles/registry';
+import { preloadStyles, presetsFor } from '../styles/registry';
 import { button, segmented, select, slider, toggle } from '../ui/ds/components';
 import { h } from '../ui/ds/dom';
 import { lockup } from '../ui/screens/brand';
@@ -59,6 +59,7 @@ document.body.append(
 
 // ── Engine for the preview (portrait framing: studio only) ──
 const canvas = $<HTMLCanvasElement>('#canvas');
+await preloadStyles();
 const renderer = initRenderer(canvas, { autoStart: false, seed: 1234 });
 setDebugFlags({ portrait: 1 });
 let source: WasmFrameSource | null = null;

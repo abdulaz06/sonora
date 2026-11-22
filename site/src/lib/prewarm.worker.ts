@@ -18,6 +18,8 @@ self.onmessage = async (e: MessageEvent<Job>) => {
   const { width, height, scenes } = e.data;
   try {
     const { initRenderer } = await import('../../../src/engine/renderer');
+    const { preloadStyles } = await import('../../../src/styles/registry');
+    await preloadStyles([...new Set(scenes.map((s) => s.style))]);
     const off = new OffscreenCanvas(width, height) as OffscreenCanvas & { clientWidth: number; clientHeight: number };
     off.clientWidth = width;
     off.clientHeight = height;

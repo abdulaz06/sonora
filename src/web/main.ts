@@ -19,7 +19,7 @@ import { WasmFrameSource } from '../audio/wasm-source';
 import { createSourceUi, type SourceUi } from './source-ui';
 import { CAMERA_PRESETS } from '../engine/camera';
 import { driftCrossing, PALETTES, resolvePalette, shadeOf, type ResolvedPalette } from '../engine/color-engine';
-import { presetsFor } from '../styles/registry';
+import { presetsFor, preloadStyles } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
 import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
 import type { QualityPreset } from '../engine/quality';
@@ -141,6 +141,8 @@ async function main(): Promise<void> {
   };
 
   let renderer: ReturnType<typeof initRenderer>;
+  // The dev page and the harness have every style ready before the engine starts.
+  await preloadStyles();
   try {
     renderer = initRenderer(canvas, {
       initialStyle: settings.mode,

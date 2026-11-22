@@ -13,7 +13,7 @@
 
 import type { AudioFeatureFrame } from '../types/audio-frame';
 import { emptyFrame } from '../types/audio-frame';
-import { getStyle } from '../styles/registry';
+import { getStyle, loadStyle, styleLoaded } from '../styles/registry';
 import {
   resolveLight,
   type LightMode,
@@ -257,7 +257,11 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   let depth = descriptor.defaultDepth;
   let ringCount: number | null = null;
 
+  // A style whose code hasn't arrived yet (web page: styles load on demand) draws
+  // nothing until it does, then fades in.
+  const BLANK: VisualStyle = { id: 'ink', update: () => undefined, render: () => undefined, dispose: () => undefined };
   const makeStyle = (d: StyleDescriptor): VisualStyle => {
+    if (!styleLoaded(d.id)) return BLANK;
     const s = d.create({ gl, canvas, quadVAO, quality: quality.params, seed });
     s.setVariant?.(variant);
     if (ringCount !== null) s.setRingCount?.(ringCount);
@@ -310,6 +314,12 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     time += dt;
     blackLevel = blackout ? Math.max(0, blackLevel - dt / BLACKOUT_FADE_S) : Math.min(1, blackLevel + dt / BLACKOUT_FADE_S);
     if (!options.fixedSize) sizeCanvas(canvas, maxPixelRatio);
+
+    // A style that wasn't loaded when chosen is built on the first frame after its code arrives
+    // (nothing is compiled while the engine is paused), and fades in.
+    if (style === BLANK && !pending) {
+      if (styleLoaded(descriptor.id)) { style = makeStyle(descriptor); fadeAlpha = 0; } else void loadStyle(descriptor.id);
+    }
 
     // Crossfade between styles
     const fadeRate = 2 / STYLE_FADE_SECONDS;

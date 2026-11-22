@@ -12,6 +12,7 @@ import { listen } from '@tauri-apps/api/event';
 
 import { TauriFrameSource } from './audio/tauri-source';
 import { initController } from './app/controller';
+import { preloadStyles } from './styles/registry';
 import { createRecorder } from './export/recorder';
 import type { MediaAction, Platform } from './app/platform';
 import { initRemoteHost } from './app/remote-host';
@@ -207,6 +208,8 @@ async function main(): Promise<void> {
   }
 
   let renderer: ReturnType<typeof initRenderer>;
+  // Every style is bundled with the app: load them all before the engine starts.
+  await preloadStyles();
   try {
     renderer = initRenderer(canvas, { initialStyle: settings.mode, autoStart: false });
   } catch (err) {
