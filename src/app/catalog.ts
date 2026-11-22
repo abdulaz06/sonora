@@ -10,6 +10,7 @@
 
 import type { MediaSrc } from '../ui/ds/components';
 import type { StyleId } from '../styles/visual-style';
+import { SHOW_12 } from './release';
 
 const FILES = import.meta.glob('../assets/media/*.{webp,webm}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const url = (file: string): string | undefined => FILES[`../assets/media/${file}`];
@@ -167,5 +168,5 @@ export const SHORTCUTS: [string[], string][] = [
   [['F9'], 'Record the visual with the sound (desktop)'],
   [['D'], 'Audio signals (advanced)'],
   [['P'], 'Show / hide FPS'],
-  [['G'], 'Filter: none, glyph, reeded glass'],
+  ...(SHOW_12 ? [[['G'], 'Filter: none, glyph, reeded glass']] as [string[], string][] : []),
 ];

@@ -5,6 +5,7 @@
  * Owns keyboard shortcuts (consolidated here) and arrow-key navigation.
  */
 
+import { SHOW_12 } from './release';
 import { ART_STYLES, STYLE_INFO } from './catalog';
 import type { Controller } from './controller';
 import type { Platform } from './platform';
@@ -289,7 +290,7 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
       } else if (lower === 'v') nextLook();
       else if (lower === 'c') ctl.cycleCameraPreset();
       else if (lower === 'p') { ctl.setShowFps(!s.showFps); toast(s.showFps ? 'fps on' : 'fps off', { ms: 900 }); }
-      else if (lower === 'g') {
+      else if (lower === 'g' && SHOW_12) {
         const order = ['none', 'glyph', 'reeded'] as const;
         const nx = order[(order.indexOf(s.filter.id) + 1) % order.length];
         ctl.setFilter({ id: nx });

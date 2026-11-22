@@ -17,6 +17,7 @@ import { FLAT_ZOOM_MAX, FLAT_ZOOM_MIN } from '../../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES, paletteFromHue, swatchCss } from '../../engine/color-engine';
 import type { QualityPreset } from '../../engine/quality';
 import type { FilterId, FluteAngle, FluteWidth, GlyphSize } from '../../engine/filters/filters';
+import { SHOW_12 } from '../../app/release';
 import { fpsCapChoices, fpsLabel, SET_MODE_INTERVALS, type Corner } from '../../ipc/settings';
 import { getStyle, presetsFor } from '../../styles/registry';
 import { variantSupportsLight, type LightMode } from '../../styles/visual-style';
@@ -184,7 +185,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
 
   const sections: Record<string, HTMLElement> = {};
   // Recording and exports are desktop features.
-  const shown = SECTIONS.filter((id) => id !== 'recording' || platform.kind === 'desktop');
+  const shown = SECTIONS.filter((id) => (id !== 'recording' || platform.kind === 'desktop') && (id !== 'filter' || SHOW_12));
   nav.append(...shown.map((id) => {
     const b = h('button', { type: 'button' }, id);
     b.addEventListener('click', () => sections[id]?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
@@ -265,7 +266,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
 
     // Filter (global)
     const fl = s.filter;
-    const filterSec = section('filter', 'filter', 'all styles',
+    const filterSec = !SHOW_12 ? null : section('filter', 'filter', 'all styles',
       row('Filter', INFO.filter(), fl.id === 'none' ? 'none' : fl.id === 'glyph' ? 'glyph' : 'reeded glass',
         segmented([{ value: 'none', label: 'None' }, { value: 'glyph', label: 'Glyph' }, { value: 'reeded', label: 'Reeded glass' }], fl.id, (v) => ctl.setFilter({ id: v as FilterId }), 'Filter').el),
       fl.id === 'glyph' ? row('Character size', INFO.glyphSize(), fl.glyphSize,
