@@ -245,6 +245,11 @@ html:not(.static) .only-static { display: none !important; }
 .shot img { width: 100%; height: auto; }
 .shot figcaption { display: flex; justify-content: space-between; gap: 16px; padding-top: 12px; }
 .shot--a { grid-column: 1 / -1; }
+/* Make videos: a 16:9 and a 9:16 export side by side, the tall one at the wide one's height. */
+.make { padding: clamp(96px, 16vh, 180px) 0 0; }
+.make-clips { display: grid; grid-template-columns: minmax(0, 16fr) minmax(0, 5.0625fr); gap: clamp(12px, 1.4vw, 24px); align-items: start; }
+.make-clips video { width: 100%; height: auto; display: block; }
+@media (max-width: 760px) { .make-clips { grid-template-columns: 1fr; } .make-tall { max-width: 320px; } }
 .shot--b, .shot--c, .shot--d { grid-column: span 4; }
 @media (max-width: 900px) { .shot--b, .shot--c, .shot--d { grid-column: 1 / -1; } .app-head { grid-template-columns: 1fr; } }
 

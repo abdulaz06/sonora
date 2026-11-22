@@ -229,12 +229,51 @@ const description = 'A visual instrument for whatever’s playing: a free Window
       </div>
     </section>
 
-    <!-- 7 · How it works -->
+    <!-- 7 · Make videos (1.1 Export) -->
+    <section class="solid make" id="make" aria-labelledby="make-h">
+      <div class="wrap">
+        <div class="app-head">
+          <div>
+            <p class="kicker label"><span class="n">06</span><span class="line"></span>make videos</p>
+            <h2 class="h1" id="make-h">turn a song into a video.</h2>
+          </div>
+          <p class="lede">Pick a song, a moment and a style; sonora renders it frame by frame in time with the music, in 16:9, 9:16, square or 4:5, with your own text. Or press F9 and record the visual live with the sound. These two came straight out of Export, from the demo track.</p>
+        </div>
+        <div class="make-clips">
+          <figure class="shot make-wide rv">
+            <div class="frame"><video class="make-video" muted loop playsinline preload="none" width="960" height="540" poster="/media/made-with-export-landscape-poster.webp" aria-label="A 16:9 export: Voyage City in the Sunset palette, the camera pulling out over farmland">
+              <source src="/media/made-with-export-landscape.webm" type="video/webm" /><source src="/media/made-with-export-landscape.mp4" type="video/mp4" />
+            </video></div>
+            <figcaption><span class="label bone">16:9 · voyage · city</span><span class="micro">1080p60 export, shown smaller</span></figcaption>
+          </figure>
+          <figure class="shot make-tall rv">
+            <div class="frame"><video class="make-video" muted loop playsinline preload="none" width="540" height="960" poster="/media/made-with-export-portrait-poster.webp" aria-label="A 9:16 export: a styles tour cutting on the bars through the drop">
+              <source src="/media/made-with-export-portrait.webm" type="video/webm" /><source src="/media/made-with-export-portrait.mp4" type="video/mp4" />
+            </video></div>
+            <figcaption><span class="label bone">9:16 · styles tour</span><span class="micro">cuts on the bars</span></figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+    <script>
+      // The export clips load and play only while they're on screen (nothing for the first paint).
+      const clips = document.querySelectorAll<HTMLVideoElement>('.make-video');
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!still && 'IntersectionObserver' in window) {
+        const io = new IntersectionObserver((es) => es.forEach((e) => {
+          const v = e.target as HTMLVideoElement;
+          if (e.isIntersecting) void v.play().catch(() => undefined); else v.pause();
+        }), { threshold: 0.35 });
+        clips.forEach((v) => io.observe(v));
+      }
+    </script>
+
+    <!-- 8 · How it works -->
     <section class="solid how" aria-labelledby="how-h">
       <div class="wrap">
         <div class="how-head">
           <div>
-            <p class="kicker label"><span class="n">06</span><span class="line"></span>how it works</p>
+            <p class="kicker label"><span class="n">07</span><span class="line"></span>how it works</p>
             <h2 class="h1" id="how-h">from your speakers to the screen in one frame.</h2>
           </div>
           <p class="lede">One Rust analysis crate runs natively in the app and as WebAssembly in this page. It turns sound into a handful of musical signals and events, and the styles draw only from those.</p>

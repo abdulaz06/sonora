@@ -11,7 +11,7 @@ import { connectApp } from './cdp.mjs';
 
 const song = process.argv[2];
 const only = (() => { const i = process.argv.indexOf('--only'); return i > 0 ? process.argv[i + 1].split(',') : null; })();
-const OUT = join('verify', 'review-1.1', 'exports');
+const OUT = (() => { const i = process.argv.indexOf('--out'); return i > 0 ? process.argv[i + 1] : join('verify', 'review-1.1', 'exports'); })();
 mkdirSync(OUT, { recursive: true });
 const { page } = await connectApp();
 page.on('console', (m) => { if (m.type() === 'error') console.log('  [console]', m.text()); });
@@ -24,17 +24,24 @@ const SAMPLES = [
     texts: [{ text: 'first time hearing it like this', start: 6, end: 10, pos: 'center', size: 'l', font: 'instrument', case: 'lower' }] },
   { id: 'landscape', name: 'sample 16x9', size: [1920, 1080], fps: 60, secs: 15, format: 'song', combo: 'voyage-city', palette: 'album', outro: false,
     title: { style: 'reel', in: 0, out: 4 }, nowPlaying: false, corner: 'br', texts: [] },
+  // Website clips (sonora's own demo track: no third-party music or artwork).
+  { id: 'site-portrait', name: 'site 9x16', size: [1080, 1920], fps: 60, secs: 15, format: 'tour', combo: 'silk-depth', palette: 6, outro: false, start: 24,
+    title: { style: 'reel', in: 0, out: 15 }, nowPlaying: false, corner: 'br', texts: [], song: { title: 'sonora demo', artist: 'made for sonora' } },
+  { id: 'site-landscape', name: 'site 16x9', size: [1920, 1080], fps: 60, secs: 12, format: 'song', combo: 'voyage-city', palette: 5, outro: false, start: 47,
+    title: { style: 'reel', in: 0, out: 12 }, nowPlaying: false, corner: 'br', texts: [], song: { title: 'sonora demo', artist: 'made for sonora' } },
 ];
 for (const s of SAMPLES) {
   if (only && !only.includes(s.id)) continue;
   const r = await page.evaluate(async ({ s, bytes, file }) => {
     const H = window.__sonoraHooks;
-    window.__sampleSong ??= await H.loadSong(new File([new Uint8Array(bytes)], file));
-    const song = window.__sampleSong;
+    window.__samples ??= {};
+    window.__samples[file] ??= await H.loadSong(new File([new Uint8Array(bytes)], file));
+    const song = { ...window.__samples[file], ...(s.song ?? {}) };
     const { paletteFromArt } = await import('/src/app/album-colours.ts');
     const album = song.cover ? await paletteFromArt(song.cover) : null;
     const sug = song.analysis.suggestions[String(s.secs)]?.[0] ?? song.analysis.suggestions['30'][0];
-    const w = { start: sug.start, end: sug.start + s.secs };
+    const st = s.start !== undefined ? song.analysis.bars.reduce((b, x) => (Math.abs(x - s.start) < Math.abs(b - s.start) ? x : b), s.start) : sug.start;
+    const w = { start: st, end: st + s.secs };
     const plan = H.buildPlan({ format: s.format, song: song.file, title: song.title, artist: song.artist, window: w, combo: s.combo, palette: s.palette, combo2: 'voyage-void',
       showcase: 'palettes', tour: { combos: ['silk-depth', 'ink-glow-depth', 'wisp-tunnel', 'voyage-city', 'warp'], every: 2 }, text: 'none', labels: false, nowPlaying: false, camera: 'planet' }, song.analysis);
     const sink = await H.desktopSink(`${song.title.toLowerCase()} · ${s.name}`);
