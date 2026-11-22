@@ -14,6 +14,7 @@ import { WasmFrameSource, type SourceStatus } from '../../../src/audio/wasm-sour
 import { initRenderer } from '../../../src/engine/renderer';
 import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../../../src/ipc/settings';
 import { refreshDownloads } from '../lib/download';
+import { staticMode } from './static';
 
 declare const __APP_VERSION__: string;
 
@@ -25,6 +26,9 @@ const MAX_PIXEL_RATIO = 2;
 const DEMO = { webm: '/demo/demo.webm', m4a: '/demo/demo.m4a' };
 /** The demo starts where the groove comes in (s), so the picture moves at once. */
 const DEMO_START_S = 8.4;
+/** After load, wait this long (then for idle time) before fetching the first style and warming its shaders (ms). */
+const PREFETCH_AFTER_MS = 2500;
+const PREWARM_TIMEOUT_MS = 15000;
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string): T | null => document.querySelector<T>(sel);
 
@@ -48,7 +52,7 @@ function canShareTabAudio(): boolean {
 export async function bootLive(): Promise<void> {
   void refreshDownloads();
   const html = document.documentElement;
-  if (html.classList.contains('lv-static')) { staticMode(); return; }
+  if (html.classList.contains('lv-static')) { staticMode(); return; }  // (the page loads ./static for these)
 
   const canvas = $<HTMLCanvasElement>('#canvas')!;
   const settings = loadSettings();
@@ -69,9 +73,8 @@ export async function bootLive(): Promise<void> {
     return;
   }
   const controller = initController({ renderer, settings, persist });
-  const source = await WasmFrameSource.create();
-  source.subscribe((f) => controller.onFrame(f));
-  source.onStatus((st) => audioStatus.patch({ device: st.state === 'idle' ? '' : st.label }));
+  // The analyser (WebAssembly) loads alongside the shell.
+  const sourceReady = WasmFrameSource.create();
 
   const sheet = $('#lv-sheet')!;
   const note = $('#lv-note')!;
@@ -90,6 +93,18 @@ export async function bootLive(): Promise<void> {
     onFullscreenChange: (cb) => document.addEventListener('fullscreenchange', () => cb(!!document.fullscreenElement)),
   };
   const shell: Shell = await initShell(controller, platform, { noLaunch: true, start: 'menu' });
+  const source = await sourceReady;
+  source.subscribe((f) => controller.onFrame(f));
+  source.onStatus((st) => audioStatus.patch({ device: st.state === 'idle' ? '' : st.label }));
+  // Once the page is idle: fetch the chosen style's code and compile its shaders in a worker
+  // (the GPU process caches them), so opening the visual never stalls the page.
+  const idle = (f: () => void): void => { const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback; if (ric) ric(f, { timeout: PREFETCH_AFTER_MS * 2 }); else window.setTimeout(f, PREFETCH_AFTER_MS); };
+  window.setTimeout(() => idle(() => {
+    void import('../../../src/styles/registry').then((r) => r.loadStyle(settings.mode));
+    if (shell.screen() !== 'visual') {
+      void import('../lib/prewarm').then((m) => m.prewarm([{ style: settings.mode, variant: controller.variantFor(settings.mode), depth: controller.depthFor(settings.mode) } as Parameters<typeof m.prewarm>[0][number]], Math.min(innerWidth, 1280), Math.min(innerHeight, 720), PREWARM_TIMEOUT_MS));
+    }
+  }), PREFETCH_AFTER_MS);
   // The strip hides on the visual (the app's own chrome takes over).
   const watch = (): void => { document.body.classList.toggle('lv-visual', shell.screen() === 'visual'); };
   window.setInterval(watch, 300);
@@ -180,16 +195,4 @@ export async function bootLive(): Promise<void> {
     if (st.state === 'reconnect' || st.state === 'error') { openSheet(); say(st.message); }
   });
   (window as unknown as { __live?: unknown }).__live = { shell, source, renderer, controller };
-}
-
-function staticMode(): void {
-  const why = document.documentElement.dataset.why;
-  if (why === 'webgl') {
-    const t = $('[data-fb-title]'), b = $('[data-fb-body]');
-    if (t) t.textContent = 'the visuals can’t start in this browser.';
-    if (b) b.textContent = 'sonora draws with WebGL 2 and high-precision render targets, and this browser or graphics driver doesn’t offer them. Updating the graphics driver, or trying Chrome or Edge, usually fixes it. Meanwhile, here is what it looks like, recorded from the engine.';
-  }
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    document.querySelectorAll<HTMLVideoElement>('.lv-fallback video').forEach((v) => { v.autoplay = false; v.pause(); v.removeAttribute('autoplay'); });
-  }
 }

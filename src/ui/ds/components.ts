@@ -120,7 +120,7 @@ export function media(src: MediaSrc, opts: { large?: boolean; eager?: boolean } 
   let wantPlay = false;
   const build = (s: MediaSrc): void => {
     cur = s;
-    img = h('img', { alt: s.alt ?? '', decoding: 'async', loading: opts.eager ? 'eager' : 'lazy', draggable: 'false' });
+    img = h('img', { alt: s.alt ?? '', decoding: 'async', loading: opts.eager ? 'eager' : 'lazy', draggable: 'false', fetchpriority: opts.large && opts.eager ? 'high' : null });
     img.src = !opts.large && s.stillSmall ? s.stillSmall : s.still;
     video = null;
     el.replaceChildren(img);

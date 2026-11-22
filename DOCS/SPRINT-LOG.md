@@ -23,7 +23,7 @@
 - [ ] D5. Water: Gerstner bands, Fresnel sky reflection, crest SSS, fold/shore foam, depth colour, glints, ripples (City + Ocean)
 - [ ] D6. Budgets: frame time per preset, compile time, installer ≤ +25 MB; palette metrics recalibrated for City/Ocean
 - [ ] D7. After stills and clips; `npm run media`, palette thumbnails
-- [ ] E1. /live code split: shell first, styles + shaders on demand; Lighthouse desktop 90+, mobile 100; `test:live` extended (Export hidden on the web)
+- [x] E1. /live code split: shell first, styles + shaders on demand; Lighthouse desktop 90+, mobile 100; `test:live` extended (Export hidden on the web)
 - [ ] R. Full gates; review summary; `verify/review-1.1/index.html`; stop
 
 # Batch 1.0.2 — album-art colours, controller view, license, reel studio, "I Wonder" trailer — shipped (v1.0.2; trailer A2 on the site)

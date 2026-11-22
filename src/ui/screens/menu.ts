@@ -13,6 +13,9 @@ import { button, icon, media, meter, type Media } from '../ds/components';
 import { h } from '../ds/dom';
 import { lockup } from './brand';
 
+/** The first open card's loop starts this long after the menu first shows (ms). */
+const FIRST_LOOP_DELAY_MS = 1600;
+
 export interface MenuHandlers {
   openStyle(id: StyleId, from: HTMLElement): void;
   resume(from: HTMLElement): void;
@@ -76,12 +79,20 @@ export function createMenu(ctl: Controller, on: MenuHandlers, platform: 'desktop
     cards.push({ id, el: card, media: m });
   });
 
+  // The first time the menu shows, the open card's loop waits a moment: its still paints first
+  // (a quick first paint; the page's largest picture is the still, not a video's first frame).
+  let firstShow = true;
+  let holdUntil = 0;
+  let loopTimer = 0;
   function setOpen(i: number): void {
     openIdx = i;
+    window.clearTimeout(loopTimer);
+    const wait = holdUntil - performance.now();
     cards.forEach((c, k) => {
       const open = k === i;
       c.el.classList.toggle('is-open', open);
-      if (open) c.media.play(); else c.media.stop();
+      if (open && wait > 0) loopTimer = window.setTimeout(() => { if (openIdx === k && !el.hidden) c.media.play(); }, wait);
+      else if (open) c.media.play(); else c.media.stop();
     });
   }
   strip.addEventListener('pointerleave', () => {
@@ -174,6 +185,8 @@ export function createMenu(ctl: Controller, on: MenuHandlers, platform: 'desktop
       el.hidden = false;
       el.classList.remove('is-in', 'is-settled');
       const cur = ART_STYLES.indexOf(s.mode);
+      if (firstShow) holdUntil = performance.now() + FIRST_LOOP_DELAY_MS;
+      firstShow = false;
       setOpen(cur >= 0 ? cur : openIdx);
       requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('is-in')));
       window.clearTimeout(settleTimer);

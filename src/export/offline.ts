@@ -12,7 +12,7 @@
 import { WasmFrameSource } from '../audio/wasm-source';
 import type { Palette } from '../engine/color-engine';
 import { initRenderer, type Renderer } from '../engine/renderer';
-import { presetsFor } from '../styles/registry';
+import { loadStyle, presetsFor } from '../styles/registry';
 import type { StyleId } from '../styles/visual-style';
 import { createMp4, type AacStream, type Sink } from './mp4';
 import { createOverlay, type OverlaySpec } from './overlay';
@@ -176,6 +176,7 @@ export async function renderExport(
     for (const [n, sh] of shots.entries()) {
       const k0 = Math.max(0, Math.round((sh.at - W0) * fps)), k1 = Math.min(total, Math.round((sh.end - W0) * fps));
       if (k1 <= k0) continue;
+      await loadStyle(sh.style as StyleId);
       // A fresh engine per shot (as the studio's page per shot): the same plan always gives the same frames.
       const canvas = document.createElement('canvas');
       canvas.width = RW; canvas.height = RH;

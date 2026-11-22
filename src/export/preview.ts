@@ -9,6 +9,7 @@
 import { WasmFrameSource } from '../audio/wasm-source';
 import type { Palette } from '../engine/color-engine';
 import { initRenderer, type Renderer } from '../engine/renderer';
+import { loadStyle } from '../styles/registry';
 import type { StyleId } from '../styles/visual-style';
 import { applyPalette, applyShot } from './offline';
 import { createOverlay, drawSafeGuides, type Overlay, type OverlaySpec } from './overlay';
@@ -70,6 +71,7 @@ export function createPreview(host: HTMLElement): Preview {
     },
     async play(song, plan, spec, album, portrait, onTime, onEnd) {
       api.stop();
+      await Promise.all(plan.shots.map((s) => loadStyle(s.style as StyleId)));
       const r = ensure();
       r.camera.portraitFraming = portrait && gl.height > gl.width ? 1 : 0;
       r.setQuality('high');

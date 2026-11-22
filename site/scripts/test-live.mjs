@@ -5,7 +5,8 @@
 // asserts the engine itself switched (renderer + colour engine state), for each
 // audio source (the demo, a dropped file, the microphone through a fake device).
 // Also asserts the detail screen's Start button is visible and on top: the
-// landing stylesheet once leaked into /live and hid it (DECISIONS D81).
+// landing stylesheet once leaked into /live and hid it (DECISIONS D81). Also
+// checks the desktop-only Export and Record never show on the web page.
 //
 //   node scripts/test-live.mjs [--base URL] [--channel msedge|chrome|chromium] [--headed] [--sources demo,file,mic] [--swiftshader] [--slow]
 // CI: --channel chromium (Playwright's, software WebGL via SwiftShader) --slow.
@@ -104,6 +105,30 @@ async function startSource(p, source) {
   const s = await until(p, (x) => x.screen === 'visual', 20000);
   const status = await p.evaluate(() => window.__live.source.currentStatus);
   check(s.screen === 'visual' && (status.state === 'live' || status.state === 'quiet'), `${source}: source starts and the visual shows`, `${status.kind} ${status.state} "${status.label}"`);
+}
+
+/** Desktop-only features stay off the web page: no Export entry (button, E key), no Record (HUD, F9), no recording settings. */
+async function desktopOnlyHidden(p, source) {
+  await p.keyboard.press('Escape');
+  await p.evaluate(() => window.__live.shell.goMenu());
+  await wait(700);
+  if ((await engine(p)).screen !== 'menu') { check(false, `${source}: back to the menu (desktop-only check)`); return; }
+  const exportBtn = await p.locator('.scr-menu button', { hasText: /^export$/i }).count();
+  check(exportBtn === 0, `${source}: no Export button in the menu`, `${exportBtn}`);
+  await p.keyboard.press('e');
+  await wait(600);
+  const ex = await p.evaluate(() => ({ screen: window.__live.shell.screen(), el: !!document.querySelector('.scr-export') }));
+  check(ex.screen === 'menu' && !ex.el, `${source}: E does nothing on the web`, `screen ${ex.screen}, export screen ${ex.el}`);
+  // The settings sheet's section list is built once (it's in the page, open or not).
+  const nav = await p.evaluate(() => [...document.querySelectorAll('.st-nav button')].map((b) => b.textContent?.trim()));
+  check(nav.length > 5 && !nav.includes('recording'), `${source}: no recording settings on the web`, nav.join(' · '));
+  await p.evaluate(() => window.__live.shell.goVisual());
+  await wait(900);
+  const recBtn = await p.locator('.hud-bar button', { hasText: /^record/i }).count();
+  await p.keyboard.press('F9');
+  await wait(400);
+  const ind = await p.evaluate(() => { const e = document.querySelector('.rec-ind'); return !!e && !(e).hidden; });
+  check(recBtn === 0 && !ind, `${source}: no Record button and F9 does nothing on the web`, `button ${recBtn}, indicator ${ind}`);
 }
 
 async function toMenu(p) {
@@ -307,6 +332,7 @@ try {
     await stylesViaDetail(p, source);
     await quickSwitcher(p, source);
     await otherControls(p, source);
+    await desktopOnlyHidden(p, source);
     check(errors.length === 0, `${source}: no page errors`, errors.join(' | '));
     await ctx.close();
   }

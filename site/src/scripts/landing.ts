@@ -236,6 +236,8 @@ async function startDemo(sections: LiveSection[]): Promise<void> {
   let mod: typeof import('../lib/stage');
   try {
     mod = await import('../lib/stage');
+    // The page shows every art style: their code loads in parallel before the stage exists.
+    await mod.preloadStyles(['ink', 'silk', 'wisp', 'warp', 'voyage']);
     // Compile every style in a worker first (nothing live on screen yet, so
     // the GPU process can be busy); then each section switch takes milliseconds.
     const t0 = performance.now();
