@@ -374,7 +374,11 @@ try {
   await Promise.all(pages.map(async (page) => {
     while (jobs.length) {
       const j = jobs.shift();
-      await renderOne(page, j.combo, j.pal, j.track, tracks[j.track]);
+      // One retry: a page reload can time out while another harness run loads the GPU.
+      try { await renderOne(page, j.combo, j.pal, j.track, tracks[j.track]); } catch (e) {
+        console.log(`  retry ${j.combo.id} ${j.pal.name} ${j.track}: ${String(e).split(String.fromCharCode(10))[0]}`);
+        await renderOne(page, j.combo, j.pal, j.track, tracks[j.track]);
+      }
       done++;
       if (done % 10 === 0) console.log(`  ${done} done, ${((Date.now() - t0) / 1000).toFixed(0)} s`);
     }
