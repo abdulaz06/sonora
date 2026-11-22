@@ -438,7 +438,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       const filtering = filterPass.active(filter);
       artPost.outputFb = filtering ? filterPass.input(canvas.width, canvas.height) : null;
       artPost.apply(quadVAO, post, time, fadeAlpha * blackLevel, holdSmooth);
-      if (filtering) filterPass.apply(filter, { palette: ctx.palette, light: ctx.light });
+      if (filtering) filterPass.apply(filter, { palette: ctx.palette, light: ctx.light, pulse: ctx.bassHits * ctx.fadeInOut });
       else filterPass.idle();
     }
     if (syncLatched) { syncHold = SYNC_FLASH_HOLD_S; syncLatched = false; }

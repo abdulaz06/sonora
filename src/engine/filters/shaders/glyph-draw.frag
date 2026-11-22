@@ -16,6 +16,7 @@ uniform vec3 u_tint;         // palette highlight
 uniform vec3 u_paper;
 uniform float u_light;
 uniform float u_fill;        // share of the cell colour behind the glyphs
+uniform float u_pulse;       // bass-hit envelope: the characters answer each kick on the hit frame
 out vec4 frag;
 
 void main() {
@@ -35,8 +36,9 @@ void main() {
   float sat = (mx - mn) / (mx + 1e-3);
   if (u_light > 0.5) {
     // Ink characters on paper: the cell's own colour, darker, over a paper-lightened ground.
-    vec3 ground = mix(c, u_paper, 0.72);
-    vec3 ink = c * mix(0.55, 0.8, sat);
+    // The ground keeps half of the cell's own tone, so local changes (a kick's shadow) still read.
+    vec3 ground = mix(c, u_paper, 0.45);
+    vec3 ink = c * mix(0.45, 0.7, sat) * (1.0 - 0.35 * u_pulse);   // only the ink darkens: the page never pulses
     frag = vec4(mix(ground, ink, m), 1.0);
     return;
   }
@@ -49,5 +51,7 @@ void main() {
   g = mix(g, hi * max(g.r, max(g.g, g.b)), max(over * 0.55 * smoothstep(0.05, 0.4, mx), (1.0 - sat) * 0.35));
   // Dim cells keep more of their own tone (the palette's background stays), lit cells are mostly glyph.
   float fill = mix(u_fill * 3.0, u_fill, smoothstep(0.0, 0.2, cov));
+  // Kicks lift dim strokes into fixed headroom (bright strokes stay as they are: no clipping).
+  g = mix(g, max(g, min(g * 1.5, vec3(0.9))), u_pulse);
   frag = vec4(g * m + c * fill * (1.0 - m), 1.0);
 }

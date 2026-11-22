@@ -100,6 +100,8 @@ function locs(gl: WebGL2RenderingContext, p: WebGLProgram, names: string[]): U {
 export interface FilterFrame {
   palette: ResolvedPalette;
   light: boolean;
+  /** Bass-hit envelope (0–1): Glyph's characters answer each kick on the hit frame. */
+  pulse: number;
 }
 
 export class FilterPass {
@@ -145,7 +147,7 @@ export class FilterPass {
     this.progs = { cells, draw, reeded };
     this.u = {
       cells: locs(gl, cells, ['u_src', 'u_prev', 'u_cell', 'u_res', 'u_levels', 'u_light', 'u_reset', 'u_hyst', 'u_edge']),
-      draw: locs(gl, draw, ['u_state', 'u_colour', 'u_atlas', 'u_cell', 'u_count', 'u_levels', 'u_cov', 'u_tint', 'u_paper', 'u_light', 'u_fill']),
+      draw: locs(gl, draw, ['u_state', 'u_colour', 'u_atlas', 'u_cell', 'u_count', 'u_levels', 'u_cov', 'u_tint', 'u_paper', 'u_light', 'u_fill', 'u_pulse']),
       reeded: locs(gl, reeded, ['u_src', 'u_res', 'u_w', 'u_mode', 'u_angle', 'u_tint', 'u_light']),
     };
   }
@@ -234,6 +236,7 @@ export class FilterPass {
       gl.uniform3fv(U.draw.u_paper, fr.palette.paper);
       gl.uniform1f(U.draw.u_light, fr.light ? 1 : 0);
       gl.uniform1f(U.draw.u_fill, GLYPH_FILL);
+      gl.uniform1f(U.draw.u_pulse, Math.min(1, Math.max(0, fr.pulse)));
       gl.drawArrays(gl.TRIANGLES, 0, 6);
       this.wasGlyph = true;
     } else if (f.id === 'reeded') {
