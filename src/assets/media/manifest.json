@@ -22,6 +22,40 @@
     "responsiveness": 0.6
    }
   },
+  "explain-album": {
+   "kind": "explain",
+   "style": "ink",
+   "look": "glow",
+   "view": "depth",
+   "stills": {
+    "640": "explain-album-640.webp"
+   },
+   "loop": null,
+   "loopSeconds": null,
+   "source": {
+    "track": "house-124",
+    "time": 56,
+    "palette": "album:twotone-01-30-270.jpg",
+    "light": "auto",
+    "camera": "glide",
+    "quality": "high",
+    "responsiveness": 0.6
+   }
+  },
+  "explain-album-cover": {
+   "kind": "explain",
+   "style": null,
+   "look": null,
+   "view": null,
+   "stills": {
+    "640": "explain-album-cover-640.webp"
+   },
+   "loop": null,
+   "loopSeconds": null,
+   "source": {
+    "cover": "twotone-01-30-270.jpg"
+   }
+  },
   "explain-cam-glide": {
    "kind": "explain",
    "style": "ink",
@@ -1399,14 +1433,14 @@
    "look": "city",
    "view": null,
    "stills": {
-    "640": "voyage-city-640.webp",
-    "1280": "voyage-city-1280.webp"
+    "1280": "voyage-city-1280.webp",
+    "640": "voyage-city-640.webp"
    },
    "loop": "voyage-city.webm",
    "loopSeconds": 3.5,
    "source": {
     "track": "house-124",
-    "time": 94,
+    "time": 90,
     "palette": 5,
     "light": "auto",
     "camera": null,
@@ -1420,8 +1454,8 @@
    "look": "ocean",
    "view": null,
    "stills": {
-    "640": "voyage-ocean-640.webp",
-    "1280": "voyage-ocean-1280.webp"
+    "1280": "voyage-ocean-1280.webp",
+    "640": "voyage-ocean-640.webp"
    },
    "loop": "voyage-ocean.webm",
    "loopSeconds": 3.5,
@@ -1580,40 +1614,6 @@
     "camera": null,
     "quality": "high",
     "responsiveness": 0.6
-   }
-  },
-  "explain-album": {
-   "kind": "explain",
-   "style": "ink",
-   "look": "glow",
-   "view": "depth",
-   "stills": {
-    "640": "explain-album-640.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "track": "house-124",
-    "time": 56,
-    "palette": "album:twotone-01-30-270.jpg",
-    "light": "auto",
-    "camera": "glide",
-    "quality": "high",
-    "responsiveness": 0.6
-   }
-  },
-  "explain-album-cover": {
-   "kind": "explain",
-   "style": null,
-   "look": null,
-   "view": null,
-   "stills": {
-    "640": "explain-album-cover-640.webp"
-   },
-   "loop": null,
-   "loopSeconds": null,
-   "source": {
-    "cover": "twotone-01-30-270.jpg"
    }
   }
  }
