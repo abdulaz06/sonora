@@ -153,8 +153,8 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
   },
   memory: {
     id: 'memory', label: 'Memory',
-    line: 'A walk through a scanned place that dissolves into points on the beat.',
-    more: 'Made of hundreds of thousands of points from real photoscans. Kicks lift them off and let them settle, builds pull the world apart and the drop snaps it back. Quiet passages turn it into a glowing point cloud.',
+    line: 'A walk through a scanned place; every kick sends a ring of light through it.',
+    more: 'Made of hundreds of thousands of points from real photoscans. Each kick sends a ring of light out through the scene and lifts a few points off, builds pull the world apart and the drop snaps it back. Quiet passages turn it into a glowing point cloud.',
     suits: 'ambient, lo-fi, chill',
     heavy: true,
     looks: [

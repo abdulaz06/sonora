@@ -53,12 +53,12 @@ export const PLAN = [
   style('glass', { style: 'glass', look: 'bubbles', track: H, candidates: [30, 44, 51, 56, 62, 70, 80, 86], pick: 51, loop: 3 }),
   style('cover', { style: 'cover', look: 'cover', track: H, candidates: [30, 40, 45, 51, 56, 62, 70, 86], pick: 30, loop: 3 }),
   style('echo', { style: 'echo', look: 'glow', track: H, candidates: [30, 44, 51, 53, 56, 62, 70, 86], pick: 53, loop: 3 }),
-  style('memory', { style: 'memory', look: 'forest', track: H, candidates: [26, 30, 44, 51, 56, 62, 70, 86], pick: 30, loop: 3 }),
+  style('memory', { style: 'memory', look: 'forest', track: H, candidates: [26, 30, 44, 51, 56, 62, 70, 86], pick: 44, loop: 3 }),
   look('silk-helix', { style: 'silk', look: 'helix', depth: false, track: H, candidates: [30, 44, 48, 51, 56, 62, 70, 76], pick: 48, loop: 3 }),
   { name: 'silk-helix-depth', kind: 'look', style: 'silk', look: 'helix', depth: true, track: H, candidates: [44, 56, 62, 70], pick: 62, loop: 0 },
   ...[['stage', 'club', 56], ['stage', 'arena', 56], ['stage', 'cathedral', 86], ['cymatics', 'stone', 56], ['cymatics', 'sand', 56], ['cymatics', 'liquid', 51],
     ['glass', 'bubbles', 51], ['glass', 'fins', 56], ['glass', 'chrome', 56], ['echo', 'glow', 53], ['echo', 'trace', 53],
-    ['memory', 'forest', 30], ['memory', 'coast', 30], ['memory', 'desert', 30]].map(([s, l, t]) => (
+    ['memory', 'forest', 44], ['memory', 'coast', 30], ['memory', 'desert', 44]].map(([s, l, t]) => (
     { name: `${s}-${l}`, kind: 'look', style: s, look: l, track: H, candidates: [30, 44, 51, 53, 56, 62, 70, 86], pick: t, loop: 0 })),
   // Filter (i) card pictures: the same frame with each filter.
   ...[['none', ''], ['glyph', 'glyph'], ['reeded', 'reeded']].map(([n, f]) => (

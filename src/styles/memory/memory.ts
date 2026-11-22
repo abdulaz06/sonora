@@ -7,8 +7,9 @@
  * Splats are drawn back to front (a counting sort in a worker; synchronously
  * in offline exports, so frames are deterministic) as projected Gaussians.
  *
- *   kicks       a share of the splats lifts off into drifting points and
- *               settles back; the light lifts a little (on the hit frame)
+ *   kicks       a ring of light runs out from the walker through the scene
+ *               (on the hit frame; darks and mid-tones only) and a fifth of
+ *               the splats lift off into drifting points
  *   bass        pushes splats outward along the view
  *   build       the world slowly pulls apart …
  *   drop        … and snaps back together with a camera surge

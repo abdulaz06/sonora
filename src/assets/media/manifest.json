@@ -768,7 +768,7 @@
    "loopSeconds": 3,
    "source": {
     "track": "house-124",
-    "time": 30,
+    "time": 44,
     "palette": 0,
     "light": "auto",
     "camera": null,
@@ -810,7 +810,7 @@
    "loopSeconds": null,
    "source": {
     "track": "house-124",
-    "time": 30,
+    "time": 44,
     "palette": 0,
     "light": "auto",
     "camera": null,
@@ -831,7 +831,7 @@
    "loopSeconds": null,
    "source": {
     "track": "house-124",
-    "time": 30,
+    "time": 44,
     "palette": 0,
     "light": "auto",
     "camera": null,
