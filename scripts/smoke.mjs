@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = 5199;
+const PORT = Number(process.env.SONORA_HARNESS_PORT || 5199);
 const base = `http://localhost:${PORT}/web.html`;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const steps = [];
