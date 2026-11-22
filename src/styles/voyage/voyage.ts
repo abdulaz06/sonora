@@ -36,6 +36,8 @@ import marchFrag from './shaders/march.frag?raw';
 import resolveFrag from './shaders/resolve.frag?raw';
 import presentFrag from './shaders/present.frag?raw';
 import backdropSrc from './shaders/backdrop.glsl?raw';
+import layoutSrc from './shaders/layout.glsl?raw';
+import heightBakeFrag from './shaders/heightbake.frag?raw';
 import { loadVoyageTextures, type VoyageTextures } from './textures';
 import landBakeFrag from './shaders/landbake.frag?raw';
 import fullscreenVert from '../../engine/shaders/fullscreen.vert?raw';
@@ -139,7 +141,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
   const { gl, quadVAO } = deps;
   const rng = createRng(deps.seed ^ 0xf4ac);
   let quality = deps.quality;
-  const march = makeProgram(gl, fullscreenVert, withIncludes(marchFrag, { noise: noiseSrc, backdrop: backdropSrc }));
+  const march = makeProgram(gl, fullscreenVert, withIncludes(marchFrag, { noise: noiseSrc, backdrop: withIncludes(backdropSrc, { layout: layoutSrc }) }));
   let backdrop: Backdrop = 'void';
   // City layout: baked once on first use (terrain, water, cities, forests).
   let landTex: Target | null = null;
@@ -171,6 +173,27 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     texReq ??= loadVoyageTextures(gl).then((t) => { tex = t; }, (e: unknown) => { texFailed = true; console.warn('sonora: Voyage textures failed to load', e); });
     return texReq;
   };
+  // The City's height field, baked from the layout (and the imagery once it's here).
+  let heightTex: Target | null = null;
+  let heightBakedWith: 'none' | 'plain' | 'tex' = 'none';
+  function ensureHeights(): void {
+    const want = tex ? 'tex' : 'plain';
+    if (!landTex || heightBakedWith === want) return;
+    if (!heightTex) {
+      heightTex = createTarget(gl, LAND_TEX, LAND_TEX, { internal: gl.RGBA16F, filter: gl.LINEAR });
+      gl.bindTexture(gl.TEXTURE_2D, heightTex.tex[0]);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    const bake = makeProgram(gl, fullscreenVert, withIncludes(heightBakeFrag, { layout: layoutSrc }));
+    bindTarget(gl, heightTex);
+    gl.disable(gl.BLEND);
+    gl.useProgram(bake.prog);
+    setUniforms(gl, bake, { u_size: [LAND_TEX, LAND_TEX], u_land_r: LAND_R, u_zspan: LAND_ZSPAN, u_land_tex: landTex.tex[0], u_tex_aerial: tex ? tex.aerial : blankArray, u_tex: tex ? 1 : 0 });
+    drawQuad(gl, quadVAO);
+    gl.deleteProgram(bake.prog);
+    heightBakedWith = want;
+  }
   const resolve = makeProgram(gl, fullscreenVert, resolveFrag);
   const present = makeProgram(gl, fullscreenVert, presentFrag);
   let low: Target | null = null;
@@ -516,7 +539,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     },
 
     render(ctx: StyleContext): void {
-      if (backdrop === 'city') { ensureLand(); void requestTextures(); }
+      if (backdrop === 'city') { ensureLand(); void requestTextures(); if (tex || texFailed || !deps.loadAssets) ensureHeights(); }
       if (tex) texMix = Math.min(1, texMix + ctx.dt / TEX_FADE_S);
       ensure(ctx.width, ctx.height);
       const L = low!, H = hist!;
@@ -560,6 +583,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
         u_fog: fogS, u_light: 0.45 + 0.55 * fade,
         u_tex: tex ? texMix : 0, u_q: quality.level === 'high' ? 2 : quality.level === 'medium' ? 1 : 0,
         u_tex_detail: tex ? tex.detail : blankArray, u_tex_aerial: tex ? tex.aerial : blankArray,
+        u_height_tex: heightTex && heightBakedWith !== 'none' ? heightTex.tex[0] : H.read.tex[0], u_hbaked: heightTex && heightBakedWith !== 'none' && backdrop === 'city' ? 1 : 0,
       });
       drawQuad(gl, quadVAO);
 
@@ -603,6 +627,7 @@ export function createVoyageStyle(deps: StyleDeps): VisualStyle {
     dispose(): void {
       deleteTarget(gl, low);
       deleteTarget(gl, landTex);
+      deleteTarget(gl, heightTex);
       gl.deleteTexture(blankArray);
       // The City textures stay with the GL context (loadVoyageTextures caches them per context).
       hist?.dispose();
