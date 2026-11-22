@@ -122,6 +122,18 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
       { id: 'liquid', label: 'Liquid', line: 'Standing waves on water, with caustic light on the sand below.', media: 'cymatics-liquid' },
     ],
   },
+  glass: {
+    id: 'glass', label: 'Glass',
+    line: 'Glass and chrome forms turning in a studio, bending the light into rainbows.',
+    more: 'Blobs of glass merge and split with the bass, every kick ripples their surface, and the drop sets them in a new arrangement. Glints sparkle on the hi-hats.',
+    suits: 'downtempo, R&B, polished pop',
+    heavy: true,
+    looks: [
+      { id: 'bubbles', label: 'Bubbles', line: 'Glass blobs that merge and split.', media: 'glass-bubbles' },
+      { id: 'fins', label: 'Fins', line: 'A twisting ribbon of coloured glass slats.', media: 'glass-fins' },
+      { id: 'chrome', label: 'Chrome', line: 'A field of mirror tubes riding a wave.', media: 'glass-chrome' },
+    ],
+  },
   aura: {
     id: 'aura', label: 'Aura', line: 'The original rings, particles and glow from sonora 0.1.', more: 'Classic.', suits: 'nostalgia',
     looks: [],
@@ -133,7 +145,7 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
 };
 
 /** 1.2 styles (hidden on the deployed website until the release, see release.ts). */
-export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics'];
+export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass'];
 export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage', ...(SHOW_12 ? NEW_STYLES_12 : [])];
 export const CLASSIC_STYLES: StyleId[] = ['aura', 'halo'];
 
@@ -177,6 +189,9 @@ const PIECES_12: Piece[] = [
   { id: 'cymatics:stone', style: 'cymatics', look: 'stone', label: 'Cymatics · Stone', views: ['flat'], energy: 0.3, media: 'cymatics-stone' },
   { id: 'cymatics:sand', style: 'cymatics', look: 'sand', label: 'Cymatics · Sand', views: ['flat'], energy: 0.35, media: 'cymatics-sand' },
   { id: 'cymatics:liquid', style: 'cymatics', look: 'liquid', label: 'Cymatics · Liquid', views: ['flat'], energy: 0.25, media: 'cymatics-liquid' },
+  { id: 'glass:bubbles', style: 'glass', look: 'bubbles', label: 'Glass · Bubbles', views: ['flat'], energy: 0.4, media: 'glass-bubbles' },
+  { id: 'glass:fins', style: 'glass', look: 'fins', label: 'Glass · Fins', views: ['flat'], energy: 0.55, media: 'glass-fins' },
+  { id: 'glass:chrome', style: 'glass', look: 'chrome', label: 'Glass · Chrome', views: ['flat'], energy: 0.6, media: 'glass-chrome' },
 ];
 export const PIECES: Piece[] = [
   { id: 'ink:glow', style: 'ink', look: 'glow', label: 'Ink · Glow', views: ['depth', 'flat'], energy: 0.45, media: 'ink-glow' },

@@ -27,7 +27,7 @@ import type { GenerativeState } from '../engine/generative';
 import type { QualityParams } from '../engine/quality';
 import { SHOW_12 } from '../app/release';
 
-export type StyleId = 'ink' | 'silk' | 'wisp' | 'warp' | 'voyage' | 'stage' | 'cymatics' | 'aura' | 'halo';
+export type StyleId = 'ink' | 'silk' | 'wisp' | 'warp' | 'voyage' | 'stage' | 'cymatics' | 'glass' | 'aura' | 'halo';
 export type StyleCategory = 'art' | 'classic';
 /** Background preference: follow the variant's default, or force one. */
 export type LightMode = 'auto' | 'dark' | 'light';
@@ -69,6 +69,11 @@ export const STYLE_VARIANTS: Record<StyleId, VariantOption[]> = {
     { id: 'stone', label: 'Stone', lightCapable: false },
     { id: 'sand', label: 'Sand', lightCapable: false },
     { id: 'liquid', label: 'Liquid', lightCapable: false },
+  ],
+  glass: [
+    { id: 'bubbles', label: 'Bubbles', lightCapable: false },
+    { id: 'fins', label: 'Fins', lightCapable: false },
+    { id: 'chrome', label: 'Chrome', lightCapable: false },
   ],
   aura: [
     { id: 'circle', label: 'Circle' },
