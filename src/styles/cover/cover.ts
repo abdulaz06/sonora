@@ -39,6 +39,8 @@ const SIZE = 0.24;
 const BREATHE = 0.012;
 /** Kick pulse (size share) and decay (s). */
 const KICK_PULSE = 0.08;
+/** Dark ground: the secondary's luminance before it tints the second tone (Ocean's). */
+const DARK_SEC_LUMA = 0.28;
 const KICK_TAU = 0.15;
 /** Sweeps: stamps per second (fixed rate), alpha per stamp, trail keep per 1/60 s. */
 const STAMP_HZ = 36;
@@ -238,7 +240,10 @@ export function createCoverStyle(deps: StyleDeps): VisualStyle {
       gl.useProgram(cp.prog);
       const light = ctx.light;
       const bg = light ? mix3(pal.paper, pal.highlight, 0.12) : mix3(pal.bg, pal.shade, 0.25);
-      const bg2 = light ? mix3(pal.paper, pal.secondary, 0.18) : mix3(pal.bg, pal.secondary, 0.22);
+      // The dark ground's second tone at one level in every palette (a bright secondary lifted the page).
+      const sec = pal.secondary, sl = Math.max(0.2126 * sec[0] + 0.7152 * sec[1] + 0.0722 * sec[2], 1e-3);
+      const secN = sec.map((x) => x * Math.min(2, Math.max(0.4, DARK_SEC_LUMA / sl))) as [number, number, number];
+      const bg2 = light ? mix3(pal.paper, pal.secondary, 0.18) : mix3(pal.bg, secN, 0.22);
       const halo = light ? mix3(pal.shade, [0, 0, 0], 0.4) : mix3(pal.primary, pal.highlight, 0.3);
       setUniforms(gl, cp, {
         u_cover: coverTex, u_prev: prevTex, u_fb: fb.read.tex[0], u_res: [ctx.width, ctx.height], u_time: time,

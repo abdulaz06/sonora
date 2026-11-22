@@ -93,7 +93,8 @@ void main() {
   col = mix(col, graded, u_grade);
   col *= u_gain;
   col *= 1.0 + u_glow * (0.6 + 1.4 * fract(h * 3.7));
-  col *= 1.0 + lift * u_lift_glow;   // splats lifting off on the kick catch the light
+  // Splats lifting off on the kick catch the light (capped like the ring: never past the fog).
+  col *= min(1.0 + lift * u_lift_glow, max(1.0, u_ring_cap / max(dot(col, vec3(0.299, 0.587, 0.114)), 1e-3)));
   // Each kick sends a ring of light out from the walker through the scene: what it passes lights
   // up for a moment (local, so the fog and the shadows never pulse as a whole).
   // It lifts darks and mid-tones only: the brightest parts (a bright fog, sunlit sand) never pulse.

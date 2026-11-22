@@ -63,9 +63,9 @@ const RING_R0 = 2.0;
 const RING_SPEED = 26;
 const RING_WIDTH = 1.6;
 const RING_TAU = 0.32;
-const RING_GAIN: Record<Look, number> = { forest: 1.1, coast: 1.8, desert: 2.4 };
+const RING_GAIN: Record<Look, number> = { forest: 1.4, coast: 1.8, desert: 2.4 };
 /** The ring lifts colours up to this share of the fog's luminance (forest, coast) or this luminance (desert). */
-const RING_CAP: Record<Look, number> = { forest: 0.8, coast: 0.92, desert: 0.5 };
+const RING_CAP: Record<Look, number> = { forest: 0.8, coast: 0.86, desert: 0.5 };
 /** Scene light per look: the desert is a moonlit night (dark enough that the ring reads). */
 const GAIN: Record<Look, number> = { forest: 1, coast: 1, desert: 0.6 };
 /** The desert's moonlight takes this much of the palette's primary hue (the light carries the palette, D89). */
@@ -76,6 +76,12 @@ const FOG_TINT = 0.6;
 const LOW_STRIDE = 2;
 
 interface Scene { n: number; pos: Float32Array; posTex: WebGLTexture; nrmTex: WebGLTexture; colTex: WebGLTexture; texW: number }
+
+const luma = (c: number[]): number => 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+const toLuma = (c: number[], target: number): [number, number, number] => {
+  const k = target / Math.max(luma(c), 1e-3);
+  return [c[0] * k, c[1] * k, c[2] * k];
+};
 
 export function createMemoryStyle(deps: StyleDeps): VisualStyle {
   const { gl, quadVAO } = deps;
@@ -222,8 +228,10 @@ void main() { float y = gl_FragCoord.y / u_res.y; frag = vec4(mix(u_bot, u_top, 
       const cam = ctx.camera;
       // Fog and light from the palette (the forest's fog is bright, as in reel01; the desert's is night).
       // The palette lives in the light (D89): the fog and sky take the palette's hues, the scans stay natural.
-      const fogCol: [number, number, number] = look === 'forest' ? mix3(mix3(pal.paper, pal.highlight, 0.3), pal.primary, FOG_TINT)
-        : look === 'coast' ? mix3(mix3(mix3(pal.highlight, pal.paper, 0.45), pal.secondary, 0.15), pal.primary, FOG_TINT) : mix3(mix3(pal.secondary, pal.bg, 0.55), pal.accent, 0.12);
+      // The bright fogs keep their pale level (the kick ring needs the room under it); only the hue deepens.
+      const paleFog = look === 'forest' ? mix3(pal.paper, pal.highlight, 0.3) : mix3(mix3(pal.highlight, pal.paper, 0.45), pal.secondary, 0.15);
+      const fogCol: [number, number, number] = look === 'desert' ? mix3(mix3(pal.secondary, pal.bg, 0.55), pal.accent, 0.12)
+        : toLuma(mix3(paleFog, pal.primary, FOG_TINT), Math.min(0.9, luma(paleFog)));
       const night = mix3(pal.bg, pal.shade, 0.3);
       const fogNow = mix3(fogCol, night, points * 0.8);
       ctx.bindScene();

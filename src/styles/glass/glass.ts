@@ -50,6 +50,14 @@ const KICK_STUDIO: Record<Look, number> = { bubbles: 0.38, fins: 0.62, chrome: 0
 /** Fins: each kick turns the slats a step (rad), most of it within this time (s): the light through them shifts on the hit. */
 const FIN_TURN = 0.3;
 const FIN_TURN_TAU = 0.05;
+/** Studio backdrop luminance (mid and top of the gradient), the same in every palette (Ocean's). */
+const STUDIO_MID_LUMA = 0.2;
+const STUDIO_HI_LUMA = 0.59;
+const toLuma = (c: RGB | number[], target: number): RGB => {
+  const l = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
+  const k = Math.min(2.5, Math.max(0.4, target / Math.max(l, 1e-3)));
+  return [c[0] * k, c[1] * k, c[2] * k];
+};
 /** Fins: the camera's swing either side of the ribbon's face (rad). */
 const FIN_SWING = 0.7;
 /** Drop: reform envelope decay (s). */
@@ -167,12 +175,14 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       // Chrome is brighter overall (mirrors everywhere): a smaller lift keeps each hit's step in bounds.
       const studio = 1 + KICK_STUDIO[look] * kick;
       const lo = mix3(pal.bg, pal.shade, 0.5).map((x) => x * 1.4 * studio) as RGB;
-      const mid = mul3(pal.secondary, 0.7 * studio) as RGB;
-      const hi = mul3(mix3(pal.highlight, pal.primary, 0.35), 0.95 * studio) as RGB;
+      // The studio's level is the same in every palette (a bright secondary lit the whole backdrop:
+      // colour gate's exposure vs Ocean); chrome's highlight leans to the primary (dim gold read olive).
+      const mid = mul3(toLuma(pal.secondary, STUDIO_MID_LUMA), studio) as RGB;
+      const hi = mul3(toLuma(mix3(pal.highlight, pal.primary, look === 'chrome' ? 0.75 : 0.35), STUDIO_HI_LUMA), studio) as RGB;
       const keyI = (1.8 + 1.2 * glowK) * (1 + KICK_FLARE * kick) * (look === 'chrome' ? 0.4 : 1);
       const key = mul3(mix3([1, 1, 1], pal.highlight, 0.25), keyI);
       const rim = mul3(pal.accent, 1.3 + 0.6 * glowK);
-      const tint: RGB = look === 'fins' ? normTint(pal.primary, 0.75) : look === 'chrome' ? mix3([1, 1, 1], pal.highlight, 0.3) as RGB : mix3([1, 1, 1], pal.secondary, 0.12) as RGB;
+      const tint: RGB = look === 'fins' ? normTint(pal.primary, 0.75) : look === 'chrome' ? mix3([1, 1, 1], pal.primary, 0.2) as RGB : mix3([1, 1, 1], pal.secondary, 0.12) as RGB;
 
       bindTarget(gl, target);
       gl.disable(gl.BLEND);
