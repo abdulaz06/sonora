@@ -86,6 +86,8 @@ export class ArtPost {
   private latestLuma: number | null = null;
   /** Fraction of probe pixels with any channel ≥ 250 (blown out). */
   latestHot = 0;
+  /** Where the composite draws: the canvas (null) or a filter's input target. */
+  outputFb: WebGLFramebuffer | null = null;
 
   constructor(gl: WebGL2RenderingContext) {
     this.gl = gl;
@@ -197,8 +199,8 @@ export class ArtPost {
       gl.disable(gl.BLEND);
     }
 
-    // Composite to the canvas
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    // Composite to the canvas (or a filter's input)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.outputFb);
     gl.viewport(0, 0, this.outW, this.outH);
     gl.useProgram(this.composite);
     gl.activeTexture(gl.TEXTURE0);
@@ -274,7 +276,7 @@ export class ArtPost {
     gl.readPixels(0, 0, PROBE_W, PROBE_H, gl.RGBA, gl.UNSIGNED_BYTE, 0);
     gl.bindBuffer(gl.PIXEL_PACK_BUFFER, null);
     this.fence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.outputFb);
     gl.viewport(0, 0, this.outW, this.outH);
   }
 }

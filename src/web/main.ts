@@ -21,7 +21,8 @@ import { CAMERA_PRESETS } from '../engine/camera';
 import { driftCrossing, PALETTES, resolvePalette, shadeOf, type ResolvedPalette } from '../engine/color-engine';
 import { presetsFor, preloadStyles } from '../styles/registry';
 import { initRenderer } from '../engine/renderer';
-import { defaultSettings, mergeWithDefaults, type PersistedSettings } from '../ipc/settings';
+import { defaultSettings, mergeWithDefaults, parseFilter, type PersistedSettings } from '../ipc/settings';
+import { filtersReady } from '../engine/filters/filters';
 import type { QualityPreset } from '../engine/quality';
 import type { SonoraEvent } from '../engine/events';
 import type { LightMode, StyleId } from '../styles/visual-style';
@@ -170,6 +171,15 @@ async function main(): Promise<void> {
   };
 
   if (harness) {
+    // ?filter=glyph[:small|medium|large] or reeded[:vertical|angled|radial][:fine|medium|wide]
+    // (SONORA_FILTER in the harness scripts): every gate can run with a filter on.
+    const fp = params.get('filter');
+    if (fp) {
+      const [id, a, b] = fp.split(':');
+      const f = parseFilter({ id, glyphSize: a, fluteAngle: a, fluteWidth: b });
+      controller.setFilter(f);
+      await filtersReady();
+    }
     exposeHarness(renderer, source, tracks);
     return;
   }

@@ -237,7 +237,7 @@ try {
   for (let j = 0; j < Math.max(1, opts.jobs); j++) {
     const p = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
     p.on('pageerror', (e) => console.log('  [page exception]', e.message));
-    await p.goto(`http://localhost:${PORT}/web.html?harness=1`);
+    await p.goto(`http://localhost:${PORT}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
     await p.waitForFunction(() => window.__sonora?.ready === true, null, { timeout: 60000 });
     pages.push(p);
   }

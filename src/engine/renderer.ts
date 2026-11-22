@@ -36,6 +36,7 @@ import { buildProgram } from './gl-utils';
 import { PostProcessPipeline } from './post-process';
 import { QualityManager, type QualityParams, type QualityPreset } from './quality';
 import { debugFlags } from './debug-flags';
+import { FilterPass, getDefaultFilter, type FilterSettings } from './filters/filters';
 
 import fullscreenVertSrc from './shaders/fullscreen.vert?raw';
 import postBloomFragSrc from './shaders/post-bloom.frag?raw';
@@ -172,6 +173,9 @@ export interface Renderer {
   setBlackout(on: boolean): void;
   /** Hold the current picture (nothing is drawn; analysis and events keep running). */
   setFrozen(on: boolean): void;
+  /** Filter over the picture (Glyph, Reeded glass) or none; art styles only. */
+  setFilter(f: FilterSettings): void;
+  getFilter(): FilterSettings;
   isFrozen(): boolean;
   /** Called after every drawn frame, with the canvas still holding it (the
    * controller's preview tap reads it back asynchronously here). */
@@ -231,6 +235,8 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   legacyPost.bloomStrength = 0.25;
   const artPost = new ArtPost(gl);
   artPost.deterministic = !!options.offline;
+  const filterPass = new FilterPass(gl, quadVAO);
+  let filter: FilterSettings = getDefaultFilter();
 
   // ── Shared state ──
   const seed = options.seed ?? Math.floor(Math.random() * 1e6);
@@ -425,7 +431,11 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       const holdWant = flash.current > 0.002 ? Math.min(HOLD_RANGE[1], Math.max(HOLD_RANGE[0], flash.target / flash.current)) : 1;
       holdSmooth += (1 + (holdWant - 1) * flash.damping - holdSmooth) * (1 - Math.exp(-dt / HOLD_TAU));
       post.bloom *= glow;
+      const filtering = filterPass.active(filter);
+      artPost.outputFb = filtering ? filterPass.input(canvas.width, canvas.height) : null;
       artPost.apply(quadVAO, post, time, fadeAlpha * blackLevel, holdSmooth);
+      if (filtering) filterPass.apply(filter, { palette: ctx.palette, light: ctx.light });
+      else filterPass.idle();
     }
     if (syncLatched) { syncHold = SYNC_FLASH_HOLD_S; syncLatched = false; }
     if (syncHold > 0 && debugFlags.syncFlash) {
@@ -643,6 +653,8 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     setGlow(g: number): void { glow = Number.isFinite(g) ? Math.max(0, g) : 1; },
     setBlackout(on: boolean): void { blackout = on; },
     setFrozen(on: boolean): void { frozen = on; },
+    setFilter(f: FilterSettings): void { filter = { ...f }; },
+    getFilter: () => ({ ...filter }),
     isFrozen: () => frozen,
     setFrameHook(cb): void { frameHook = cb; },
     addFrameHook(cb) { extraHooks.add(cb); return () => { extraHooks.delete(cb); }; },

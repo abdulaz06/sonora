@@ -55,7 +55,7 @@ try {
   const b = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
   const p = await b.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   p.on('pageerror', (e) => console.log('  [page exception]', e.message));
-  await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1`);
+  await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await p.waitForFunction(() => window.__sonora?.ready === true);
   const tracks = await p.evaluate(() => window.__sonora.tracks);
   const meta = tracks[track];

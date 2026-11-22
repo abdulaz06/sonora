@@ -12,7 +12,7 @@ try {
   for (let i = 0; i < 80; i++) { try { if ((await fetch(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html`)).ok) break; } catch { /* wait */ } await new Promise((r) => setTimeout(r, 400)); }
   const b = await chromium.launch({ channel: 'msedge', headless: true });
   const p = await b.newPage();
-  await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1`);
+  await p.goto(`http://localhost:${process.env.SONORA_HARNESS_PORT || 5199}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await p.waitForFunction(() => window.__sonora?.ready === true);
   await p.evaluate((n) => window.__sonora.loadTrack(n), track);
   await p.evaluate((s) => window.__sonora.analyseOnly(s), Number(to));

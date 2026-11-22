@@ -35,7 +35,7 @@ try {
   const open = async (look, palette, w, h, quality = 'high') => {
     const p = await b.newPage({ viewport: { width: w, height: h } });
     p.on('pageerror', (e) => console.log('  [page]', e.message));
-    await p.goto(`http://localhost:${PORT}/web.html?harness=1`);
+    await p.goto(`http://localhost:${PORT}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
     await p.waitForFunction(() => window.__sonora?.ready === true, null, { timeout: 60000 });
     await p.evaluate(([l, q]) => window.__sonora.configure({ style: 'voyage', variant: l, quality: q, drift: false, debug: { fixedExposure: true } }), [look, quality]);
     await p.evaluate((i) => window.__sonora.setPalette({ index: i }), palette);

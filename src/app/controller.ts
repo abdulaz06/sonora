@@ -8,6 +8,7 @@
 
 import type { CameraView } from '../engine/camera';
 import type { QualityPreset } from '../engine/quality';
+import { setDefaultFilter, type FilterSettings } from '../engine/filters/filters';
 import type { Renderer } from '../engine/renderer';
 import { defaultStylePrefs, type PersistedSettings, type StylePrefs } from '../ipc/settings';
 import { getStyle, presetsFor } from '../styles/registry';
@@ -64,6 +65,8 @@ export interface Controller {
   setQuality(q: QualityPreset): void;
   setFpsCap(n: number): void;
   setShowFps(on: boolean): void;
+  /** Filter over every style (Glyph, Reeded glass) and its options; global. */
+  setFilter(f: Partial<FilterSettings>): void;
   cycleCameraPreset(): void;
   toggleDebug(): void;
   /** Enable mouse camera control on the canvas (only while the visual shows). */
@@ -148,6 +151,8 @@ export function initController(opts: ControllerOptions): Controller {
     renderer.setQuality(settings.quality);
     renderer.setFpsCap(settings.fpsCap);
     renderer.setRingCount(settings.ringCount);
+    renderer.setFilter(settings.filter);
+    setDefaultFilter(settings.filter);
   }
 
   // Mouse changes come from the camera itself; mirror them into settings.
@@ -267,6 +272,12 @@ export function initController(opts: ControllerOptions): Controller {
     setQuality(q: QualityPreset): void { renderer.setQuality(q); settings.quality = q; changed(); },
     setFpsCap(n: number): void { renderer.setFpsCap(n); settings.fpsCap = n; changed(); },
     setShowFps(on: boolean): void { settings.showFps = on; changed(); },
+    setFilter(f: Partial<FilterSettings>): void {
+      settings.filter = { ...settings.filter, ...f };
+      renderer.setFilter(settings.filter);
+      setDefaultFilter(settings.filter);
+      changed();
+    },
     cycleCameraPreset(): void {
       if (!depthActive()) return;
       const list = presetsFor(settings.mode);

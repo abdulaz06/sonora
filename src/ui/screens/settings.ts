@@ -16,6 +16,7 @@ import { audioStatus } from '../../app/stores';
 import { FLAT_ZOOM_MAX, FLAT_ZOOM_MIN } from '../../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES, paletteFromHue, swatchCss } from '../../engine/color-engine';
 import type { QualityPreset } from '../../engine/quality';
+import type { FilterId, FluteAngle, FluteWidth, GlyphSize } from '../../engine/filters/filters';
 import { fpsCapChoices, fpsLabel, SET_MODE_INTERVALS, type Corner } from '../../ipc/settings';
 import { getStyle, presetsFor } from '../../styles/registry';
 import { variantSupportsLight, type LightMode } from '../../styles/visual-style';
@@ -27,7 +28,7 @@ import { albumInfo, albumTile } from './album-tile';
 import { lockup } from './brand';
 
 const PRESET_MATCH = 0.03;
-export const SECTIONS = ['visual', 'colour', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'recording', 'performance', 'system', 'keys', 'about'] as const;
+export const SECTIONS = ['visual', 'colour', 'filter', 'camera', 'feel', 'set mode', 'now playing', 'audio', 'recording', 'performance', 'system', 'keys', 'about'] as const;
 export type SectionId = typeof SECTIONS[number];
 
 export interface SettingsHandlers {
@@ -64,6 +65,16 @@ const INFO = {
     options: [['Auto', 'The look’s natural background (Sumi is paper, the rest are dark).'], ['Dark', 'Always dark.'], ['Light', 'Always light, like ink on paper.']],
     media: [{ src: mediaFor('explain-light-dark'), caption: 'dark' }, { src: mediaFor('explain-light-light'), caption: 'light' }],
   }),
+  filter: (): InfoContent => ({
+    title: 'filter', scope: 'all styles',
+    body: ['Draws every style through a filter. It applies to whatever is on screen, and to recordings and exports too.',
+      'Glyph keeps steady characters on steady pictures: a character only changes when the picture under it really does.'],
+    options: [['None', 'The visual as it is.'], ['Glyph', 'The picture redrawn as characters: brighter areas get denser characters, edges become lines.'],
+      ['Reeded glass', 'The picture seen through ribbed glass, each rib bending its own slice of the image.'], ['G', 'Switch filters while the visual plays.']],
+    media: [{ src: mediaFor('explain-filter-none'), caption: 'none' }, { src: mediaFor('explain-filter-glyph'), caption: 'glyph' }, { src: mediaFor('explain-filter-reeded'), caption: 'reeded glass' }],
+  }),
+  glyphSize: (): InfoContent => ({ title: 'character size', scope: 'glyph', body: ['How big each character is. Small shows more of the picture; large reads as bold type from across the room.'] }),
+  flutes: (): InfoContent => ({ title: 'ribs', scope: 'reeded glass', body: ['Width: how wide each rib of glass is.', 'Direction: upright, tilted, or fanning out from the centre.'] }),
   classic: (): InfoContent => ({ title: 'classic styles', body: ['Adds Aura and Halo, the original visuals from sonora 0.1, to the menu.'] }),
   palette: (style: string, match: boolean): InfoContent => ({
     title: 'palette', scope: match ? 'all styles' : `for ${style}`,
@@ -252,6 +263,18 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
         slider({ min: MIN_DRIFT_PERIOD_S, max: MAX_DRIFT_PERIOD_S, step: 10, value: MAX_DRIFT_PERIOD_S + MIN_DRIFT_PERIOD_S - s.driftPeriod, ends: ['slow', 'fast'], onInput: (v) => ctl.setDriftPeriod(MAX_DRIFT_PERIOD_S + MIN_DRIFT_PERIOD_S - v) }).el) : null,
       row('Same colours for every style', INFO.match(), null, toggle('', s.matchColours, (v) => ctl.setMatchColours(v)).el, true));
 
+    // Filter (global)
+    const fl = s.filter;
+    const filterSec = section('filter', 'filter', 'all styles',
+      row('Filter', INFO.filter(), fl.id === 'none' ? 'none' : fl.id === 'glyph' ? 'glyph' : 'reeded glass',
+        segmented([{ value: 'none', label: 'None' }, { value: 'glyph', label: 'Glyph' }, { value: 'reeded', label: 'Reeded glass' }], fl.id, (v) => ctl.setFilter({ id: v as FilterId }), 'Filter').el),
+      fl.id === 'glyph' ? row('Character size', INFO.glyphSize(), fl.glyphSize,
+        segmented((['small', 'medium', 'large'] as GlyphSize[]).map((v) => ({ value: v, label: v })), fl.glyphSize, (v) => ctl.setFilter({ glyphSize: v }), 'Character size').el) : null,
+      fl.id === 'reeded' ? row('Rib width', INFO.flutes(), fl.fluteWidth,
+        segmented((['fine', 'medium', 'wide'] as FluteWidth[]).map((v) => ({ value: v, label: v })), fl.fluteWidth, (v) => ctl.setFilter({ fluteWidth: v }), 'Rib width').el) : null,
+      fl.id === 'reeded' ? row('Rib direction', INFO.flutes(), fl.fluteAngle,
+        segmented((['vertical', 'angled', 'radial'] as FluteAngle[]).map((v) => ({ value: v, label: v })), fl.fluteAngle, (v) => ctl.setFilter({ fluteAngle: v }), 'Rib direction').el) : null);
+
     // Camera
     const presets = presetsFor(id);
     const active = presets.find((p) => Math.abs(p.view.height - s.camera.height) < PRESET_MATCH && Math.abs(p.view.tilt - s.camera.tilt) < PRESET_MATCH && Math.abs(p.view.curve - s.camera.curve) < PRESET_MATCH);
@@ -359,7 +382,7 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
       h('p', { class: 's-micro', style: { margin: '0' } }, 'fonts: inter and ibm plex mono, sil open font license. third-party licenses: third-party-notices.md in the install folder.')));
 
     const scroll = sh.body.scrollTop;
-    content.replaceChildren(...[visual, colour, camera, feel, setmode, np, audio, recording, perf, system, keys, about].filter((x): x is HTMLElement => !!x));
+    content.replaceChildren(...[visual, colour, filterSec, camera, feel, setmode, np, audio, recording, perf, system, keys, about].filter((x): x is HTMLElement => !!x));
     sh.body.scrollTop = scroll;
   }
 

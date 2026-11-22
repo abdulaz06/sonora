@@ -45,7 +45,7 @@ const killServer = (s) => { try { execFileSync('taskkill', ['/pid', String(s.pid
 
 async function openPage(browser, e) {
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
-  await page.goto(`http://localhost:${PORT}/web.html?harness=1`);
+  await page.goto(`http://localhost:${PORT}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await page.waitForFunction(() => window.__sonora?.ready === true, null, { timeout: 60000 });
   await page.evaluate((o) => window.__sonora.configure(o), {
     style: e.style, variant: e.look, depth: e.depth, light: e.light, quality: e.quality,

@@ -1,3 +1,26 @@
+# 1.2 styles — Stage, Cymatics, Glass, Cover, Memory, Echo; Glyph and Reeded glass filters; Silk Helix
+
+> Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.
+> Work happens in a separate worktree (`C:/Users/abdul/sonora-12`, branch `styles-1.2`, pushed to `origin main`) so the 1.1 run's uncommitted files in the main checkout are never touched. Harness runs use their own port: `SONORA_HARNESS_PORT=5211 SONORA_VITE_CACHE=node_modules/.vite-12`.
+> New styles stay off the website until the release (hidden on the site build; the app and the dev page show them).
+
+## Summary
+(written at the review stop)
+
+## Checklist
+- [x] 0. Read the docs, references and engine; worktree; harness scripts honour `SONORA_HARNESS_PORT` (parallel runs)
+- [ ] F1. Filters: Glyph (atlas from bundled Plex Mono, per-cell hysteresis, edge glyphs) and Reeded glass (vertical / angled / radial); renderer hook after the composite; settings, controller, G key, (i) card; harness `--filter` / `SONORA_FILTER`
+- [ ] F2. Filter gates on every style (sync, flicker, motion, colour), cost ≤ 1 ms at 1080p Medium, 9:16 legibility
+- [ ] H. Silk Helix look (Flat + Depth); gates
+- [ ] S. Stage (Club / Arena / Cathedral); gates
+- [ ] C. Cymatics (Stone / Sand / Liquid); gates
+- [ ] G. Glass (Bubbles / Fins / Chrome); gates
+- [ ] V. Cover (album art; generated fallback; Set Mode only with a cover); gates
+- [ ] M. Memory (Gaussian splat scenes, licence-checked, ≤ 8 MB each, on demand); gates
+- [ ] E. Echo (licence-safe mocap, retimed; time echoes); gates
+- [ ] P. Catalog words, (i) cards, Set Mode tags, `npm run media` thumbnails / loops for every look; ASSETS.md; installer size per style
+- [ ] R. Review: `verify/review-1.2/index.html` (contact sheets, clips, 9:16 stills, gate tables, sizes, what didn't pass); summary; stop
+
 # 1.1 — export, recording, text in exports, AAA Voyage worlds, faster /live
 
 > Resume rule: read this section and `git log`, continue from the first unchecked item. Never redo checked work.

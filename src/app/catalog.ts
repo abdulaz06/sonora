@@ -167,4 +167,5 @@ export const SHORTCUTS: [string[], string][] = [
   [['F9'], 'Record the visual with the sound (desktop)'],
   [['D'], 'Audio signals (advanced)'],
   [['P'], 'Show / hide FPS'],
+  [['G'], 'Filter: none, glyph, reeded glass'],
 ];

@@ -289,6 +289,12 @@ export async function initShell(ctl: Controller, platform: Platform, opts: Shell
       } else if (lower === 'v') nextLook();
       else if (lower === 'c') ctl.cycleCameraPreset();
       else if (lower === 'p') { ctl.setShowFps(!s.showFps); toast(s.showFps ? 'fps on' : 'fps off', { ms: 900 }); }
+      else if (lower === 'g') {
+        const order = ['none', 'glyph', 'reeded'] as const;
+        const nx = order[(order.indexOf(s.filter.id) + 1) % order.length];
+        ctl.setFilter({ id: nx });
+        toast(nx === 'none' ? 'no filter' : nx === 'glyph' ? 'glyph' : 'reeded glass', { ms: 1000 });
+      }
       else if (/^[1-9]$/.test(k)) ctl.setPalette(Number(k) - 1);
       else if (k === '0') ctl.setPalette(9);
       else if (lower === 'a') { ctl.setAlbumColours(!s.albumColours); toast(s.albumColours ? (ctl.album.get().status === 'cover' ? 'album colours' : 'album colours · when a cover plays') : 'album colours off', { ms: 1400 }); }

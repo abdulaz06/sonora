@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_CAMERA_VIEW, FLAT_ZOOM_MAX, FLAT_ZOOM_MIN, type CameraView } from '../engine/camera';
 import { DEFAULT_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES, paletteIndexByName } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
+import { DEFAULT_FILTER, type FilterSettings } from '../engine/filters/filters';
 import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
@@ -162,6 +163,9 @@ export interface PersistedSettings {
   glow: number;
   /** The controller (second screen) has been offered once. */
   controllerOffered: boolean;
+  // ── 1.2 (no version bump: a missing field takes the default) ──
+  /** Filter over every style: none, Glyph or Reeded glass, and their options. */
+  filter: FilterSettings;
 }
 
 /** Fixed frame-rate caps offered on every display (and 90, kept for older saves). */
@@ -255,6 +259,7 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   albumIntro: false,
   glow: 1,
   controllerOffered: false,
+  filter: { ...DEFAULT_FILTER },
 };
 
 /** Load saved settings from disk; returns DEFAULT_SETTINGS if none exist. */
@@ -482,8 +487,21 @@ export function mergeWithDefaults(raw: unknown): PersistedSettings {
     if (typeof r.albumIntro === 'boolean') out.albumIntro = r.albumIntro;
   }
   if (typeof r.controllerOffered === 'boolean') out.controllerOffered = r.controllerOffered;
+  out.filter = parseFilter(r.filter);
   out.glow = out.styles[out.mode]?.glow ?? 1;
   return out;
+}
+
+/** A saved filter choice, each field checked (unknown → default). */
+export function parseFilter(raw: unknown): FilterSettings {
+  const f = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const pick = <T extends string>(v: unknown, ok: readonly T[], d: T): T => (ok.includes(v as T) ? v as T : d);
+  return {
+    id: pick(f.id, ['none', 'glyph', 'reeded'] as const, DEFAULT_FILTER.id),
+    glyphSize: pick(f.glyphSize, ['small', 'medium', 'large'] as const, DEFAULT_FILTER.glyphSize),
+    fluteWidth: pick(f.fluteWidth, ['fine', 'medium', 'wide'] as const, DEFAULT_FILTER.fluteWidth),
+    fluteAngle: pick(f.fluteAngle, ['vertical', 'angled', 'radial'] as const, DEFAULT_FILTER.fluteAngle),
+  };
 }
 
 /** A fresh copy of the defaults (nested objects not shared). */

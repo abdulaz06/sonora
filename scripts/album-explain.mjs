@@ -23,7 +23,7 @@ try {
   for (let i = 0; i < 100; i++) { try { if ((await fetch(`http://localhost:${PORT}/web.html`)).ok) break; } catch { /* wait */ } await wait(400); }
   const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
-  await page.goto(`http://localhost:${PORT}/web.html?harness=1`);
+  await page.goto(`http://localhost:${PORT}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await page.waitForFunction(() => window.__sonora?.ready === true, null, { timeout: 60000 });
   const url = `data:image/jpeg;base64,${readFileSync(cover).toString('base64')}`;
   const ex = await page.evaluate((u) => window.__sonora.albumExtract(u), url);

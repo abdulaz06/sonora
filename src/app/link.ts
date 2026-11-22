@@ -26,7 +26,7 @@ export const LINK_TIMEOUT_MS = 3500;
 export const REMOTE_CALLS = [
   'show', 'setVariant', 'setDepth', 'setLightMode', 'setShowClassic', 'setRingCount', 'setCamera', 'setFlatZoom',
   'setMatchColours', 'setPalette', 'setCustomHue', 'setAlbumColours', 'setAutoDrift', 'setDriftPeriod',
-  'setResponsiveness', 'setGlow', 'setQuality', 'setFpsCap', 'setShowFps', 'setBlackout', 'setFrozen', 'cycleCameraPreset',
+  'setResponsiveness', 'setGlow', 'setQuality', 'setFpsCap', 'setShowFps', 'setFilter', 'setBlackout', 'setFrozen', 'cycleCameraPreset',
 ] as const;
 export type RemoteCall = typeof REMOTE_CALLS[number];
 

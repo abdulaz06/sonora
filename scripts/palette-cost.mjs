@@ -32,7 +32,7 @@ await up(5193); await up(5192);
 const browser = await chromium.launch({ channel: 'msedge', headless: true, args: ['--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 async function cost(port, [style, look, depth]) {
-  await page.goto(`http://localhost:${port}/web.html?harness=1`);
+  await page.goto(`http://localhost:${port}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await page.waitForFunction(() => window.__sonora?.ready === true, null, { timeout: 60000 });
   await page.evaluate((c) => window.__sonora.configure({ style: c[0], variant: c[1], depth: c[2], quality: 'medium', palette: 0, drift: false }), [style, look, depth]);
   await page.evaluate(() => window.__sonora.loadTrack('house-124'));

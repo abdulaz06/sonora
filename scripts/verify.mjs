@@ -27,6 +27,8 @@
 //                       interval mean / p99 and held frames per cap (match, 1/2, 60)
 //   --dt-sweep          frame-rate independence (forwards to scripts/dt-sweep.mjs)
 //   --palette-matrix    every palette × style / look / view + colour metrics (scripts/palette-matrix.mjs)
+//   --filter <f>        filter over the style: glyph[:small|medium|large], reeded[:vertical|angled|radial][:fine|medium|wide]
+//                       (same as SONORA_FILTER, which every harness script honours)
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -81,6 +83,7 @@ function parseArgs(argv) {
     else if (a === '--seconds') o.seconds = Number(next());
     else if (a === '--preview') o.preview = true;
     else if (a === '--preview-cost') o.previewCost = true;
+    else if (a === '--filter') process.env.SONORA_FILTER = next();
   }
   return o;
 }
@@ -130,7 +133,7 @@ try {
   const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: 1 });
   page.on('console', (m) => { if (m.type() === 'error') console.log('  [page error]', m.text()); });
   page.on('pageerror', (e) => console.log('  [page exception]', e.message));
-  await page.goto(`http://localhost:${PORT}/web.html?harness=1`);
+  await page.goto(`http://localhost:${PORT}/web.html?harness=1${process.env.SONORA_FILTER ? `&filter=${process.env.SONORA_FILTER}` : ''}`);
   await page.waitForFunction(() => window.__sonora?.ready === true, null, { timeout: 30000 });
 
   const gpu = await page.evaluate(() => window.__sonora.gpu());
@@ -167,7 +170,7 @@ try {
     const variant = opts.variant || '';
     const outDir = opts.out
       ? join(ROOT, opts.out, name)
-      : join(ROOT, 'verify', `${opts.style}${variant && variant !== opts.style ? '-' + variant : ''}${opts.flat ? '-flat' : ''}${opts.camera ? '-' + opts.camera : ''}${opts.light !== 'auto' ? '-' + opts.light : ''}`, name);
+      : join(ROOT, 'verify', `${opts.style}${variant && variant !== opts.style ? '-' + variant : ''}${opts.flat ? '-flat' : ''}${opts.camera ? '-' + opts.camera : ''}${opts.light !== 'auto' ? '-' + opts.light : ''}${process.env.SONORA_FILTER ? '-' + process.env.SONORA_FILTER.replace(/:/g, '-') : ''}`, name);
     mkdirSync(outDir, { recursive: true });
 
     // Fresh page state per track

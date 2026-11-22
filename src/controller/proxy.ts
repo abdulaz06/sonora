@@ -111,6 +111,7 @@ export function createProxy(link: Link, desktop: { listDevices?: Platform['listD
     setQuality: (q: QualityPreset) => call('setQuality', q),
     setFpsCap: (n: number) => call('setFpsCap', n),
     setShowFps: (on: boolean) => call('setShowFps', on),
+    setFilter: (f) => call('setFilter', f),
     cycleCameraPreset: () => call('cycleCameraPreset'),
     toggleDebug: () => undefined,
     setCanvasInput: () => undefined,
