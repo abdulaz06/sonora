@@ -80,6 +80,8 @@ export class ArtPost {
   private probe: { fb: WebGLFramebuffer; tex: WebGLTexture } | null = null;
   private pbo: WebGLBuffer | null = null;
   private fence: WebGLSync | null = null;
+  /** Offline renders: collect the luminance readback a fixed one frame later (blocking if needed), never by timing. */
+  deterministic = false;
   private probePixels = new Uint8Array(PROBE_W * PROBE_H * 4);
   private latestLuma: number | null = null;
   /** Fraction of probe pixels with any channel ≥ 250 (blown out). */
@@ -230,8 +232,10 @@ export class ArtPost {
     const gl = this.gl;
     // Collect a finished readback first.
     if (this.fence) {
-      const st = gl.clientWaitSync(this.fence, 0, 0);
-      if (st === gl.TIMEOUT_EXPIRED) return;
+      if (!this.deterministic) {
+        const st = gl.clientWaitSync(this.fence, 0, 0);
+        if (st === gl.TIMEOUT_EXPIRED) return;
+      }
       gl.deleteSync(this.fence);
       this.fence = null;
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.pbo);

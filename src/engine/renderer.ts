@@ -77,6 +77,10 @@ const MAX_DT = 0.05;
 const BLACKOUT_FADE_S = 0.4;
 /** Cap on the canvas backing store (pixels on the long side). */
 const MAX_BACKING_LONG_SIDE = 3840;
+/** A/V sync probe: an analysis frame whose instant energy is above this and
+ * this many times the previous frame's counts as a click. */
+const SYNC_FLASH_MIN = 0.002, SYNC_FLASH_JUMP = 4;
+
 /** Default post values for art styles. */
 const POST_DEFAULTS: PostControls = {
   exposure: 1, bloom: 0.55, bloomThreshold: 1.0, grain: 0.04, vignette: 0.28, tonemap: 'filmic', flash: 0,
@@ -120,6 +124,8 @@ export interface RendererOptions {
   maxPixelRatio?: number;
   /** Keep the canvas at the size it was given (exports render off-screen at a fixed size). */
   fixedSize?: boolean;
+  /** Offline render (exports): exposure readback and adaptive budgets never depend on wall-clock time. */
+  offline?: boolean;
 }
 
 export interface Renderer {
@@ -220,6 +226,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   );
   legacyPost.bloomStrength = 0.25;
   const artPost = new ArtPost(gl);
+  artPost.deterministic = !!options.offline;
 
   // ── Shared state ──
   const seed = options.seed ?? Math.floor(Math.random() * 1e6);
@@ -289,7 +296,7 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
     events: [], eventState: events.state, camera,
     palette: colorEngine.getResolved(), light: false, depth,
     quality: quality.params, post, flash,
-    beatPulse, colorEngine, generative,
+    beatPulse, colorEngine, generative, offline: !!options.offline,
   };
 
   function step(rawDt: number): void {
@@ -405,8 +412,24 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
       post.bloom *= glow;
       artPost.apply(quadVAO, post, time, fadeAlpha * blackLevel, holdSmooth);
     }
+    if (syncLatched && debugFlags.syncFlash) {
+      // A/V sync probe: a white corner on the frame that first shows a click.
+      const k = Math.round(Math.min(canvas.width, canvas.height) * 0.12);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.scissor(0, 0, k, k);
+      gl.clearColor(1, 1, 1, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.disable(gl.SCISSOR_TEST);
+    }
+    syncLatched = false;
     frameHook?.(gl, performance.now());
   }
+
+  // A/V sync probe (debugFlags.syncFlash): a click is an energy jump in one analysis frame.
+  let syncLatched = false;
+  let syncPrev = 0;
 
   // Beat onsets arrive at analysis rate; latch so a render frame never misses one.
   let beatOnsetLatched = false;
@@ -489,6 +512,11 @@ export function initRenderer(canvas: HTMLCanvasElement, options: RendererOptions
   const api: Renderer = {
     canvas, colorEngine, events, camera,
     pushFrame(fr: AudioFeatureFrame): void {
+      if (debugFlags.syncFlash) {
+        const e = fr.energy.instant;
+        if (e > SYNC_FLASH_MIN && e > syncPrev * SYNC_FLASH_JUMP) syncLatched = true;
+        syncPrev = e;
+      }
       events.process(fr);
       if (fr.beat.onset) beatOnsetLatched = true;
       framesSinceStep++;

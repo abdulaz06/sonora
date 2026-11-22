@@ -71,6 +71,8 @@ export interface ExportResult {
   hardware: string;
   /** Hash of every frame's pixels (determinism checks; only with `hashFrames`). */
   frameHash?: string;
+  /** Per-frame hashes (with `hashFrames`). */
+  frameHashes?: string[];
 }
 
 const yieldNow = (): Promise<void> => new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
@@ -162,6 +164,7 @@ export async function renderExport(
   let frame = 0, lastYield = performance.now();
   let hash = 0x811c9dc5;
   const hashPx = opts.hashFrames ? new Uint8Array(OW * OH * 4) : null;
+  const hashes: string[] = [];
   const rateStart = { t: performance.now(), f: 0 };
   const report = (stage: ExportProgress['stage'], shot: number): void => {
     const el = (performance.now() - rateStart.t) / 1000;
@@ -176,7 +179,7 @@ export async function renderExport(
       // A fresh engine per shot (as the studio's page per shot): the same plan always gives the same frames.
       const canvas = document.createElement('canvas');
       canvas.width = RW; canvas.height = RH;
-      const r = initRenderer(canvas, { autoStart: false, preserveDrawingBuffer: true, seed: SEED, fixedSize: true, initialStyle: sh.style as StyleId });
+      const r = initRenderer(canvas, { autoStart: false, preserveDrawingBuffer: true, seed: SEED, fixedSize: true, offline: true, initialStyle: sh.style as StyleId });
       try {
         r.camera.portraitFraming = s.portrait && RH > RW ? 1 : 0;
         r.setQuality('high');
@@ -210,8 +213,16 @@ export async function renderExport(
           g.drawImage(canvas, 0, 0, OW, OH);
           overlay.draw(g, t);
           if (hashPx) {
-            const px = g.getImageData(0, 0, OW, OH).data;
-            for (let i = 0; i < px.length; i += 61) { hash ^= px[i]; hash = Math.imul(hash, 0x01000193) >>> 0; }
+            // Hash what the encoder gets (a VideoFrame of the composite). getImageData would make the
+            // browser move the canvas to CPU drawing part-way through, which itself changes the pixels.
+            const vf = new VideoFrame(comp, { timestamp: 0, alpha: 'discard' });
+            await vf.copyTo(hashPx, { format: 'RGBA' } as VideoFrameCopyToOptions);
+            vf.close();
+            const px = hashPx;
+            let fh = 0x811c9dc5;
+            for (let i = 0; i < px.length; i += 61) { fh ^= px[i]; fh = Math.imul(fh, 0x01000193) >>> 0; }
+            hashes.push(fh.toString(16));
+            hash = Math.imul(hash ^ fh, 0x01000193) >>> 0;
           }
           await encodeAudioTo(t + AUDIO_AHEAD_S);
           await mp4.addFrame(comp, t, dt);
@@ -232,6 +243,7 @@ export async function renderExport(
       path: sink.path, bytes: out.bytes, frames: out.videoFrames, seconds: length, wallSeconds: (performance.now() - t0) / 1000,
       codec: mp4.config.codec, hardware: mp4.config.hardwareAcceleration ?? 'no-preference',
       frameHash: hashPx ? hash.toString(16) : undefined,
+      frameHashes: hashPx ? hashes : undefined,
     };
   } catch (e) {
     await mp4.abort();

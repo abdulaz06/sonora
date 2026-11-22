@@ -7,6 +7,7 @@
 //
 //   node scripts/app/export-check.mjs [--track house-124] [--combo ink-glow-depth] [--start 40] [--secs 10]
 //        [--size 1920x1080] [--fps 60] [--ss 1] [--format song] [--twice] [--outro] [--name check]
+//        [--sync]   (click track with the sync probe → scripts/av-sync.py on the result)
 import { connectApp } from './cdp.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };
@@ -14,15 +15,18 @@ const flag = (k) => process.argv.includes(`--${k}`);
 const opts = {
   track: arg('track', 'house-124'), combo: arg('combo', 'ink-glow-depth'), start: Number(arg('start', 40)), secs: Number(arg('secs', 10)),
   size: arg('size', '1920x1080').split('x').map(Number), fps: Number(arg('fps', 60)), ss: Number(arg('ss', 1)), format: arg('format', 'song'),
-  outro: flag('outro'), name: arg('name', 'export-check'), hash: flag('twice'), palette: Number(arg('palette', 0)),
+  outro: flag('outro'), name: arg('name', 'export-check'), hash: flag('twice'), palette: Number(arg('palette', 0)), sync: flag('sync'),
 };
+if (opts.sync) { opts.track = arg('track', 'click-120'); opts.start = Number(arg('start', 4)); opts.secs = Number(arg('secs', 20)); }
 const { browser, page } = await connectApp();
+// A fresh page: after hot updates, modules imported here could be other instances than the app's.
+await page.reload(); await page.waitForFunction(() => document.querySelector('.scr-menu, .scr-detail, .hud') !== null, null, { timeout: 60000 }).catch(() => undefined);
 page.on('console', (m) => { if (m.type() === 'error') console.log('  [console]', m.text()); });
 const run = () => page.evaluate(async (o) => {
-  const { loadSong } = await import('/src/export/song.ts');
-  const { buildPlan } = await import('/src/export/plan-lib.mjs');
-  const { renderExport } = await import('/src/export/offline.ts');
-  const { desktopSink, openAac } = await import('/src/export/desktop-io.ts');
+  // The app's own module instances (dev builds: src/app/dev-hooks.ts).
+  for (let i = 0; i < 100 && !window.__sonoraHooks; i++) await new Promise((r) => setTimeout(r, 100));
+  const { loadSong, buildPlan, renderExport, desktopSink, openAac, setDebugFlags } = window.__sonoraHooks;
+  setDebugFlags({ syncFlash: o.sync });
   const w = window;
   if (!w.__exSong || w.__exSong.file !== `${o.track}.wav`) {
     const bytes = await fetch(`/test-audio/${o.track}.wav`).then((r) => r.arrayBuffer());
@@ -37,14 +41,22 @@ const run = () => page.evaluate(async (o) => {
     plan, size: o.size, fps: o.fps, supersample: o.ss, albumPalette: null, portrait: true,
     overlay: { size: o.size, duration: o.secs, mark: { corner: 'br' }, outro: o.outro, title: null, texts: [], nowPlaying: null },
   }, sink, aac, (p) => { if (p.frame % 60 === 0) prog.push([p.stage, p.frame, +p.rate.toFixed(1)]); }, new AbortController().signal, { hashFrames: o.hash });
+  setDebugFlags({ syncFlash: false });
   return { ...res, prog: prog.slice(-4) };
 }, opts);
 const r1 = await run();
-console.log(JSON.stringify(r1));
+console.log(JSON.stringify({ ...r1, frameHashes: undefined }));
 console.log(`render speed: ${(r1.frames / r1.wallSeconds).toFixed(1)} fps (${(r1.seconds / r1.wallSeconds).toFixed(2)}× real time) · ${(r1.bytes / 1048576).toFixed(1)} MB · ${r1.codec} ${r1.hardware}`);
+if (opts.sync) {
+  const { execFileSync } = await import('node:child_process');
+  console.log(execFileSync('python', ['scripts/av-sync.py', r1.path], { encoding: 'utf8' }).trim());
+}
 if (opts.hash) {
   const r2 = await run();
-  console.log(`determinism: ${r1.frameHash} vs ${r2.frameHash} → ${r1.frameHash === r2.frameHash ? 'IDENTICAL' : 'DIFFERENT'}`);
+  const r3 = await run();
+  console.log(`third run: ${r3.frameHash} (${r3.frameHash === r2.frameHash ? 'same as the second' : r3.frameHash === r1.frameHash ? 'same as the first' : 'different again'})`);
+  const firstDiff = (r1.frameHashes ?? []).findIndex((h, i) => h !== r2.frameHashes?.[i]);
+  console.log(`determinism: ${r1.frameHash} vs ${r2.frameHash} → ${r1.frameHash === r2.frameHash ? 'IDENTICAL' : `DIFFERENT from frame ${firstDiff}`}`);
 }
 await browser.close().catch(() => undefined);
 process.exit(0);

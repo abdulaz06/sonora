@@ -12,14 +12,18 @@ export interface DebugFlags {
   /** Reel studio only: portrait (9:16) framing, 0 = off (the app and site
    * never set it). Read by the camera and the styles with their own framing. */
   portrait: number;
+  /** A/V sync checks: a white square in the bottom-left corner on every frame
+   * whose audio had a click (an energy jump), drawn over the picture. */
+  syncFlash: boolean;
 }
 
-export const debugFlags: DebugFlags = { inkExp: {}, fixedExposure: false, portrait: 0 };
+export const debugFlags: DebugFlags = { inkExp: {}, fixedExposure: false, portrait: 0, syncFlash: false };
 
 export function setDebugFlags(f: Partial<DebugFlags>): void {
   if (f.inkExp) debugFlags.inkExp = { ...f.inkExp };
   if (f.fixedExposure !== undefined) debugFlags.fixedExposure = f.fixedExposure;
   if (f.portrait !== undefined) debugFlags.portrait = f.portrait;
+  if (f.syncFlash !== undefined) debugFlags.syncFlash = f.syncFlash;
 }
 
 /** Experiment knob value (harness), or `fallback` when unset. */
