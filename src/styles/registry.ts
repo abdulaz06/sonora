@@ -94,6 +94,7 @@ export const STYLES: StyleDescriptor[] = [
   },
   {
     id: 'cymatics', label: 'Cymatics', category: 'art',
+    glyphKick: 1,
     variants: STYLE_VARIANTS.cymatics, defaultVariant: 'stone',
     supportsLight: false, supportsDepth: false, defaultDepth: false,
     create: lazy('cymatics'),
