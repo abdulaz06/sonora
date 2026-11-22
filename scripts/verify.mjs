@@ -453,6 +453,10 @@ async function runSync(page, meta, name) {
     lags.push(at * dt * 1000);
   }
   const seen = rises.filter((r) => r >= SYNC_SEEN).length;
+  if (process.env.SYNC_DEBUG) {
+    const ks = kicks.filter((k) => k >= start + 0.1 && k <= start + len - 0.2);
+    ks.forEach((k, n) => console.log(`  kick ${k.toFixed(2)} s: rise ${(100 * rises[n]).toFixed(1)}%, region ${(100 * regional[n]).toFixed(1)}%`));
+  }
   // Motion sync: peak frame-to-frame change within 133 ms after each kick vs
   // the median change over the window (how much more the picture moves on hits).
   const sortedM = [...motion].sort((a, b) => a - b);

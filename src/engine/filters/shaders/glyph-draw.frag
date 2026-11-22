@@ -38,7 +38,7 @@ void main() {
     // Ink characters on paper: the cell's own colour, darker, over a paper-lightened ground.
     // The ground keeps half of the cell's own tone, so local changes (a kick's shadow) still read.
     vec3 ground = mix(c, u_paper, 0.45);
-    vec3 ink = c * mix(0.45, 0.7, sat) * (1.0 - 0.35 * u_pulse);   // only the ink darkens: the page never pulses
+    vec3 ink = c * mix(0.45, 0.7, sat) * (1.0 - 0.6 * u_pulse);   // only the ink darkens: the page never pulses
     frag = vec4(mix(ground, ink, m), 1.0);
     return;
   }
