@@ -150,6 +150,11 @@ export function setUniforms(
       if (t === gl.INT || t === gl.BOOL || t === gl.UNSIGNED_INT) gl.uniform1i(loc, Math.round(x));
       else gl.uniform1f(loc, x);
     } else if (p.types[k] === gl.FLOAT_MAT4) gl.uniformMatrix4fv(loc, false, v);
+    // Vectors and arrays by the uniform's declared type (a vec3[3] is 9 floats, a vec2[24] is 48).
+    else if (p.types[k] === gl.FLOAT_VEC2) gl.uniform2fv(loc, v);
+    else if (p.types[k] === gl.FLOAT_VEC3) gl.uniform3fv(loc, v);
+    else if (p.types[k] === gl.FLOAT_VEC4) gl.uniform4fv(loc, v);
+    else if (p.types[k] === gl.FLOAT) gl.uniform1fv(loc, v);
     else if (v.length === 2) gl.uniform2fv(loc, v);
     else if (v.length === 3) gl.uniform3fv(loc, v);
     else if (v.length % 4 === 0) gl.uniform4fv(loc, v);

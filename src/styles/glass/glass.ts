@@ -25,6 +25,7 @@ import type { StyleContext, StyleDeps, VisualStyle } from '../visual-style';
 import { bindTarget, createTarget, deleteTarget, drawQuad, makeProgram, setUniforms, type Program, type Target } from '../shared/gl';
 import fullscreenVert from '../../engine/shaders/fullscreen.vert?raw';
 import glassFrag from './shaders/glass.frag?raw';
+import { createDisco, type Disco } from './disco';
 
 // ── Tuning ──────────────────────────────────────────────────────
 type Look = 'bubbles' | 'fins' | 'chrome';
@@ -82,6 +83,8 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
   vec3 b = (texture(u_src, uv + vec2(tx.x, 0.0)).rgb + texture(u_src, uv - vec2(tx.x, 0.0)).rgb + texture(u_src, uv + vec2(0.0, tx.y)).rgb + texture(u_src, uv - vec2(0.0, tx.y)).rgb) * 0.25;
   frag = vec4(max(c + (c - b) * 0.35, 0.0), 1.0); }`));
   let target: Target | null = null;
+  let disco: Disco | null = null;
+  const discoOf = (): Disco => (disco ??= createDisco(gl, quadVAO, deps.seed));
 
   // ── State ──
   let time = 0;
@@ -111,7 +114,8 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
   return {
     id: 'glass',
 
-    onEvent(e: SonoraEvent): void {
+    onEvent(e: SonoraEvent, ctx: StyleContext): void {
+      if (look === 'chrome') { discoOf().onEvent(e, ctx); return; }
       if (e.type === 'drop') { layout = rng() * 100; reform = 1; rippleT = 0; rippleC = [0, 0, 0]; }
       else if (e.type === 'trackChange') layout = rng() * 100;
     },
@@ -119,6 +123,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
     update(ctx: StyleContext): void {
       const dt = ctx.dt;
       time += dt;
+      if (look === 'chrome') { discoOf().update(ctx); return; }
       const fade = ctx.fadeInOut;
       spin += dt * (SPIN[0] + SPIN[1] * ctx.intensitySmoothed) * (0.4 + 0.6 * fade);
       orbit += dt * ORBIT * (1 + ctx.intensitySmoothed);
@@ -148,23 +153,36 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       const q = quality.level;
       const w = Math.max(1, Math.round(ctx.width * RES[q])), h = Math.max(1, Math.round(ctx.height * RES[q]));
       if (!target || target.w !== w || target.h !== h) { deleteTarget(gl, target); target = createTarget(gl, w, h, { internal: gl.RGBA16F }); }
+      if (look === 'chrome') {
+        bindTarget(gl, target);
+        gl.disable(gl.BLEND);
+        discoOf().draw(ctx, w, h, q);
+        ctx.bindScene();
+        const sp0 = upProgram();
+        gl.useProgram(sp0.prog);
+        setUniforms(gl, sp0, { u_src: target.tex[0], u_res: [ctx.width, ctx.height], u_src_res: [w, h] });
+        drawQuad(gl, quadVAO);
+        const post0 = ctx.post;
+        post0.bloom = 0.55; post0.bloomThreshold = 0.9; post0.exposure = 0.85; post0.vignette = 0.35;
+        return;
+      }
       const glowK = clamp01(ctx.intensityGlow);
       const es = ctx.eventState;
 
       // Camera: an orbit around the forms, the shared camera's surge and roll.
-      const dist = (look === 'chrome' ? 2.2 : look === 'fins' ? 2.2 : 2.1) * (1 - cam.lurchAmount * 0.12);
-      const elev = look === 'chrome' ? 0.85 + 0.12 * Math.sin(time * 0.05) : 0.18 + 0.12 * Math.sin(time * 0.07);
+      const dist = (look === 'fins' ? 2.2 : 2.1) * (1 - cam.lurchAmount * 0.12);
+      const elev = 0.18 + 0.12 * Math.sin(time * 0.07);
       // Fins: the ribbon lies along x, so the camera swings across its side instead of orbiting
       // (a full orbit flew along the ribbon's axis, past its end: an empty frame).
       const az = look === 'fins' ? Math.PI / 2 + FIN_SWING * Math.sin(orbit * 0.8) + simplex2(time * 0.03, 3) * 0.2 : orbit + simplex2(time * 0.03, 3) * 0.4;
-      const pos: [number, number, number] = [Math.cos(az) * Math.cos(elev) * dist, Math.sin(elev) * dist + (look === 'chrome' ? 0.3 : 0), Math.sin(az) * Math.cos(elev) * dist];
-      const tgt: [number, number, number] = [0, look === 'chrome' ? 0.2 : 0, 0];
+      const pos: [number, number, number] = [Math.cos(az) * Math.cos(elev) * dist, Math.sin(elev) * dist, Math.sin(az) * Math.cos(elev) * dist];
+      const tgt: [number, number, number] = [0, 0, 0];
       const f = norm3([tgt[0] - pos[0], tgt[1] - pos[1], tgt[2] - pos[2]]);
       let r = norm3(cross3(f, [0, 1, 0]));
       let u = cross3(r, f);
       const roll = cam.roll * 1.2;
       [r, u] = [add3(mul3(r, Math.cos(roll)), mul3(u, Math.sin(roll))), add3(mul3(u, Math.cos(roll)), mul3(r, -Math.sin(roll)))];
-      const fov = (look === 'chrome' ? 48 : 42) * Math.PI / 180 + (cam.fov - 52 * Math.PI / 180);
+      const fov = 42 * Math.PI / 180 + (cam.fov - 52 * Math.PI / 180);
 
       // Forms.
       const n = Math.round(countNow);
@@ -178,11 +196,11 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       // The studio's level is the same in every palette (a bright secondary lit the whole backdrop:
       // colour gate's exposure vs Ocean); chrome's highlight leans to the primary (dim gold read olive).
       const mid = mul3(toLuma(pal.secondary, STUDIO_MID_LUMA), studio) as RGB;
-      const hi = mul3(toLuma(mix3(pal.highlight, pal.primary, look === 'chrome' ? 0.75 : 0.35), STUDIO_HI_LUMA), studio) as RGB;
-      const keyI = (1.8 + 1.2 * glowK) * (1 + KICK_FLARE * kick) * (look === 'chrome' ? 0.4 : 1);
+      const hi = mul3(toLuma(mix3(pal.highlight, pal.primary, 0.35), STUDIO_HI_LUMA), studio) as RGB;
+      const keyI = (1.8 + 1.2 * glowK) * (1 + KICK_FLARE * kick);
       const key = mul3(mix3([1, 1, 1], pal.highlight, 0.25), keyI);
       const rim = mul3(pal.accent, 1.3 + 0.6 * glowK);
-      const tint: RGB = look === 'fins' ? normTint(pal.primary, 0.75) : look === 'chrome' ? mix3([1, 1, 1], pal.primary, 0.2) as RGB : mix3([1, 1, 1], pal.secondary, 0.12) as RGB;
+      const tint: RGB = look === 'fins' ? normTint(pal.primary, 0.75) : mix3([1, 1, 1], pal.secondary, 0.12) as RGB;
 
       bindTarget(gl, target);
       gl.disable(gl.BLEND);
@@ -206,7 +224,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       const post = ctx.post;
       post.bloom = 0.5;
       post.bloomThreshold = 1.0;
-      post.exposure = look === 'chrome' ? 0.62 : 1;
+      post.exposure = 1;
       post.vignette = 0.3;
     },
 
@@ -216,6 +234,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
     dispose(): void {
       for (const x of Object.values(progs)) if (x) gl.deleteProgram(x.prog);
       if (up) gl.deleteProgram(up.prog);
+      disco?.dispose();
       deleteTarget(gl, target);
     },
   };
