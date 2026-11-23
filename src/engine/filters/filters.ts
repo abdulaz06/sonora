@@ -25,17 +25,17 @@ import reededFrag from './shaders/reeded.frag?raw';
 
 export type FilterId = 'none' | 'glyph' | 'reeded';
 export type GlyphSize = 'small' | 'medium' | 'large';
-export type FluteWidth = 'fine' | 'medium' | 'wide';
 export type FluteAngle = 'vertical' | 'angled' | 'radial';
 
 export interface FilterSettings {
   id: FilterId;
   glyphSize: GlyphSize;
-  fluteWidth: FluteWidth;
+  /** Rib width, 0 (very fine: the default and the narrowest) to 1 (wide). */
+  fluteWidth: number;
   fluteAngle: FluteAngle;
 }
 
-export const DEFAULT_FILTER: FilterSettings = { id: 'none', glyphSize: 'medium', fluteWidth: 'medium', fluteAngle: 'vertical' };
+export const DEFAULT_FILTER: FilterSettings = { id: 'none', glyphSize: 'medium', fluteWidth: 0, fluteAngle: 'radial' };
 
 // ── Tuning ──────────────────────────────────────────────────────
 /** Character cell height (px) at 1080 px on the frame's short side; width = height × GLYPH_ASPECT. */
@@ -47,8 +47,11 @@ const GLYPH_HYST = 0.4;
 const GLYPH_EDGE: [number, number] = [0.38, 0.24];
 /** Share of the cell colour drawn behind the glyphs. */
 const GLYPH_FILL = 0.1;
-/** Flute width (px) at 1080 px on the short side. */
-export const FLUTE_PX: Record<FluteWidth, number> = { fine: 22, medium: 40, wide: 72 };
+/** Rib width (px at 1080 px on the short side): very fine at 0, wide at 1 (more of the slider for the fine end). */
+const FLUTE_PX: [number, number] = [9, 72];
+export const flutePx = (w: number): number => FLUTE_PX[0] + (FLUTE_PX[1] - FLUTE_PX[0]) * Math.pow(Math.min(1, Math.max(0, w)), 1.6);
+/** Named widths (harness, older saves). */
+export const FLUTE_NAMED: Record<string, number> = { fine: 0, medium: 0.45, wide: 1 };
 /** Angled flutes: tilt from vertical (rad). */
 const FLUTE_ANGLE = (20 * Math.PI) / 180;
 
@@ -247,7 +250,7 @@ export class FilterPass {
       gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, src.tex[0]);
       gl.uniform1i(U.reeded.u_src, 0);
       gl.uniform2f(U.reeded.u_res, W, H);
-      gl.uniform1f(U.reeded.u_w, Math.max(6, FLUTE_PX[f.fluteWidth] * unit));
+      gl.uniform1f(U.reeded.u_w, Math.max(6, flutePx(f.fluteWidth) * unit));
       gl.uniform1i(U.reeded.u_mode, f.fluteAngle === 'radial' ? 2 : 0);
       gl.uniform1f(U.reeded.u_angle, f.fluteAngle === 'angled' ? FLUTE_ANGLE : 0);
       gl.uniform3fv(U.reeded.u_tint, fr.palette.highlight);

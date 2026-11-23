@@ -10,7 +10,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_CAMERA_VIEW, FLAT_ZOOM_MAX, FLAT_ZOOM_MIN, type CameraView } from '../engine/camera';
 import { DEFAULT_DRIFT_PERIOD_S, MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES, paletteIndexByName } from '../engine/color-engine';
 import type { QualityPreset } from '../engine/quality';
-import { DEFAULT_FILTER, type FilterSettings } from '../engine/filters/filters';
+import { DEFAULT_FILTER, FLUTE_NAMED, type FilterSettings } from '../engine/filters/filters';
 import { DEFAULT_STYLE, isStyleId, STYLES } from '../styles/registry';
 import type { LightMode, StyleId } from '../styles/visual-style';
 
@@ -499,7 +499,8 @@ export function parseFilter(raw: unknown): FilterSettings {
   return {
     id: pick(f.id, ['none', 'glyph', 'reeded'] as const, DEFAULT_FILTER.id),
     glyphSize: pick(f.glyphSize, ['small', 'medium', 'large'] as const, DEFAULT_FILTER.glyphSize),
-    fluteWidth: pick(f.fluteWidth, ['fine', 'medium', 'wide'] as const, DEFAULT_FILTER.fluteWidth),
+    fluteWidth: typeof f.fluteWidth === 'number' && Number.isFinite(f.fluteWidth) ? Math.min(1, Math.max(0, f.fluteWidth))
+      : typeof f.fluteWidth === 'string' && f.fluteWidth in FLUTE_NAMED ? FLUTE_NAMED[f.fluteWidth] : DEFAULT_FILTER.fluteWidth,
     fluteAngle: pick(f.fluteAngle, ['vertical', 'angled', 'radial'] as const, DEFAULT_FILTER.fluteAngle),
   };
 }

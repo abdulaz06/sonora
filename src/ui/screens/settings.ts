@@ -16,7 +16,7 @@ import { audioStatus } from '../../app/stores';
 import { FLAT_ZOOM_MAX, FLAT_ZOOM_MIN } from '../../engine/camera';
 import { MAX_DRIFT_PERIOD_S, MIN_DRIFT_PERIOD_S, PALETTES, paletteFromHue, swatchCss } from '../../engine/color-engine';
 import type { QualityPreset } from '../../engine/quality';
-import type { FilterId, FluteAngle, FluteWidth, GlyphSize } from '../../engine/filters/filters';
+import type { FilterId, FluteAngle, GlyphSize } from '../../engine/filters/filters';
 import { SHOW_12 } from '../../app/release';
 import { fpsCapChoices, fpsLabel, SET_MODE_INTERVALS, type Corner } from '../../ipc/settings';
 import { getStyle, presetsFor } from '../../styles/registry';
@@ -271,10 +271,10 @@ export function createSettings(ctl: Controller, platform: Platform, on: Settings
         segmented([{ value: 'none', label: 'None' }, { value: 'glyph', label: 'Glyph' }, { value: 'reeded', label: 'Reeded glass' }], fl.id, (v) => ctl.setFilter({ id: v as FilterId }), 'Filter').el),
       fl.id === 'glyph' ? row('Character size', INFO.glyphSize(), fl.glyphSize,
         segmented((['small', 'medium', 'large'] as GlyphSize[]).map((v) => ({ value: v, label: v })), fl.glyphSize, (v) => ctl.setFilter({ glyphSize: v }), 'Character size').el) : null,
-      fl.id === 'reeded' ? row('Rib width', INFO.flutes(), fl.fluteWidth,
-        segmented((['fine', 'medium', 'wide'] as FluteWidth[]).map((v) => ({ value: v, label: v })), fl.fluteWidth, (v) => ctl.setFilter({ fluteWidth: v }), 'Rib width').el) : null,
+      fl.id === 'reeded' ? row('Rib width', INFO.flutes(), fl.fluteWidth < 0.02 ? 'very fine' : `${Math.round(fl.fluteWidth * 100)}`,
+        slider({ min: 0, max: 100, value: Math.round(fl.fluteWidth * 100), ends: ['very fine', 'wide'], ariaLabel: 'Rib width', onInput: (v) => ctl.setFilter({ fluteWidth: v / 100 }) }).el) : null,
       fl.id === 'reeded' ? row('Rib direction', INFO.flutes(), fl.fluteAngle,
-        segmented((['vertical', 'angled', 'radial'] as FluteAngle[]).map((v) => ({ value: v, label: v })), fl.fluteAngle, (v) => ctl.setFilter({ fluteAngle: v }), 'Rib direction').el) : null);
+        segmented((['radial', 'vertical', 'angled'] as FluteAngle[]).map((v) => ({ value: v, label: v })), fl.fluteAngle, (v) => ctl.setFilter({ fluteAngle: v }), 'Rib direction').el) : null);
 
     // Camera
     const presets = presetsFor(id);
