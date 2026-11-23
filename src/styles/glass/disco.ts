@@ -45,6 +45,8 @@ const COLLIDE_EVERY = { drop: 4, loud: 8, calm: 0 };
 /** Ring strengths: kick, collision. */
 const KICK_RING = 1.0;
 const HIT_RING = 1.8;
+/** Planet surfaces stay at least this far from the flight path (m). */
+const CLEARANCE = 2.6;
 /** Distance fog (1/m). */
 const FOG = 0.011;
 
@@ -100,7 +102,16 @@ export function createDisco(gl: WebGL2RenderingContext, quadVAO: WebGLVertexArra
     }
   }
 
-  const posOf = (p: Planet): [number, number, number] => [p.base[0] + p.off[0], p.base[1] + p.off[1], p.base[2] + p.off[2]];
+  /** A planet's place, kept clear of the flight path (a collision could push one into the camera's way). */
+  const posOf = (p: Planet): [number, number, number] => {
+    const c: [number, number, number] = [p.base[0] + p.off[0], p.base[1] + p.off[1], p.base[2] + p.off[2]];
+    const q = path(-c[2]);
+    const dx = c[0] - q[0], dy = c[1] - q[1];
+    const d = Math.hypot(dx, dy) || 1e-3;
+    const need = p.r + CLEARANCE;
+    if (d < need) { c[0] = q[0] + dx / d * need; c[1] = q[1] + dy / d * need; }
+    return c;
+  };
 
   /** Two planets ahead that can meet: close enough to each other, far enough ahead to be seen coming. */
   function startCollision(beatSec: number, withFlash: boolean, ahead: [number, number]): void {
