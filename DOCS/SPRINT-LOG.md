@@ -4,6 +4,25 @@
 > Work happens in a separate worktree (`C:/Users/abdul/sonora-12`, branch `styles-1.2`, pushed to `origin main`) so the 1.1 run's uncommitted files in the main checkout are never touched. Harness runs use their own port: `SONORA_HARNESS_PORT=5211 SONORA_VITE_CACHE=node_modules/.vite-12`.
 > New styles stay off the website until the release (hidden on the site build; the app and the dev page show them).
 
+## Rework after review 1 (resume here)
+Abdul's review: Memory scrapped; Stage, Cymatics and Cover rethought for 1.3; Glass and Echo are the hits but need big improvements; Silk Helix reworked; filters kept (Reeded glass: radial and very fine by default, rib width a slider). 1.2 ships Glass, Echo, Silk Helix and the filters once they're great; each rework shows prototype clips for a yes/no before polish and gates (D100).
+
+1.2
+- [x] Memory removed (style, scenes, media, scripts)
+- [x] Reeded glass: radial + very fine default, rib width slider
+- [x] Stage, Cymatics, Cover held for 1.3 (`SHOW_13`: dev server only; their media out of the shipped assets)
+- [ ] Echo: less glow in Glow; smoother, more human bodies (light trails from hands and feet); more moves (more CMU clips); more dancers only ever in sync or delayed in time; drops: the dancer stretches vertically / horizontally into rows and towers of synced copies; harder musicality; a void world
+- [ ] Glass Bubbles: tiny background particles plus bigger primary bubbles with effects (not crowded); stronger sync
+- [ ] Glass Fins: camera moves on hits; try an endless twirling ribbon with a chase camera
+- [ ] Glass Chrome: a universe of mirror-ball planets (collisions, beat ripples running across their facets) with a Voyage-like chase camera
+- [ ] Silk Helix: less repetitive, more sync, a camera that orbits it with rings (Saturn); Depth and Flat genuinely different
+- [ ] Prototype clips for each → yes/no → polish → every gate → review stop 2 → ship 1.2.0
+
+1.3
+- [ ] Laser (replaces Stage): lasers only (no stage, crowd or rig); venues Cathedral and caverns, Desert canyon at night, Brutalist megastructure, Dark ocean, with AAA textures; a curated kit from fans / tunnels / sheets, shapes drawn in the air, lasers on surfaces, a liquid-sky ceiling
+- [ ] Cymatics rebuild: travelling waves that visibly move the sand and stone as each wavefront passes; removed if the prototype doesn't sell it
+- [ ] Cover as three modes: shatter and reassemble, cover terrain, infinite gallery
+
 ## Summary
 **Review stop.** Open `verify/review-1.2/index.html` (every look: arc contact sheet, 24 s clip with audio, 9:16 still, gate rows; sizes; ASSETS.md).
 
