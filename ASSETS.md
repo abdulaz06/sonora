@@ -77,14 +77,17 @@ All SIL Open Font License 1.1; the licence text is next to each font.
 
 The four export fonts come from the Fontsource packages (latin subsets, woff2).
 
-## Echo motion data (`src/assets/echo/moves.bin`, 669 KB)
+## Echo motion data (`src/assets/echo/moves.bin`, 1.9 MB)
 
-Seven dance clips from the **CMU Graphics Lab Motion Capture Database**
+Twenty-four dance clips from the **CMU Graphics Lab Motion Capture Database**
 (https://mocap.cs.cmu.edu), converted by `scripts/echo/convert-cmu.py` into
-joint positions (27 joints, 30 fps, millimetres, 16-bit): subject 5 trials 2,
-6, 13 (modern dance), subject 60 trials 2 and 8 (salsa), subject 55 trial 2
-(lambada), subject 141 trial 12 (the twist). The raw ASF/AMC files stay in the
-git-ignored `local-media/cmu/`.
+joint positions (27 joints, 30 fps, millimetres, 16-bit; at most 40 s each):
+subject 5 trials 2, 5, 6, 7, 11, 12, 13, 17, 18 (modern dance), subject 55
+trials 1 and 2 (whirl, lambada), subject 60 trials 2, 4, 8, 10 and subject 61
+trials 3, 7, 12 (salsa), subject 90 trials 28, 30, 31 (breakdance, Russian
+dance), subject 120 trial 5 (Mickey dance), subject 141 trial 12 (the twist),
+subject 143 trial 35 (Macarena). The raw ASF/AMC files stay in the git-ignored
+`local-media/cmu/`.
 
 Terms, quoted from the site (checked 2026-11-22): "This dataset of motions is
 free for all uses." "The motion capture data may be copied, modified, or
