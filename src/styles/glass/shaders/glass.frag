@@ -23,6 +23,9 @@ uniform vec3 u_key;          // softbox colour × intensity
 uniform vec3 u_rim;          // rim light colour × intensity
 uniform float u_sparkle;     // highs: glints flare
 uniform float u_studio;      // kick lift of the studio light (seen through and in the glass only)
+uniform float u_dust;        // bubbles: tiny glass beads in the studio (0 = none)
+uniform float u_dust_kick;   // their glint on the kick
+uniform float u_dust_t;      // their slow drift
 // forms
 uniform vec4 u_balls[10];
 uniform int u_ball_count;
@@ -66,8 +69,7 @@ float map(vec3 p) {
   float d = 1e3;
   for (int k = -1; k <= 1; k++) {
     float i = id + float(k);
-    if (abs(i) > u_count) continue;
-    vec3 q = p;
+    vec3 q = p;   // endless: the camera chases along the ribbon
     q.x -= i * w;
     q.y -= sin(i * 0.22 + u_time * 0.4) * 0.22;
     q.z -= cos(i * 0.17 + u_time * 0.3) * 0.15;
@@ -102,6 +104,30 @@ vec3 normal(vec3 p) {
 }
 
 // The studio: a soft palette gradient, a key softbox above-left, a rim light behind.
+// Tiny glass beads and soft bokeh scattered around the studio (directions on a sphere, so the
+// bubbles refract and reflect them too). Kicks make them glint; they drift slowly.
+vec3 dust(vec3 d) {
+  if (u_dust <= 0.0) return vec3(0.0);
+  vec3 acc = vec3(0.0);
+  for (int layer = 0; layer < 2; layer++) {
+    float sc = layer == 0 ? 26.0 : 11.0;
+    float lon = atan(d.z, d.x) + u_dust_t * (layer == 0 ? 0.02 : 0.035);
+    vec2 g = vec2(lon * sc, (d.y + 0.03 * sin(u_dust_t * 0.3 + lon * 3.0)) * sc);
+    vec2 cell = floor(g);
+    vec2 f = fract(g) - 0.5;
+    float h = fract(sin(dot(cell + float(layer) * 17.0, vec2(127.1, 311.7))) * 43758.5453);
+    if (h < (layer == 0 ? 0.7 : 0.86)) continue;
+    vec2 o = vec2(fract(h * 13.7), fract(h * 71.3)) - 0.5;
+    float r = layer == 0 ? 0.06 + 0.06 * fract(h * 5.1) : 0.16 + 0.14 * fract(h * 3.3);
+    float dd = length(f - o * 0.6);
+    // Near beads are crisp rings of light (a lens), far ones soft discs (bokeh).
+    float bead = layer == 0 ? smoothstep(r, r * 0.4, dd) * (0.35 + 0.65 * smoothstep(r * 0.35, r * 0.85, dd)) : smoothstep(r, r * 0.2, dd) * 0.35;
+    vec3 c = fract(h * 29.0) < 0.5 ? u_rim : u_key * 0.35;
+    acc += c * bead * (0.5 + 1.6 * u_dust_kick * fract(h * 41.0));
+  }
+  return acc * u_dust;
+}
+
 vec3 env(vec3 d) {
   float y = d.y;
   vec3 c = mix(u_env_lo, u_env_mid, smoothstep(-0.6, 0.15, y));
@@ -112,7 +138,7 @@ vec3 env(vec3 d) {
   float rim = smoothstep(0.85, 0.95, dot(d, bd));
   // a long strip light for chrome streaks
   float strip = smoothstep(0.035, 0.0, abs(d.y - 0.55)) * smoothstep(0.2, 0.6, d.x + 0.4);
-  return c + u_key * key * (1.0 + 2.0 * u_sparkle) + u_rim * rim + u_key * strip * 0.35;
+  return c + u_key * key * (1.0 + 2.0 * u_sparkle) + u_rim * rim + u_key * strip * 0.35 + dust(d);
 }
 
 float march(vec3 ro, vec3 rd, float tmax, float sgn) {
@@ -138,6 +164,7 @@ void main() {
   bg = mix(bg, u_env_hi, smoothstep(0.15, 0.95, y)) * 0.55 + u_env_lo * 0.25;
   // The backdrop seen directly never pulses: kicks light the glass (refraction, reflections), not the wall.
   bg /= u_studio;
+  bg += dust(rd);
   bg += u_rim * 0.05 * exp(-pow(length(ndc * vec2(aspect * 0.5, 1.0)) * 1.2, 2.0));
   float t = march(ro, rd, 12.0, 1.0);
   vec3 col = bg;
@@ -185,9 +212,15 @@ void main() {
       dirIn = reflect(dirIn, ne);
       q = pe + ne * 0.004;
     }
+    // Light still inside after the last bounce leaves the way it's heading (no black pockets).
+    trans += throughput * env(dirIn) * 0.85;
     col = mix(trans, refl, F);
     // a caustic-like inner glow where the body is thin
     col += u_rim * 0.08 * exp(-path * 6.0);
+#endif
+#if SCENE == 1
+    // The endless ribbon fades into the studio with distance (thin far slats would alias).
+    col = mix(col, bg, smoothstep(5.5, 11.5, t));
 #endif
   }
   frag = vec4(col, 1.0);

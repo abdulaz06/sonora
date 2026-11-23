@@ -35,9 +35,12 @@ const RES: Record<QualityParams['level'], number> = { low: 0.55, medium: 0.72, h
 const STEPS: Record<QualityParams['level'], number> = { low: 48, medium: 80, high: 120 };
 const BOUNCES: Record<QualityParams['level'], number> = { low: 0, medium: 1, high: 2 };
 /** Bubbles: how many (quiet → loud), size range, smooth-union width (calm → bass). */
-const BALLS: [number, number] = [4, 9];
-const BALL_R: [number, number] = [0.17, 0.33];
-const BLEND_K: [number, number] = [0.12, 0.36];
+const BALLS: [number, number] = [5, 8];
+const BALL_R: [number, number] = [0.22, 0.42];
+/** Bubbles: they swell on the kick by this share; the beads' density. */
+const BALL_KICK = 0.09;
+const DUST = 1;
+const BLEND_K: [number, number] = [0.07, 0.24];
 /** Spin (rad/s): base + intensity; camera orbit (rad/s). */
 const SPIN: [number, number] = [0.12, 0.9];
 const ORBIT = 0.05;
@@ -59,8 +62,13 @@ const toLuma = (c: RGB | number[], target: number): RGB => {
   const k = Math.min(2.5, Math.max(0.4, target / Math.max(l, 1e-3)));
   return [c[0] * k, c[1] * k, c[2] * k];
 };
-/** Fins: the camera's swing either side of the ribbon's face (rad). */
-const FIN_SWING = 0.7;
+/** Fins: chase speed along the endless ribbon (m/s, quiet → loud), drop surge (m/s); camera offset beside and above it. */
+const FIN_SPEED: [number, number] = [0.35, 1.6];
+const FIN_SURGE = 4;
+const FIN_CAM: [number, number, number] = [-1.3, 0.38, 1.35];
+/** Fins camera hits: FOV punch (rad) and roll kick (rad) on each kick. */
+const FIN_FOV_KICK = 0.09;
+const FIN_ROLL_KICK = 0.05;
 /** Drop: reform envelope decay (s). */
 const REFORM_TAU = 1.2;
 
@@ -89,6 +97,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
   // ── State ──
   let time = 0;
   let spin = 0;
+  let finX = 0, finSurge = 0, finRoll = 0, finRollSign = 1;
   let finTurn = 0;
   let finTurnNow = 0;
   let orbit = rng() * Math.PI * 2;
@@ -104,10 +113,10 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
 
   const ballPos = (i: number, t: number): [number, number, number, number] => {
     const s = layout + i * 7.31;
-    const r = 0.25 + 0.42 * (0.5 + 0.5 * Math.sin(s * 1.7));
+    const r = 0.45 + 0.75 * (0.5 + 0.5 * Math.sin(s * 1.7));
     const a = s + t * (0.11 + 0.05 * Math.sin(s)) + spin * 0.6;
-    const y = Math.sin(s * 2.3 + t * 0.17) * 0.32;
-    const rad = BALL_R[0] + (BALL_R[1] - BALL_R[0]) * (0.5 + 0.5 * Math.sin(s * 3.1 + t * 0.2));
+    const y = Math.sin(s * 2.3 + t * 0.17) * 0.45;
+    const rad = (BALL_R[0] + (BALL_R[1] - BALL_R[0]) * (0.5 + 0.5 * Math.sin(s * 3.1 + t * 0.2))) * (1 + BALL_KICK * kick);
     return [Math.cos(a) * r * (1 + reform * 0.8), y * (1 + reform * 0.6), Math.sin(a) * r * (1 + reform * 0.8), rad];
   };
 
@@ -116,7 +125,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
 
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
       if (look === 'chrome') { discoOf().onEvent(e, ctx); return; }
-      if (e.type === 'drop') { layout = rng() * 100; reform = 1; rippleT = 0; rippleC = [0, 0, 0]; }
+      if (e.type === 'drop') { layout = rng() * 100; reform = 1; rippleT = 0; rippleC = [0, 0, 0]; finSurge = 1; }
       else if (e.type === 'trackChange') layout = rng() * 100;
     },
 
@@ -130,6 +139,9 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       waveT += dt * (1.2 + 3.5 * ctx.intensitySmoothed);
       reform *= Math.exp(-dt / REFORM_TAU);
       finTurnNow += (finTurn - finTurnNow) * (1 - Math.exp(-dt / FIN_TURN_TAU));
+      finSurge *= Math.exp(-dt / 1.2);
+      finRoll *= Math.exp(-dt / 0.35);
+      finX += dt * ((FIN_SPEED[0] + (FIN_SPEED[1] - FIN_SPEED[0]) * ctx.intensitySmoothed) * (0.35 + 0.65 * fade) + FIN_SURGE * finSurge);
       rippleT += dt;
       kick *= Math.exp(-dt / KICK_TAU);
       // Frame-accurate: the bass envelope flares the key light on the hit frame.
@@ -139,9 +151,9 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       if (kickArmed && ctx.bassHits > 0.55 && fade > 0.1) {
         kickArmed = false;
         rippleT = 0;
-        if (look === 'fins') finTurn += FIN_TURN;
+        if (look === 'fins') { finTurn += FIN_TURN; finRollSign = -finRollSign; finRoll = finRollSign * FIN_ROLL_KICK; }
         const b = ballPos(Math.floor(rng() * countNow), time);
-        rippleC = look === 'bubbles' ? [b[0], b[1], b[2]] : [(rng() - 0.5) * 0.8, 0, (rng() - 0.5) * 0.8];
+        rippleC = look === 'bubbles' ? [b[0], b[1], b[2]] : [finX + 1.2 + rng() * 1.6, 0, 0];   // fins: just ahead of the chase
       }
       const want = BALLS[0] + (BALLS[1] - BALLS[0]) * clamp01(ctx.intensityGlow);
       countNow += (want - countNow) * (1 - Math.exp(-dt / 3));
@@ -170,19 +182,23 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
       const es = ctx.eventState;
 
       // Camera: an orbit around the forms, the shared camera's surge and roll.
-      const dist = (look === 'fins' ? 2.2 : 2.1) * (1 - cam.lurchAmount * 0.12);
+      const dist = (look === 'fins' ? 2.2 : 3.0) * (1 - cam.lurchAmount * 0.12);
       const elev = 0.18 + 0.12 * Math.sin(time * 0.07);
-      // Fins: the ribbon lies along x, so the camera swings across its side instead of orbiting
-      // (a full orbit flew along the ribbon's axis, past its end: an empty frame).
-      const az = look === 'fins' ? Math.PI / 2 + FIN_SWING * Math.sin(orbit * 0.8) + simplex2(time * 0.03, 3) * 0.2 : orbit + simplex2(time * 0.03, 3) * 0.4;
-      const pos: [number, number, number] = [Math.cos(az) * Math.cos(elev) * dist, Math.sin(elev) * dist, Math.sin(az) * Math.cos(elev) * dist];
-      const tgt: [number, number, number] = [0, 0, 0];
+      const az = orbit + simplex2(time * 0.03, 3) * 0.4;
+      let pos: [number, number, number] = [Math.cos(az) * Math.cos(elev) * dist, Math.sin(elev) * dist, Math.sin(az) * Math.cos(elev) * dist];
+      let tgt: [number, number, number] = [0, 0, 0];
+      if (look === 'fins') {
+        // Chase: alongside the endless ribbon, a little above it, looking ahead along it; drifting in and out.
+        const sway = simplex2(time * 0.05, 4);
+        pos = [finX + FIN_CAM[0], FIN_CAM[1] + 0.25 * simplex2(time * 0.04, 5), FIN_CAM[2] + 0.45 * sway];
+        tgt = [finX + 2.4, 0.05 * Math.sin(time * 0.3), -0.25 * sway];
+      }
       const f = norm3([tgt[0] - pos[0], tgt[1] - pos[1], tgt[2] - pos[2]]);
       let r = norm3(cross3(f, [0, 1, 0]));
       let u = cross3(r, f);
-      const roll = cam.roll * 1.2;
+      const roll = cam.roll * 1.2 + (look === 'fins' ? finRoll : 0);
       [r, u] = [add3(mul3(r, Math.cos(roll)), mul3(u, Math.sin(roll))), add3(mul3(u, Math.cos(roll)), mul3(r, -Math.sin(roll)))];
-      const fov = 42 * Math.PI / 180 + (cam.fov - 52 * Math.PI / 180);
+      const fov = (look === 'fins' ? 50 : 42) * Math.PI / 180 + (cam.fov - 52 * Math.PI / 180) + (look === 'fins' ? FIN_FOV_KICK * kick : 0);
 
       // Forms.
       const n = Math.round(countNow);
@@ -212,6 +228,7 @@ void main() { vec2 uv = gl_FragCoord.xy / u_res; vec2 tx = 1.0 / u_src_res;
         u_balls: balls, u_ball_count: n, u_blend_k: BLEND_K[0] + (BLEND_K[1] - BLEND_K[0]) * clamp01(ctx.bassPresence),
         u_ripple: [rippleC[0], rippleC[1], rippleC[2], KICK_RIPPLE * (rippleT < 1.5 ? 1 : 0)], u_ripple_t: rippleT,
         u_spin: spin + finTurnNow, u_twist: 0.1 + 0.16 * es.buildProgress + 0.05 * glowK, u_count: look === 'fins' ? 10 + Math.round(10 * glowK) : 8 + 6 * glowK,
+        u_dust: look === 'bubbles' ? DUST * (0.45 + 0.55 * ctx.fadeInOut) : 0, u_dust_kick: kick, u_dust_t: time,
         u_tint: tint, u_wave_t: waveT, u_wave_amp: 0.4 + 0.8 * clamp01(ctx.bassPresence), u_reform: reform,
       });
       drawQuad(gl, quadVAO);
