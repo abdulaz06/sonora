@@ -4,7 +4,7 @@ import { CAMERA_PRESETS, type CameraPreset } from '../engine/camera';
  * style by writing its module and appending a descriptor here.
  */
 
-import { SHOW_12 } from '../app/release';
+import { SHOW_12, SHOW_13, STYLES_13 } from '../app/release';
 import { STYLE_VARIANTS, type StyleCategory, type StyleDeps, type StyleDescriptor, type StyleId, type VisualStyle } from './visual-style';
 
 // Styles (their code and shaders) load on demand: the web page fetches only
@@ -144,7 +144,7 @@ export function isStyleId(v: unknown): v is StyleId {
 
 /** Styles visible in pickers (classic hidden unless enabled). */
 export function visibleStyles(showClassic: boolean, category?: StyleCategory): StyleDescriptor[] {
-  return STYLES.filter((s) => (showClassic || s.category !== 'classic') && (!category || s.category === category) && (SHOW_12 || !UNRELEASED_12.includes(s.id)));
+  return STYLES.filter((s) => (showClassic || s.category !== 'classic') && (!category || s.category === category) && (SHOW_12 || !UNRELEASED_12.includes(s.id)) && (SHOW_13 || !(STYLES_13 as readonly StyleId[]).includes(s.id)));
 }
 
 /** Camera presets for a style (its own views where it has them). */

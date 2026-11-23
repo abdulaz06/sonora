@@ -10,7 +10,7 @@
 
 import type { MediaSrc } from '../ui/ds/components';
 import type { StyleId } from '../styles/visual-style';
-import { SHOW_12 } from './release';
+import { SHOW_12, SHOW_13, STYLES_13 } from './release';
 
 const FILES = import.meta.glob('../assets/media/*.{webp,webm}', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const url = (file: string): string | undefined => FILES[`../assets/media/${file}`];
@@ -162,7 +162,7 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
 };
 
 /** 1.2 styles (hidden on the deployed website until the release, see release.ts). */
-export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo'];
+export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo'].filter((s) => SHOW_13 || !(STYLES_13 as readonly string[]).includes(s)) as StyleId[];
 export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage', ...(SHOW_12 ? NEW_STYLES_12 : [])];
 export const CLASSIC_STYLES: StyleId[] = ['aura', 'halo'];
 
@@ -226,7 +226,7 @@ export const PIECES: Piece[] = [
   { id: 'voyage:void', style: 'voyage', look: 'void', label: 'Voyage · Void', views: ['flat'], energy: 0.55, media: 'voyage-void' },
   { id: 'voyage:city', style: 'voyage', look: 'city', label: 'Voyage · City', views: ['flat'], energy: 0.5, media: 'voyage-city' },
   { id: 'voyage:ocean', style: 'voyage', look: 'ocean', label: 'Voyage · Ocean', views: ['flat'], energy: 0.45, media: 'voyage-ocean' },
-  ...(SHOW_12 ? PIECES_12 : []),
+  ...(SHOW_12 ? PIECES_12.filter((p) => SHOW_13 || !(STYLES_13 as readonly StyleId[]).includes(p.style)) : []),
 ];
 
 export const SHORTCUTS: [string[], string][] = [
