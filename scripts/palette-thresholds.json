@@ -255,30 +255,6 @@
    "olive_max": 0.05,
    "sep_min": 19.6,
    "_note": "1.2: calibrated on the new12 matrix (Ocean, Neon, Crimson, Violet), as the 1.0 combos."
-  },
-  "memory-forest": {
-   "mode": "light",
-   "light_off_max": 0.15,
-   "light_chroma_min": 0.04,
-   "L_min": 0.35,
-   "L95_max": 0.85,
-   "_note": "1.2 (as D89): photoscans stay natural, the palette is in the fog and the light. Measured on all nine palettes: light off <= 3%, light chroma >= 0.056 (a pale fog: the floor is 0.04, half Voyage City's), L 0.55-0.56, L95 <= 0.70."
-  },
-  "memory-coast": {
-   "mode": "light",
-   "light_off_max": 0.15,
-   "light_chroma_min": 0.04,
-   "L_min": 0.35,
-   "L95_max": 0.85,
-   "_note": "1.2 (as D89): photoscans stay natural, the palette is in the fog and the light. Measured on all nine palettes: light off <= 4%, light chroma >= 0.048 (a pale fog: the floor is 0.04, half Voyage City's), L 0.53-0.56, L95 <= 0.66."
-  },
-  "memory-desert": {
-   "mode": "light",
-   "light_off_max": 0.15,
-   "light_chroma_min": 0.04,
-   "L_min": 0.35,
-   "L95_max": 0.85,
-   "_note": "1.2 (as D89): photoscans stay natural, the palette is in the fog and the light. Measured on all nine palettes: light off <= 0%, light chroma >= 0.058 (a pale fog: the floor is 0.04, half Voyage City's), L 0.45-0.54, L95 <= 0.63."
   }
  },
  "expo_tol": {

@@ -15,8 +15,8 @@ mkdir -p "$out"
 here=$(cd "$(dirname "$0")" && pwd)
 seqroot=${SEQ_ROOT:-${TMPDIR:-/tmp}/sonora-12-seq}
 # style:look:view
-DEFAULTS="ink:glow:depth silk:silk:flat wisp:ground:flat warp:warp:flat voyage:void:flat stage:club:flat cymatics:stone:flat glass:bubbles:flat cover:cover:flat echo:glow:flat memory:forest:flat"
-NEW="silk:helix:flat silk:helix:depth stage:club:flat stage:arena:flat stage:cathedral:flat cymatics:stone:flat cymatics:sand:flat cymatics:liquid:flat glass:bubbles:flat glass:fins:flat glass:chrome:flat cover:cover:flat echo:glow:flat echo:trace:flat memory:forest:flat memory:coast:flat memory:desert:flat"
+DEFAULTS="ink:glow:depth silk:silk:flat wisp:ground:flat warp:warp:flat voyage:void:flat stage:club:flat cymatics:stone:flat glass:bubbles:flat cover:cover:flat echo:glow:flat"
+NEW="silk:helix:flat silk:helix:depth stage:club:flat stage:arena:flat stage:cathedral:flat cymatics:stone:flat cymatics:sand:flat cymatics:liquid:flat glass:bubbles:flat glass:fins:flat glass:chrome:flat cover:cover:flat echo:glow:flat echo:trace:flat"
 
 if [ "$batch" = filters ]; then
   log="$out/filters.log"; : > "$log"
@@ -54,7 +54,7 @@ fi
 
 if [ "$batch" = dt ]; then
   log="$out/dt.log"; : > "$log"
-  for c in ${DT_COMBOS:-silk:helix:flat stage:club:flat cymatics:stone:flat glass:bubbles:flat cover:cover:flat echo:glow:flat memory:forest:flat}; do
+  for c in ${DT_COMBOS:-silk:helix:flat stage:club:flat cymatics:stone:flat glass:bubbles:flat cover:cover:flat echo:glow:flat}; do
     IFS=: read -r style look view <<< "$c"
     vf=""; [ "$view" = flat ] && vf="--flat"
     node scripts/verify.mjs --dt-sweep --style $style --variant $look $vf --track house-124 --start 44 --secs 4 2>&1 | grep -E "PASS|FAIL|seen|rise|drift|fine|pop|rror" | sed "s/^/DT $style $look $view /" | tee -a "$log"

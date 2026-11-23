@@ -38,7 +38,6 @@ const STATES = {
   'detail-ink': { url: `${base}?${q}&screen=detail&style=ink`, after: 1400 },
   'menu-stage': { url: `${base}?${q}&screen=menu`, after: 1400, act: async (p) => { await p.hover('.scard:nth-child(6)'); await wait(1400); } },
   'detail-stage': { url: `${base}?${q}&screen=detail&style=stage`, after: 1600 },
-  'detail-memory': { url: `${base}?${q}&screen=detail&style=memory`, after: 2400 },
   'settings-filter': { url: `${base}?${q}&screen=menu`, after: 1000, act: async (p) => { await p.click('text=Settings'); await wait(700); await p.click('.st-nav button:has-text("filter")'); await wait(900); } },
   'settings-filter-info': { url: `${base}?${q}&screen=menu`, after: 1000, act: async (p) => { await p.click('text=Settings'); await wait(700); await p.click('.st-nav button:has-text("filter")'); await wait(700); await p.click('.st-row:has-text("Filter") .s-info'); await wait(900); } },
   'detail-wisp': { url: `${base}?${q}&screen=detail&style=wisp`, after: 1400 },

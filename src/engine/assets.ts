@@ -1,5 +1,5 @@
 /**
- * Assets a style is still fetching (Memory's scenes, Echo's moves). Offline
+ * Assets a style is still fetching (Echo's moves). Offline
  * renders (the harness, exports) can wait for them before rendering, since a
  * tight render loop never yields long enough for a fetch to finish.
  */

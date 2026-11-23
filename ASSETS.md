@@ -99,25 +99,3 @@ database was created with funding from NSF EIA-0196217."
 Drawn at runtime from the bundled IBM Plex Mono SemiBold
 (`src/assets/fonts/ibm-plex-mono-latin-600-normal.woff2`, SIL Open Font
 License 1.1, already listed with the fonts above); no new file.
-
-## Memory scenes (`src/assets/memory/*.splat`: forest 7.7 MB, coast 7.5 MB, desert 7.3 MB)
-
-Splat scenes built by `scripts/memory/build-scenes.py` from Poly Haven
-photoscans (CC0 1.0: "All assets are CC0", https://polyhaven.com/license),
-downloaded at 1K by `scripts/memory/fetch-polyhaven.py` through the public API
-(https://api.polyhaven.com) into the git-ignored `local-media/polyhaven/`.
-Every model's surface is sampled into flat disc splats coloured from its
-diffuse map (leaves alpha-tested with their alpha maps), placed along a path
-over a textured ground, and quantised to 13 bytes per splat. Loaded only when
-Memory shows (one scene per look).
-
-| Scene | Models (https://polyhaven.com/a/<id>) | Ground texture |
-|---|---|---|
-| Forest | island_tree_02, fir_sapling, pine_sapling_small, tree_stump_01, tree_stump_02, dead_tree_trunk_02, rock_moss_set_01, rock_moss_set_02, root_cluster_01, fern_02, shrub_02, shrub_03, shrub_04, moss_01 | forest_ground_04 |
-| Coast | coast_rocks_01, coastal_cliff_01, coast_rocks_05, sand_rocks_small_01, grass_bermuda_01 | coast_sand_01 |
-| Desert | quiver_tree_01, quiver_tree_02, dead_quiver_trunk, namaqualand_boulder_02, namaqualand_boulder_03, namaqualand_boulder_05, namaqualand_rocks_01, boulder_01, cheiridopsis_succulent, flower_ursinia | gravelly_sand |
-
-No openly licensed outdoor Gaussian-splat scans suitable for bundling were
-found (checked 2026-11-22): SuperSplat's downloadable outdoor scenes were
-CC BY-NC, CC BY-NC-SA or CC BY-SA, or listed no licence; the 3ds-scan.de sets
-are CC BY-SA 4.0; the Steam Studio pages offered no CC0 files we could find.

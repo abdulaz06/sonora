@@ -78,9 +78,6 @@ export const COMBOS = [
   { id: 'cover-dark', style: 'cover', variant: 'cover', depth: false, light: 'dark' },
   { id: 'echo-glow', style: 'echo', variant: 'glow', depth: false },
   { id: 'echo-trace', style: 'echo', variant: 'trace', depth: false, light: 'light' },
-  { id: 'memory-forest', style: 'memory', variant: 'forest', depth: false },
-  { id: 'memory-coast', style: 'memory', variant: 'coast', depth: false },
-  { id: 'memory-desert', style: 'memory', variant: 'desert', depth: false },
 ];
 /** The 1.2 combos (palette-matrix --combos new12). */
 export const NEW12 = COMBOS.slice(COMBOS.findIndex((c) => c.id === 'silk-helix-flat')).map((c) => c.id);

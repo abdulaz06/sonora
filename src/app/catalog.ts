@@ -151,18 +151,6 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
       { id: 'trace', label: 'Trace', line: 'Red and violet echoes on a bright ground.', media: 'echo-trace' },
     ],
   },
-  memory: {
-    id: 'memory', label: 'Memory',
-    line: 'A walk through a scanned place; every kick sends a ring of light through it.',
-    more: 'Made of hundreds of thousands of points from real photoscans. Each kick sends a ring of light out through the scene and lifts a few points off, builds pull the world apart and the drop snaps it back. Quiet passages turn it into a glowing point cloud.',
-    suits: 'ambient, lo-fi, chill',
-    heavy: true,
-    looks: [
-      { id: 'forest', label: 'Forest', line: 'Pines and ferns fading into white fog.', media: 'memory-forest' },
-      { id: 'coast', label: 'Coast', line: 'Rocks and dune grass along a cliff.', media: 'memory-coast' },
-      { id: 'desert', label: 'Desert', line: 'Quiver trees and boulders at night.', media: 'memory-desert' },
-    ],
-  },
   aura: {
     id: 'aura', label: 'Aura', line: 'The original rings, particles and glow from sonora 0.1.', more: 'Classic.', suits: 'nostalgia',
     looks: [],
@@ -174,7 +162,7 @@ export const STYLE_INFO: Record<StyleId, StyleInfo> = {
 };
 
 /** 1.2 styles (hidden on the deployed website until the release, see release.ts). */
-export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo', 'memory'];
+export const NEW_STYLES_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo'];
 export const ART_STYLES: StyleId[] = ['ink', 'silk', 'wisp', 'warp', 'voyage', ...(SHOW_12 ? NEW_STYLES_12 : [])];
 export const CLASSIC_STYLES: StyleId[] = ['aura', 'halo'];
 
@@ -224,9 +212,6 @@ const PIECES_12: Piece[] = [
   { id: 'cover', style: 'cover', look: 'cover', label: 'Cover', views: ['flat'], energy: 0.5, media: 'cover' },
   { id: 'echo:glow', style: 'echo', look: 'glow', label: 'Echo · Glow', views: ['flat'], energy: 0.6, media: 'echo-glow' },
   { id: 'echo:trace', style: 'echo', look: 'trace', label: 'Echo · Trace', views: ['flat'], energy: 0.45, media: 'echo-trace' },
-  { id: 'memory:forest', style: 'memory', look: 'forest', label: 'Memory · Forest', views: ['flat'], energy: 0.25, media: 'memory-forest' },
-  { id: 'memory:coast', style: 'memory', look: 'coast', label: 'Memory · Coast', views: ['flat'], energy: 0.3, media: 'memory-coast' },
-  { id: 'memory:desert', style: 'memory', look: 'desert', label: 'Memory · Desert', views: ['flat'], energy: 0.35, media: 'memory-desert' },
 ];
 export const PIECES: Piece[] = [
   { id: 'ink:glow', style: 'ink', look: 'glow', label: 'Ink · Glow', views: ['depth', 'flat'], energy: 0.45, media: 'ink-glow' },

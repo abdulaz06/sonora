@@ -22,13 +22,12 @@ const LOADERS: Record<StyleId, () => Promise<Factory>> = {
   glass: () => import('./glass/glass').then((m) => m.createGlassStyle),
   cover: () => import('./cover/cover').then((m) => m.createCoverStyle),
   echo: () => import('./echo/echo').then((m) => m.createEchoStyle),
-  memory: () => import('./memory/memory').then((m) => m.createMemoryStyle),
   aura: () => import('./classic/aura').then((m) => m.createAuraStyle),
   halo: () => import('./classic/halo-spectrum').then((m) => m.createHaloStyle),
 };
 const factories: Partial<Record<StyleId, Factory>> = {};
 /** 1.2 styles: hidden from pickers on the deployed website until the release (release.ts). */
-const UNRELEASED_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo', 'memory'];
+const UNRELEASED_12: StyleId[] = ['stage', 'cymatics', 'glass', 'cover', 'echo'];
 const loading: Partial<Record<StyleId, Promise<Factory>>> = {};
 
 /** Load a style's code (once). */
@@ -118,13 +117,6 @@ export const STYLES: StyleDescriptor[] = [
     variants: STYLE_VARIANTS.echo, defaultVariant: 'glow',
     supportsLight: true, supportsDepth: false, defaultDepth: false,
     create: lazy('echo'),
-  },
-  {
-    id: 'memory', label: 'Memory', category: 'art',
-    glyphKick: 1,
-    variants: STYLE_VARIANTS.memory, defaultVariant: 'forest',
-    supportsLight: false, supportsDepth: false, defaultDepth: false,
-    create: lazy('memory'),
   },
   {
     id: 'aura', label: 'Aura', category: 'classic',

@@ -322,7 +322,7 @@ function exposeHarness(renderer: ReturnType<typeof initRenderer>, source: WasmFr
       if (!pcm) throw new Error('could not decode wav');
       source.loadOffline(pcm.mono, pcm.sampleRate);
       hits.length = 0;
-      // Styles that fetch assets (Memory's scenes, Echo's moves) have them before rendering starts.
+      // Styles that fetch assets (Echo's moves) have them before rendering starts.
       await assetsSettled();
       return { duration: pcm.mono.length / pcm.sampleRate, sampleRate: pcm.sampleRate };
     },

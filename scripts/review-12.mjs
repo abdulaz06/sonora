@@ -36,14 +36,10 @@ export const ITEMS = [
   ['cover-art', 'Cover · with a cover (synthetic test cover)', 'cover', 'cover', 'flat', 'auto', '', 'Cover', 'busy-02.jpg'],
   ['echo-glow', 'Echo · Glow', 'echo', 'glow', 'flat', 'auto', '', 'Echo'],
   ['echo-trace', 'Echo · Trace', 'echo', 'trace', 'flat', 'auto', '', 'Echo'],
-  ['memory-forest', 'Memory · Forest', 'memory', 'forest', 'flat', 'auto', '', 'Memory'],
-  ['memory-coast', 'Memory · Coast', 'memory', 'coast', 'flat', 'auto', '', 'Memory'],
-  ['memory-desert', 'Memory · Desert', 'memory', 'desert', 'flat', 'auto', '', 'Memory'],
   ['glyph-ink', 'Glyph filter · over Ink Glow', 'ink', 'glow', 'depth', 'auto', 'glyph', 'Filters'],
   ['glyph-stage', 'Glyph filter (large) · over Stage Arena', 'stage', 'arena', 'flat', 'auto', 'glyph:large', 'Filters'],
   ['reeded-silk', 'Reeded glass · vertical · over Silk', 'silk', 'silk', 'flat', 'auto', 'reeded', 'Filters'],
   ['reeded-glass', 'Reeded glass · radial · over Glass Bubbles', 'glass', 'bubbles', 'flat', 'auto', 'reeded:radial', 'Filters'],
-  ['reeded-memory', 'Reeded glass · angled, wide · over Memory Forest', 'memory', 'forest', 'flat', 'auto', 'reeded:angled:wide', 'Filters'],
 ];
 
 const COVERS = 'C:/Users/abdul/OneDrive/Documents/sonora/local-media/covers/test';
@@ -143,9 +139,8 @@ const mb = (n) => `${(n / 1e6).toFixed(2)} MB`;
 function html() {
   const summary = read(join(OUT, 'summary.html'));
   const sizes = [
-    ['Memory scenes (forest, coast, desert)', ['forest', 'coast', 'desert'].reduce((a, s) => a + sizeOf(join(ROOT, 'src/assets/memory', `${s}.splat`)), 0)],
     ['Echo moves', sizeOf(join(ROOT, 'src/assets/echo/moves.bin'))],
-    ['New thumbnails, loops, (i) pictures', readdirSync(join(ROOT, 'src/assets/media')).filter((f) => /^(stage|cymatics|glass|cover|echo|memory|silk-helix|explain-filter|pal-(stage|cymatics|glass|cover|echo|memory))/.test(f)).reduce((a, f) => a + sizeOf(join(ROOT, 'src/assets/media', f)), 0)],
+    ['New thumbnails, loops, (i) pictures', readdirSync(join(ROOT, 'src/assets/media')).filter((f) => /^(stage|cymatics|glass|cover|echo|silk-helix|explain-filter|pal-(stage|cymatics|glass|cover|echo))/.test(f)).reduce((a, f) => a + sizeOf(join(ROOT, 'src/assets/media', f)), 0)],
   ];
   const groups = [...new Set(ITEMS.map((x) => x[7]))];
   const body = groups.map((g) => `<h2>${g}</h2>` + ITEMS.filter((x) => x[7] === g).map((it) => {
