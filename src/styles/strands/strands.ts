@@ -17,7 +17,7 @@
  */
 
 import { inkExp } from '../../engine/debug-flags';
-import { clamp01, createRng } from '../../engine/math';
+import { clamp01, createRng, lookAt, mat4, multiply, perspective } from '../../engine/math';
 import { simplex2 } from '../../engine/noise';
 import type { SonoraEvent } from '../../engine/events';
 import type { QualityParams } from '../../engine/quality';
@@ -33,6 +33,7 @@ import renderVert from './shaders/render.vert?raw';
 import renderFrag from './shaders/render.frag?raw';
 import displayFrag from './shaders/display.frag?raw';
 import tunnelVert from './shaders/tunnel.vert?raw';
+import helixVert from './shaders/helix.vert?raw';
 import { HIST, TRAIL_LIFE, TUNNEL_FOG, TUNNEL_PATH, TUNNEL_PATH_Y, TUNNEL_RADIUS, TUNNEL_SPAN, Tunnel, tunnelCentre } from './tunnel';
 import fullscreenVert from '../../engine/shaders/fullscreen.vert?raw';
 
@@ -162,6 +163,25 @@ const HX_THIRD_TAU = 0.7;
 const HX_PLUCK = [0.5, 0.16, 1.4];
 /** Thread gain relative to Silk (the threads crowd onto the strands). */
 const HX_GAIN = 0.32;
+/** Helix 3D: column half-height and radius, ring band (× radius), ring tilt; particle shares (threads, rings). */
+const HX3_LEN = 1.0;
+const HX3_RADIUS: [number, number] = [0.16, 0.24];
+const HX3_RING: [number, number] = [2.4, 5.2];
+const HX3_TILT = 0.38;
+const HX3_SHARE: [number, number] = [0.6, 0.35];
+/** Ring orbit speed (rad/s at the inner edge), kick waves: outward speed (radii/s), life (s). */
+const HX3_RING_SPEED: [number, number] = [0.25, 0.9];
+const HX3_WAVE_SPEED = 1.6;
+const HX3_WAVE_LIFE = 2.2;
+/** Depth camera: orbit speed (rad/s) quiet → loud, distance, elevation swing (rad); the drop swoops round. */
+const HX3_ORBIT: [number, number] = [0.08, 0.32];
+const HX3_DIST = 2.7;
+const HX3_EL: [number, number] = [-0.22, 0.55];
+const HX3_SWOOP = 2.6;
+/** Flat: straight down the axis from this height; the view turns slowly. */
+const HX3_TOP = 2.3;
+/** Flat: the column is shorter seen down its axis (its near end would blur past the lens). */
+const HX3_FLAT_LEN = 0.55;
 
 interface Pluck { s: number; age: number; str: number }
 interface Shock { x: number; y: number; r: number; s: number; age: number }
@@ -225,6 +245,9 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
   let hxPhase = rng() * 6.28, hxThird = 0, hxBurst = 0, hxBurstT = 99, hxPluckCd = 0;
   const plucks: Pluck[] = [];
   let hxOrigin: [number, number] | null = null;
+  let hx3Prog: Program | null = null;
+  let hxAz = rng() * 6.28, hxElT = rng() * 6.28, hxSwoop = 0, hxRing = 0, hxTurn = 0;
+  const hxWaves: { r: number; age: number; str: number }[] = [];
   let hxHc = 0.2, hxKick = 0;
   const tunnel = kind === 'wisp' ? new Tunnel(deps.seed) : null;
   let tunnelProg: Program | null = null;
@@ -292,6 +315,78 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     const c = depthCenter(ctx, kind);
     return [c[0] + sx * DEPTH_VIEW * 0.4, c[1] + sy * DEPTH_VIEW * 0.3];
   };
+
+  /** Silk Helix: stateless 3D particles (column, rings, glints) into the accumulation buffer, then the display.
+   *  Depth: an orbiting camera (the rings seen edge-on, from above, from below). Flat: straight down the axis. */
+  function renderHelix3D(ctx: StyleContext, depth: boolean): void {
+    const pal = ctx.palette;
+    const cam = ctx.camera;
+    hx3Prog ??= makeProgram(gl, inc(helixVert), inc(renderFrag), `${def}
+#define HELIX3D 1`);
+    const glowK = clamp01(ctx.intensityGlow);
+    const build = ctx.eventState.buildProgress;
+    const aspect = ctx.width / ctx.height;
+    const R = HX3_RADIUS[0] + (HX3_RADIUS[1] - HX3_RADIUS[0]) * glowK;
+    // Camera.
+    const view = mat4(), proj = mat4(), vp = mat4();
+    let eye: [number, number, number];
+    let fov: number;
+    if (depth) {
+      // Builds rise toward a view from above and come closer; the drop swoops round.
+      const el = HX3_EL[0] + (HX3_EL[1] - HX3_EL[0]) * (0.5 + 0.5 * Math.sin(hxElT)) + 0.6 * build;
+      const dist = HX3_DIST * (1 - 0.25 * build) * (1 - 0.1 * cam.lurchAmount) * (aspect < 1 ? 1.5 : 1);
+      eye = [Math.sin(hxAz) * Math.cos(el) * dist, Math.sin(el) * dist, Math.cos(hxAz) * Math.cos(el) * dist];
+      lookAt(view, eye, [0, 0.05 * Math.sin(time * 0.2), 0], [Math.sin(cam.roll) * Math.cos(hxAz), Math.cos(cam.roll), -Math.sin(cam.roll) * Math.sin(hxAz)]);
+      fov = 46 * Math.PI / 180 + (cam.fov - 52 * Math.PI / 180) * 0.7;
+    } else {
+      eye = [0, HX3_TOP * (aspect < 1 ? 1.4 : 1) * (1 - 0.08 * cam.lurchAmount), 0];
+      lookAt(view, eye, [0, 0, 0], [Math.sin(hxTurn + cam.roll), 0, -Math.cos(hxTurn + cam.roll)]);
+      fov = 62 * Math.PI / 180 + (cam.fov - 52 * Math.PI / 180) * 0.7;
+    }
+    perspective(proj, fov, aspect, 0.05, 60);
+    multiply(vp, proj, view);
+    const count = Math.floor(side * side * cfg.count);
+    const pl: number[] = [];
+    for (let i = 0; i < 4; i++) { const q = plucks[i]; pl.push(q ? q.s * HX3_LEN : 0, q ? q.age : 9, q ? q.str : 0, 0); }
+    const wv: number[] = [];
+    for (let i = 0; i < 4; i++) { const w = hxWaves[i]; wv.push(w ? w.r * R : 0, w ? w.age : 9, w ? w.str : 0, 0); }
+
+    bindTarget(gl, accum!);
+    gl.enable(gl.BLEND);
+    gl.useProgram(fill.prog);
+    gl.blendFunc(gl.ZERO, gl.CONSTANT_ALPHA);
+    gl.blendColor(0, 0, 0, Math.pow(HX_DECAY, ctx.dt * 60));
+    setUniforms(gl, fill, { u_color: [0, 0, 0, 0] });
+    drawQuad(gl, quadVAO);
+    gl.useProgram(hx3Prog.prog);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    setUniforms(gl, hx3Prog, {
+      u_view_proj: vp, u_cam_pos: eye, u_time: time, u_point: cfg.point * Math.max(1, ctx.height / 1080),
+      u_gain: cfg.gain * HX_GAIN * (0.6 + 0.8 * ctx.fadeInOut),
+      u_thread_count: Math.floor(count * HX3_SHARE[0]), u_ring_count: Math.floor(count * HX3_SHARE[1]),
+      u_len: depth ? HX3_LEN : HX3_FLAT_LEN, u_radius: R, u_twist: (HX_DEPTH_TURNS * 2 * Math.PI) / (2 * HX3_LEN) * (1 + HX_BUILD_TWIST * build),
+      u_phase: hxPhase, u_third: hxThird, u_burst: hxBurst, u_flow: HX3_LEN * (0.06 + 0.2 * speedEnv),
+      u_pluck: pl, u_pluck_count: 4, u_kick: hxKick,
+      u_ring_r: [HX3_RING[0] * R, HX3_RING[1] * R], u_ring_tilt: HX3_TILT * (depth ? 1 : 0.35), u_ring_phase: hxRing,
+      u_waves: wv, u_wave_count: 4, u_fog: [6, 14],
+    });
+    gl.bindVertexArray(emptyVAO);
+    gl.drawArrays(gl.POINTS, 0, count);
+    gl.bindVertexArray(null);
+    gl.disable(gl.BLEND);
+
+    ctx.bindScene();
+    const dp = helixPrograms(false).display;
+    gl.useProgram(dp.prog);
+    setUniforms(gl, dp, {
+      u_accum: accum!.tex[0], u_res: [ctx.width, ctx.height], u_time: time,
+      u_bg: pal.bg, u_paper: pal.paper, u_c0: pal.primary, u_c1: pal.secondary, u_c2: pal.accent, u_c3: pal.highlight, u_shade: pal.shade,
+      u_light: false, u_gain: cfg.display, u_fade: ctx.fadeInOut, u_pulse: ctx.bassHits, u_smoke_hue: inkExp('smokeHue', SMOKE_HUE),
+      u_agent_count: 0,
+    });
+    drawQuad(gl, quadVAO);
+    ctx.post.bloom = 0.6;
+  }
 
   /** Wisp Depth Tunnel: stateless tunnel particles into the accumulation buffer, then flames on top. */
   function renderTunnel(ctx: StyleContext, tn: Tunnel): void {
@@ -383,7 +478,7 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
     onEvent(e: SonoraEvent, ctx: StyleContext): void {
       if (kind === 'silk' && helixOn()) {
         // Helix: the drop unwinds it into a burst (it re-forms as the burst eases).
-        if (e.type === 'drop') hxBurstT = 0;
+        if (e.type === 'drop') { hxBurstT = 0; hxSwoop = 1; }
       } else if (kind === 'silk') {
         if (e.type === 'drop') { cut(ctx, CUT_BEATS_DROP); burst = 1; formT = 0; formRot = rng() * Math.PI; }
         else if (e.type === 'bigHit' && rng() < CUT_HIT_CHANCE) cut(ctx, CUT_BEATS_HIT);
@@ -421,11 +516,20 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
         hxPluckCd -= dt;
         if (ctx.bassHits > HX_PLUCK[0] && hxPluckCd <= 0 && fade > 0.1) {
           plucks.push({ s: (rng() - 0.5) * 1.2, age: 0, str: ctx.bassHits });
+          hxWaves.push({ r: HX3_RING[0], age: 0, str: ctx.bassHits });
           if (plucks.length > 4) plucks.shift();
           hxPluckCd = HX_PLUCK[1];
         }
         for (const q of plucks) q.age += dt;
         while (plucks.length && plucks[0].age > HX_PLUCK[2]) plucks.shift();
+        // 3D: the rings orbit, kicks send a wave out through them, the camera orbits (the drop swoops).
+        hxRing += dt * (HX3_RING_SPEED[0] + (HX3_RING_SPEED[1] - HX3_RING_SPEED[0]) * ctx.intensitySmoothed) * (0.35 + 0.65 * fade);
+        for (const w of hxWaves) { w.age += dt; w.r += dt * HX3_WAVE_SPEED * HX3_RING[0]; }
+        while (hxWaves.length > 4 || (hxWaves.length && hxWaves[0].age > HX3_WAVE_LIFE)) hxWaves.shift();
+        hxSwoop *= Math.exp(-dt / 1.4);
+        hxAz += dt * (HX3_ORBIT[0] + (HX3_ORBIT[1] - HX3_ORBIT[0]) * ctx.intensitySmoothed + HX3_SWOOP * hxSwoop) * (0.4 + 0.6 * fade);
+        hxElT += dt * (0.09 + 0.12 * ctx.intensitySmoothed);
+        hxTurn += dt * (0.05 + 0.15 * ctx.intensitySmoothed + 1.5 * hxSwoop);
       }
 
       // Silk shockwaves on bass hits.
@@ -543,7 +647,8 @@ precision highp float; uniform vec4 u_color; out vec4 frag; void main() { frag =
       }
       if (wasTunnel) { wasTunnel = false; needsInit = true; }
       const helix = helixOn();
-      const prog = helix ? helixPrograms(depth) : depth ? { ...p, ...depthPrograms() } : p;
+      if (helix) { renderHelix3D(ctx, depth); return; }
+      const prog = depth ? { ...p, ...depthPrograms() } : p;
       // The simulated region: the 2D view in Flat, the ground ahead in Depth.
       const view = depth ? DEPTH_VIEW : cam.viewHeight;
       const vw: View = depth ? { center: depthCenter(ctx, kind), rot: 0 } : viewOf(ctx, kind);

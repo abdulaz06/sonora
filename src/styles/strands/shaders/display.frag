@@ -73,6 +73,9 @@ void main() {
     // Helix glints burn whiter than the threads, leaning to the primary (a dim yellow-white read
     // olive in Ember, grey in Sunset: colour gate).
     col += mix(u_c0, vec3(1.0), 0.35) * dust * 0.6 * e;
+    // Rings: fine dust bands in the secondary, brightest where they're densest.
+    float rg = 1.0 - exp(-acc.b * u_gain * 0.9);
+    col += mix(u_c1, u_c3, 0.25 * smoothstep(0.5, 1.0, rg)) * rg * 0.95 * e;
 #else
     col += mix(u_c0, u_c3, 0.6) * dust * 0.9 * e;
 #endif
