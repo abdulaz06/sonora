@@ -34,6 +34,24 @@ CLIPS = [
     ('60_08', 60, 0.0, None, 'salsa-b'),
     ('55_02', 120, 0.0, None, 'lambada'),
     ('141_12', 120, 0.0, None, 'twist'),
+    # 1.2 rework: a wider vocabulary (at most 40 s each).
+    ('05_05', 120, 0.0, 40.0, 'modern-tour'),
+    ('05_07', 120, 0.0, 40.0, 'modern-attitude'),
+    ('05_11', 120, 0.0, 40.0, 'modern-steps'),
+    ('05_12', 120, 0.0, 40.0, 'modern-high'),
+    ('05_17', 120, 0.0, 40.0, 'modern-leap'),
+    ('05_18', 120, 0.0, 40.0, 'modern-bend'),
+    ('55_01', 120, 0.0, 40.0, 'whirl'),
+    ('60_04', 60, 0.0, 40.0, 'salsa-c'),
+    ('60_10', 60, 0.0, 40.0, 'salsa-d'),
+    ('61_03', 60, 0.0, 40.0, 'salsa-e'),
+    ('61_07', 60, 0.0, 40.0, 'salsa-f'),
+    ('61_12', 60, 0.0, 40.0, 'salsa-g'),
+    ('90_28', 120, 0.0, 40.0, 'breakdance'),
+    ('90_30', 120, 0.0, 40.0, 'russian-a'),
+    ('90_31', 120, 0.0, 40.0, 'russian-b'),
+    ('120_05', 120, 0.0, 40.0, 'mickey'),
+    ('143_35', 120, 0.0, 40.0, 'macarena'),
 ]
 JOINTS = ['root', 'lowerback', 'upperback', 'thorax', 'lowerneck', 'upperneck', 'head',
           'lclavicle', 'lhumerus', 'lradius', 'lwrist', 'lhand',
@@ -168,7 +186,7 @@ def main():
             bones_out = [(names.index(parent[n]), names.index(n)) for n in names if n in parent and parent[n] in names]
         frames = parse_amc(src / f'{file}.amc')
         step = fps_in / FPS_OUT
-        idx = np.arange(int(t0 * fps_in), len(frames) if t1 is None else int(t1 * fps_in), step).astype(int)
+        idx = np.arange(int(t0 * fps_in), len(frames) if t1 is None else min(len(frames), int(t1 * fps_in)), step).astype(int)
         J = np.array([[pose(bones, hierarchy, frames[i])[n] for n in names] for i in idx])
         # Keep the dancer near the middle: subtract a slow moving average of the root's x/z.
         k = int(FPS_OUT * 3)

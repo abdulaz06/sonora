@@ -12,10 +12,11 @@ import { fileURLToPath } from 'node:url';
 import ffmpegPath from 'ffmpeg-static';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'verify', 'review-1.2');
+const OUT = process.env.REVIEW_OUT ? join(ROOT, process.env.REVIEW_OUT) : join(ROOT, 'verify', 'review-1.2');
 const SCRATCH = process.env.REVIEW_SCRATCH || join(process.env.TEMP || '/tmp', 'sonora-review-12');
 const ARC = [10, 22, 34, 44, 50.5, 58, 72, 88];
-const CLIP = [38, 24];
+// REVIEW_CLIP=start,seconds and REVIEW_OUT=<dir> for prototype clips.
+const CLIP = (process.env.REVIEW_CLIP || '38,24').split(',').map(Number);
 const STILL_916 = 52;
 
 // id, title, style, look, view, light, filter, group
